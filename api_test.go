@@ -471,6 +471,28 @@ func TestProtocolAbortsOnInvalidRistrettoEncoding(t *testing.T) {
 	}
 }
 
+func TestResponderPrevalidatesInvalidInitiatorShareBeforeRandomness(t *testing.T) {
+	invalid := mustLoadDraftInvalidVector(t)
+	cases := []struct {
+		name string
+		ya   []byte
+	}{
+		{"non-canonical", invalid.InvalidY1},
+		{"identity", invalid.InvalidY2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := testConfig()
+			cfg.Rand = failingReader{err: io.ErrUnexpectedEOF}
+			badA := encodeMessageA([]byte("sid"), tc.ya, nil)
+			_, _, err := Respond(cfg, badA)
+			if !errors.Is(err, ErrAbort) || errors.Is(err, ErrRandomness) {
+				t.Fatalf("Respond err=%v", err)
+			}
+		})
+	}
+}
+
 func TestInitiatorAbortsOnInvalidResponderShare(t *testing.T) {
 	invalid := mustLoadDraftInvalidVector(t)
 	cases := []struct {

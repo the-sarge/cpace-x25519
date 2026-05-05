@@ -74,12 +74,8 @@ func scalarMult(s *ristretto255.Scalar, p *ristretto255.Element) []byte {
 }
 
 func scalarMultVFY(s *ristretto255.Scalar, encoded []byte) ([]byte, bool) {
-	// Defensive for internal callers; public message decoders enforce pointSize.
-	if len(encoded) != pointSize {
-		return clone(identityEncoding), false
-	}
-	p, err := ristretto255.NewIdentityElement().SetCanonicalBytes(encoded)
-	if err != nil {
+	p, ok := decodePublicShare(encoded)
+	if !ok {
 		return clone(identityEncoding), false
 	}
 	out := ristretto255.NewIdentityElement().ScalarMult(s, p).Bytes()
@@ -87,6 +83,21 @@ func scalarMultVFY(s *ristretto255.Scalar, encoded []byte) ([]byte, bool) {
 		return clone(identityEncoding), false
 	}
 	return out, true
+}
+
+func decodePublicShare(encoded []byte) (*ristretto255.Element, bool) {
+	// Defensive for internal callers; public message decoders enforce pointSize.
+	if len(encoded) != pointSize {
+		return nil, false
+	}
+	p, err := ristretto255.NewIdentityElement().SetCanonicalBytes(encoded)
+	if err != nil {
+		return nil, false
+	}
+	if hmac.Equal(p.Bytes(), identityEncoding) {
+		return nil, false
+	}
+	return p, true
 }
 
 func deriveISK(sid, k, transcript []byte) []byte {
