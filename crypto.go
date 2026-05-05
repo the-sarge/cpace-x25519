@@ -112,6 +112,9 @@ func scalarMultVFY(s *ristretto255.Scalar, encoded []byte) ([]byte, bool) {
 }
 
 func deriveISK(sid, k, transcript []byte) []byte {
+	// lvCat fixes the DSI, sid, and K boundaries. The remaining raw transcript
+	// is injective for the public initiator-responder flow because transcriptIR
+	// has a fixed sequence of length-value fields.
 	prefix := lvCat([]byte(dsiISK), sid, k)
 	material := make([]byte, len(prefix)+len(transcript))
 	copy(material, prefix)
