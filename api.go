@@ -29,10 +29,13 @@ type Suite byte
 
 // Config contains the local inputs for one CPace role.
 //
-// Password, InitiatorID, and ResponderID must be non-empty. Context,
-// SessionID, and AssociatedData may be empty. The AssociatedData field is ADa
-// for Start and ADb for Respond. All byte slices are copied by Start and
-// Respond before use.
+// Password, InitiatorID, and ResponderID must be non-empty. Context and
+// AssociatedData may be empty. SessionID may be empty because draft-21 only
+// recommends a unique sid, but callers should provide a fresh, non-secret,
+// parties-agree-on value for every session; an empty sid weakens replay and
+// transcript separation properties. The AssociatedData field is ADa for Start
+// and ADb for Respond. All byte slices are copied by Start and Respond before
+// use.
 type Config struct {
 	Password       []byte
 	InitiatorID    []byte
@@ -42,6 +45,8 @@ type Config struct {
 	AssociatedData []byte
 
 	// Rand supplies scalar randomness. If nil, crypto/rand.Reader is used.
+	// Custom readers must be CSPRNGs that provide fresh entropy for every
+	// exchange; deterministic readers are for tests only.
 	Rand io.Reader
 }
 
@@ -151,7 +156,8 @@ func Respond(cfg Config, messageA []byte) (*Responder, []byte, error) {
 }
 
 // Finish consumes message B, verifies the responder confirmation tag, and
-// returns message C plus an authenticated session.
+// returns message C plus an authenticated session. The initiator state is
+// consumed even when message parsing or confirmation fails.
 func (i *Initiator) Finish(messageB []byte) ([]byte, *Session, error) {
 	if i == nil {
 		return nil, nil, fmt.Errorf("%w: nil initiator", ErrInvalidInput)
@@ -180,7 +186,8 @@ func (i *Initiator) Finish(messageB []byte) ([]byte, *Session, error) {
 }
 
 // Finish consumes message C, verifies the initiator confirmation tag, and
-// returns an authenticated session.
+// returns an authenticated session. The responder state is consumed even when
+// message parsing or confirmation fails.
 func (r *Responder) Finish(messageC []byte) (*Session, error) {
 	if r == nil {
 		return nil, fmt.Errorf("%w: nil responder", ErrInvalidInput)

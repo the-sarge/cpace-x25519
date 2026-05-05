@@ -3,6 +3,7 @@ package cpace
 import (
 	"bytes"
 	"errors"
+	"io"
 	"sync"
 	"testing"
 )
@@ -22,6 +23,14 @@ func (r *repeatingReader) Read(p []byte) (int, error) {
 		r.off++
 	}
 	return len(p), nil
+}
+
+type failingReader struct {
+	err error
+}
+
+func (r failingReader) Read([]byte) (int, error) {
+	return 0, r.err
 }
 
 func testConfig() Config {
@@ -130,8 +139,77 @@ func TestInputValidation(t *testing.T) {
 func TestScalarSamplingRejectsRepeatedZero(t *testing.T) {
 	cfg := testConfig()
 	cfg.Rand = &repeatingReader{buf: []byte{0}}
-	if _, _, err := Start(cfg); !errors.Is(err, ErrInvalidInput) {
+	if _, _, err := Start(cfg); !errors.Is(err, ErrRandomness) || errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("Start err=%v", err)
+	}
+}
+
+func TestScalarSamplingWrapsRandomnessReadFailure(t *testing.T) {
+	cfg := testConfig()
+	cfg.Rand = failingReader{err: io.ErrUnexpectedEOF}
+	if _, _, err := Start(cfg); !errors.Is(err, ErrRandomness) ||
+		errors.Is(err, ErrInvalidInput) ||
+		!errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("Start err=%v", err)
+	}
+}
+
+func TestProtocolCompletesWithEmptySessionID(t *testing.T) {
+	cases := []struct {
+		name    string
+		initSID []byte
+		respSID []byte
+	}{
+		{"nil nil", nil, nil},
+		{"empty empty", []byte{}, []byte{}},
+		{"nil empty", nil, []byte{}},
+		{"empty nil", []byte{}, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			initCfg := testConfig()
+			initCfg.SessionID = tc.initSID
+			initCfg.AssociatedData = []byte("ADa")
+			initCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x11}, 32)}
+			respCfg := testConfig()
+			respCfg.SessionID = tc.respSID
+			respCfg.AssociatedData = []byte("ADb")
+			respCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x22}, 32)}
+			sI, sR := completeExchange(t, initCfg, respCfg)
+			if !bytes.Equal(sI.TranscriptID(), sR.TranscriptID()) {
+				t.Fatalf("transcript IDs differ")
+			}
+		})
+	}
+}
+
+func TestProtocolRejectsAsymmetricSessionID(t *testing.T) {
+	cases := []struct {
+		name    string
+		initSID []byte
+		respSID []byte
+	}{
+		{"initiator non-empty responder nil", []byte("sid"), nil},
+		{"initiator nil responder non-empty", nil, []byte("sid")},
+		{"initiator non-empty responder empty", []byte("sid"), []byte{}},
+		{"initiator empty responder non-empty", []byte{}, []byte("sid")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			initCfg := testConfig()
+			initCfg.SessionID = tc.initSID
+			initCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x11}, 32)}
+			respCfg := testConfig()
+			respCfg.SessionID = tc.respSID
+			respCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x22}, 32)}
+			_, msgA, err := Start(initCfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err := Respond(respCfg, msgA); !errors.Is(err, ErrMessage) {
+				t.Fatalf("Respond err=%v", err)
+			}
+		})
 	}
 }
 
@@ -254,16 +332,70 @@ func TestMessageParserRejectsMalformed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for name, msg := range map[string][]byte{
-		"truncated": msgA[:len(msgA)-1],
-		"trailing":  append(clone(msgA), 0),
-		"version":   append([]byte{0}, msgA[1:]...),
-		"suite":     append([]byte{msgA[0], 0}, msgA[2:]...),
-		"role":      append([]byte{msgA[0], msgA[1], roleB}, msgA[3:]...),
-	} {
-		t.Run(name, func(t *testing.T) {
-			if _, err := decodeMessageA(msg); err == nil {
+	cases := []struct {
+		name string
+		msg  []byte
+	}{
+		{"truncated", msgA[:len(msgA)-1]},
+		{"trailing", append(clone(msgA), 0)},
+		{"format", append([]byte{0}, msgA[1:]...)},
+		{"suite", append([]byte{msgA[0], 0}, msgA[2:]...)},
+		{"role", append([]byte{msgA[0], msgA[1], roleB}, msgA[3:]...)},
+		{"swapped format suite", append([]byte{wireSuite, wireFormatV1}, msgA[2:]...)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := decodeMessageA(tc.msg); err == nil {
 				t.Fatalf("decode succeeded")
+			}
+		})
+	}
+}
+
+func TestMessageParsersRejectMalformedBAndC(t *testing.T) {
+	msgB := encodeMessageB(bytes.Repeat([]byte{0x42}, pointSize), []byte("ADb"), bytes.Repeat([]byte{0x99}, tagSize))
+	casesB := []struct {
+		name string
+		msg  []byte
+	}{
+		{"truncated", msgB[:len(msgB)-1]},
+		{"trailing", append(clone(msgB), 0)},
+		{"format", append([]byte{0}, msgB[1:]...)},
+		{"suite", append([]byte{msgB[0], 0}, msgB[2:]...)},
+		{"role", append([]byte{msgB[0], msgB[1], roleA}, msgB[3:]...)},
+		{"swapped format suite", append([]byte{wireSuite, wireFormatV1}, msgB[2:]...)},
+		{"point len", encodeMessageB(bytes.Repeat([]byte{0x42}, pointSize-1), nil, bytes.Repeat([]byte{0x99}, tagSize))},
+		{"tag len", encodeMessageB(bytes.Repeat([]byte{0x42}, pointSize), nil, bytes.Repeat([]byte{0x99}, tagSize-1))},
+		{"leb128", []byte{wireFormatV1, wireSuite, roleB, 0x80, 0x00}},
+		{"oversized", append([]byte{wireFormatV1, wireSuite, roleB}, encodeLEB128(maxFieldLength+1)...)},
+	}
+	for _, tc := range casesB {
+		t.Run("B "+tc.name, func(t *testing.T) {
+			if _, err := decodeMessageB(tc.msg); err == nil {
+				t.Fatalf("decode B succeeded")
+			}
+		})
+	}
+
+	msgC := encodeMessageC(bytes.Repeat([]byte{0x99}, tagSize))
+	casesC := []struct {
+		name string
+		msg  []byte
+	}{
+		{"truncated", msgC[:len(msgC)-1]},
+		{"trailing", append(clone(msgC), 0)},
+		{"format", append([]byte{0}, msgC[1:]...)},
+		{"suite", append([]byte{msgC[0], 0}, msgC[2:]...)},
+		{"role", append([]byte{msgC[0], msgC[1], roleA}, msgC[3:]...)},
+		{"swapped format suite", append([]byte{wireSuite, wireFormatV1}, msgC[2:]...)},
+		{"tag len", encodeMessageC(bytes.Repeat([]byte{0x99}, tagSize-1))},
+		{"leb128", []byte{wireFormatV1, wireSuite, roleC, 0x80, 0x00}},
+		{"oversized", append([]byte{wireFormatV1, wireSuite, roleC}, encodeLEB128(maxFieldLength+1)...)},
+	}
+	for _, tc := range casesC {
+		t.Run("C "+tc.name, func(t *testing.T) {
+			if _, err := decodeMessageC(tc.msg); err == nil {
+				t.Fatalf("decode C succeeded")
 			}
 		})
 	}
@@ -332,8 +464,116 @@ func TestStateReuseAndConcurrentFinish(t *testing.T) {
 func TestProtocolAbortsOnInvalidRistrettoEncoding(t *testing.T) {
 	cfg := testConfig()
 	cfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x22}, 32)}
-	badA := encodeMessageA([]byte("sid"), hx(t, "2b3c6b8c4f3800e7aef6864025b4ed79bd599117e427c41bd47d93d654b4a51c"), nil)
+	invalid := mustLoadDraftInvalidVector(t)
+	badA := encodeMessageA([]byte("sid"), invalid.InvalidY1, nil)
 	if _, _, err := Respond(cfg, badA); !errors.Is(err, ErrAbort) {
 		t.Fatalf("Respond err=%v", err)
 	}
+}
+
+func TestInitiatorAbortsOnInvalidResponderShare(t *testing.T) {
+	invalid := mustLoadDraftInvalidVector(t)
+	cases := []struct {
+		name string
+		yb   []byte
+	}{
+		{"non-canonical", invalid.InvalidY1},
+		{"identity", invalid.InvalidY2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := testConfig()
+			cfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x11}, 32)}
+			initiator, _, err := Start(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			msgB := encodeMessageB(tc.yb, nil, bytes.Repeat([]byte{0x99}, tagSize))
+			if _, _, err := initiator.Finish(msgB); !errors.Is(err, ErrAbort) {
+				t.Fatalf("Finish err=%v", err)
+			}
+		})
+	}
+}
+
+func TestResponderRejectsTamperedMessageC(t *testing.T) {
+	initCfg := testConfig()
+	initCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x11}, 32)}
+	respCfg := testConfig()
+	respCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x22}, 32)}
+	initiator, msgA, err := Start(initCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responder, msgB, err := Respond(respCfg, msgA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msgC, _, err := initiator.Finish(msgB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msgC[len(msgC)-1] ^= 0x01
+	if _, err := responder.Finish(msgC); !errors.Is(err, ErrConfirmationFailed) {
+		t.Fatalf("Finish err=%v", err)
+	}
+}
+
+func TestFinishConsumesStateOnParseFailure(t *testing.T) {
+	initCfg := testConfig()
+	initCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x11}, 32)}
+	respCfg := testConfig()
+	respCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x22}, 32)}
+	initiator, msgA, err := Start(initCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responder, msgB, err := Respond(respCfg, msgA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := initiator.Finish([]byte("garbage")); !errors.Is(err, ErrMessage) {
+		t.Fatalf("initiator Finish garbage err=%v", err)
+	}
+	if _, _, err := initiator.Finish(msgB); !errors.Is(err, ErrStateUsed) {
+		t.Fatalf("initiator second Finish err=%v", err)
+	}
+
+	if _, err := responder.Finish([]byte("garbage")); !errors.Is(err, ErrMessage) {
+		t.Fatalf("responder Finish garbage err=%v", err)
+	}
+	msgC := encodeMessageC(bytes.Repeat([]byte{0x99}, tagSize))
+	if _, err := responder.Finish(msgC); !errors.Is(err, ErrStateUsed) {
+		t.Fatalf("responder second Finish err=%v", err)
+	}
+}
+
+func mustLoadDraftInvalidVector(t *testing.T) draftInvalidVector {
+	t.Helper()
+	v, err := loadDraftInvalidVectorJSON(draft21RistrettoInvalidJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+func completeExchange(t *testing.T, initCfg, respCfg Config) (*Session, *Session) {
+	t.Helper()
+	initiator, msgA, err := Start(initCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responder, msgB, err := Respond(respCfg, msgA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msgC, sI, err := initiator.Finish(msgB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sR, err := responder.Finish(msgC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sI, sR
 }

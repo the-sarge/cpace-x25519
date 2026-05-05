@@ -20,10 +20,16 @@ passwords the first SHA-512 input block length is independent of password
 length, but Go slice allocation and caller-side password handling are not
 constant time.
 
+The draft recommends, but does not require, a unique session identifier. This
+package accepts an empty `SessionID` for draft compatibility, but callers should
+provide a fresh, non-secret, parties-agree-on sid for every session. Empty sids
+weaken replay and transcript separation properties.
+
 Scalar sampling masks bits above group size 252 and rejects zero. This creates a
 secret-dependent loop only for the all-zero masked scalar case. That event has
 negligible probability with a uniform random reader, but the behavior should be
-reviewed for hostile or deterministic random sources.
+reviewed for hostile or deterministic random sources. Sampling failure wraps
+`ErrRandomness`.
 
 ## Memory Handling
 
@@ -49,7 +55,7 @@ point lengths, and invalid tag lengths.
 ## Dependencies
 
 - `github.com/gtank/ristretto255 v0.2.0`
-- `filippo.io/edwards25519 v1.1.0` as an indirect dependency
+- `filippo.io/edwards25519 v1.2.0` as an indirect dependency
 
 Dependency review is not complete. Run `govulncheck ./...` before any release.
 Initial notes are recorded in `docs/dependency-review.md`.
@@ -61,6 +67,8 @@ Do not mark a release production-ready until:
 - official draft-21 Ristretto255/SHA-512 vectors pass
 - `go test ./...` and `go test -race ./...` pass
 - parser and protocol fuzz targets have completed a meaningful run
+- every target in `.github/fuzz-targets.json` has run for more than five
+  minutes on release hardware or the manual long-fuzz workflow
 - `govulncheck ./...` and `staticcheck ./...` pass
 - this assessment and `docs/spec-matrix.md` are reviewed
 - no critical or high independent review findings remain

@@ -35,14 +35,39 @@ func TestStringUtilitiesDraftVectors(t *testing.T) {
 
 func TestLEB128ReaderRejectsMalformed(t *testing.T) {
 	cases := [][]byte{
-		{wireVersion, wireSuite, roleC},
-		{wireVersion, wireSuite, roleC, 0x80},
-		{wireVersion, wireSuite, roleC, 0x80, 0x00},
-		{wireVersion, wireSuite, roleC, 0x80, 0x80, 0x80, 0x80, 0x00},
+		{wireFormatV1, wireSuite, roleC},
+		{wireFormatV1, wireSuite, roleC, 0x80},
+		{wireFormatV1, wireSuite, roleC, 0x80, 0x00},
+		{wireFormatV1, wireSuite, roleC, 0x80, 0x80, 0x80, 0x80, 0x00},
+		append([]byte{wireFormatV1, wireSuite, roleC}, encodeLEB128(maxFieldLength+1)...),
 	}
 	for _, tc := range cases {
 		if _, err := decodeMessageC(tc); err == nil {
 			t.Fatalf("decodeMessageC(%x) succeeded", tc)
 		}
+	}
+}
+
+func TestWireFormatPrefixByte(t *testing.T) {
+	if wireFormatV1 != 0xc1 {
+		t.Fatalf("wireFormatV1=%#x, want 0xc1", wireFormatV1)
+	}
+	cases := []struct {
+		name string
+		msg  []byte
+	}{
+		{"A", encodeMessageA(nil, make([]byte, pointSize), nil)},
+		{"B", encodeMessageB(make([]byte, pointSize), nil, make([]byte, tagSize))},
+		{"C", encodeMessageC(make([]byte, tagSize))},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.msg[0] != wireFormatV1 {
+				t.Fatalf("format prefix=%#x, want %#x", tc.msg[0], wireFormatV1)
+			}
+			if tc.msg[1] != wireSuite {
+				t.Fatalf("suite byte=%#x, want %#x", tc.msg[1], wireSuite)
+			}
+		})
 	}
 }
