@@ -3,13 +3,14 @@ package cpace
 import "fmt"
 
 const (
-	wireVersion    byte = 0x21
-	wireSuite      byte = byte(SuiteCPaceRistretto255SHA512)
-	roleA          byte = 0x01
-	roleB          byte = 0x02
-	roleC          byte = 0x03
-	maxFieldLength      = 1 << 20
-	maxLEB128Bytes      = 4
+	wireFormatV1           byte = 0x01
+	wireSuite              byte = byte(SuiteCPaceRistretto255SHA512)
+	roleA                  byte = 0x01
+	roleB                  byte = 0x02
+	roleC                  byte = 0x03
+	maxFieldLengthLog2          = 20
+	maxFieldLength              = 1 << maxFieldLengthLog2
+	maxLEB128BytesForField      = (maxFieldLengthLog2 + 7) / 7
 )
 
 type messageA struct {
@@ -29,7 +30,7 @@ type messageC struct {
 }
 
 func encodeMessageA(sid, ya, ada []byte) []byte {
-	out := []byte{wireVersion, wireSuite, roleA}
+	out := []byte{wireFormatV1, wireSuite, roleA}
 	out = append(out, prependLen(sid)...)
 	out = append(out, prependLen(ya)...)
 	out = append(out, prependLen(ada)...)
@@ -37,7 +38,7 @@ func encodeMessageA(sid, ya, ada []byte) []byte {
 }
 
 func encodeMessageB(yb, adb, tag []byte) []byte {
-	out := []byte{wireVersion, wireSuite, roleB}
+	out := []byte{wireFormatV1, wireSuite, roleB}
 	out = append(out, prependLen(yb)...)
 	out = append(out, prependLen(adb)...)
 	out = append(out, prependLen(tag)...)
@@ -45,7 +46,7 @@ func encodeMessageB(yb, adb, tag []byte) []byte {
 }
 
 func encodeMessageC(tag []byte) []byte {
-	out := []byte{wireVersion, wireSuite, roleC}
+	out := []byte{wireFormatV1, wireSuite, roleC}
 	out = append(out, prependLen(tag)...)
 	return out
 }
@@ -132,8 +133,8 @@ func newMessageReader(in []byte, wantRole byte) (*messageReader, error) {
 	if len(in) < 3 {
 		return nil, fmt.Errorf("%w: truncated header", ErrMessage)
 	}
-	if in[0] != wireVersion {
-		return nil, fmt.Errorf("%w: wrong version", ErrMessage)
+	if in[0] != wireFormatV1 {
+		return nil, fmt.Errorf("%w: wrong wire format version", ErrMessage)
 	}
 	if in[1] != wireSuite {
 		return nil, fmt.Errorf("%w: wrong suite", ErrMessage)
@@ -162,7 +163,7 @@ func (r *messageReader) readField() ([]byte, error) {
 
 func (r *messageReader) readLEB128() (uint64, error) {
 	var n uint64
-	for i := 0; i < maxLEB128Bytes; i++ {
+	for i := 0; i < maxLEB128BytesForField; i++ {
 		if r.off >= len(r.buf) {
 			return 0, fmt.Errorf("%w: truncated LEB128", ErrMessage)
 		}

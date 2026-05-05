@@ -3,6 +3,7 @@ package cpace
 import (
 	"bytes"
 	"errors"
+	"io"
 	"sync"
 	"testing"
 )
@@ -22,6 +23,14 @@ func (r *repeatingReader) Read(p []byte) (int, error) {
 		r.off++
 	}
 	return len(p), nil
+}
+
+type failingReader struct {
+	err error
+}
+
+func (r failingReader) Read([]byte) (int, error) {
+	return 0, r.err
 }
 
 func testConfig() Config {
@@ -130,8 +139,47 @@ func TestInputValidation(t *testing.T) {
 func TestScalarSamplingRejectsRepeatedZero(t *testing.T) {
 	cfg := testConfig()
 	cfg.Rand = &repeatingReader{buf: []byte{0}}
-	if _, _, err := Start(cfg); !errors.Is(err, ErrInvalidInput) {
+	if _, _, err := Start(cfg); !errors.Is(err, ErrInvalidInput) || !errors.Is(err, ErrRandomness) {
 		t.Fatalf("Start err=%v", err)
+	}
+}
+
+func TestScalarSamplingWrapsRandomnessReadFailure(t *testing.T) {
+	cfg := testConfig()
+	cfg.Rand = failingReader{err: io.ErrUnexpectedEOF}
+	if _, _, err := Start(cfg); !errors.Is(err, ErrInvalidInput) ||
+		!errors.Is(err, ErrRandomness) ||
+		!errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("Start err=%v", err)
+	}
+}
+
+func TestProtocolCompletesWithEmptySessionID(t *testing.T) {
+	cases := []struct {
+		name    string
+		initSID []byte
+		respSID []byte
+	}{
+		{"nil nil", nil, nil},
+		{"empty empty", []byte{}, []byte{}},
+		{"nil empty", nil, []byte{}},
+		{"empty nil", []byte{}, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			initCfg := testConfig()
+			initCfg.SessionID = tc.initSID
+			initCfg.AssociatedData = []byte("ADa")
+			initCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x11}, 32)}
+			respCfg := testConfig()
+			respCfg.SessionID = tc.respSID
+			respCfg.AssociatedData = []byte("ADb")
+			respCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x22}, 32)}
+			sI, sR := completeExchange(t, initCfg, respCfg)
+			if !bytes.Equal(sI.TranscriptID(), sR.TranscriptID()) {
+				t.Fatalf("transcript IDs differ")
+			}
+		})
 	}
 }
 
@@ -269,6 +317,45 @@ func TestMessageParserRejectsMalformed(t *testing.T) {
 	}
 }
 
+func TestMessageParsersRejectMalformedBAndC(t *testing.T) {
+	msgB := encodeMessageB(bytes.Repeat([]byte{0x42}, pointSize), []byte("ADb"), bytes.Repeat([]byte{0x99}, tagSize))
+	for name, msg := range map[string][]byte{
+		"truncated": msgB[:len(msgB)-1],
+		"trailing":  append(clone(msgB), 0),
+		"version":   append([]byte{0}, msgB[1:]...),
+		"suite":     append([]byte{msgB[0], 0}, msgB[2:]...),
+		"role":      append([]byte{msgB[0], msgB[1], roleA}, msgB[3:]...),
+		"point len": encodeMessageB(bytes.Repeat([]byte{0x42}, pointSize-1), nil, bytes.Repeat([]byte{0x99}, tagSize)),
+		"tag len":   encodeMessageB(bytes.Repeat([]byte{0x42}, pointSize), nil, bytes.Repeat([]byte{0x99}, tagSize-1)),
+		"leb128":    {wireFormatV1, wireSuite, roleB, 0x80, 0x00},
+		"oversized": append([]byte{wireFormatV1, wireSuite, roleB}, encodeLEB128(maxFieldLength+1)...),
+	} {
+		t.Run("B "+name, func(t *testing.T) {
+			if _, err := decodeMessageB(msg); err == nil {
+				t.Fatalf("decode B succeeded")
+			}
+		})
+	}
+
+	msgC := encodeMessageC(bytes.Repeat([]byte{0x99}, tagSize))
+	for name, msg := range map[string][]byte{
+		"truncated": msgC[:len(msgC)-1],
+		"trailing":  append(clone(msgC), 0),
+		"version":   append([]byte{0}, msgC[1:]...),
+		"suite":     append([]byte{msgC[0], 0}, msgC[2:]...),
+		"role":      append([]byte{msgC[0], msgC[1], roleA}, msgC[3:]...),
+		"tag len":   encodeMessageC(bytes.Repeat([]byte{0x99}, tagSize-1)),
+		"leb128":    {wireFormatV1, wireSuite, roleC, 0x80, 0x00},
+		"oversized": append([]byte{wireFormatV1, wireSuite, roleC}, encodeLEB128(maxFieldLength+1)...),
+	} {
+		t.Run("C "+name, func(t *testing.T) {
+			if _, err := decodeMessageC(msg); err == nil {
+				t.Fatalf("decode C succeeded")
+			}
+		})
+	}
+}
+
 func TestStateReuseAndConcurrentFinish(t *testing.T) {
 	initCfg := testConfig()
 	initCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x11}, 32)}
@@ -336,4 +423,62 @@ func TestProtocolAbortsOnInvalidRistrettoEncoding(t *testing.T) {
 	if _, _, err := Respond(cfg, badA); !errors.Is(err, ErrAbort) {
 		t.Fatalf("Respond err=%v", err)
 	}
+}
+
+func TestInitiatorAbortsOnInvalidResponderShare(t *testing.T) {
+	cfg := testConfig()
+	cfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x11}, 32)}
+	initiator, _, err := Start(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	badYB := hx(t, "2b3c6b8c4f3800e7aef6864025b4ed79bd599117e427c41bd47d93d654b4a51c")
+	msgB := encodeMessageB(badYB, nil, bytes.Repeat([]byte{0x99}, tagSize))
+	if _, _, err := initiator.Finish(msgB); !errors.Is(err, ErrAbort) {
+		t.Fatalf("Finish err=%v", err)
+	}
+}
+
+func TestResponderRejectsTamperedMessageC(t *testing.T) {
+	initCfg := testConfig()
+	initCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x11}, 32)}
+	respCfg := testConfig()
+	respCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x22}, 32)}
+	initiator, msgA, err := Start(initCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responder, msgB, err := Respond(respCfg, msgA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msgC, _, err := initiator.Finish(msgB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msgC[len(msgC)-1] ^= 0x01
+	if _, err := responder.Finish(msgC); !errors.Is(err, ErrConfirmationFailed) {
+		t.Fatalf("Finish err=%v", err)
+	}
+}
+
+func completeExchange(t *testing.T, initCfg, respCfg Config) (*Session, *Session) {
+	t.Helper()
+	initiator, msgA, err := Start(initCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responder, msgB, err := Respond(respCfg, msgA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msgC, sI, err := initiator.Finish(msgB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sR, err := responder.Finish(msgC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sI, sR
 }

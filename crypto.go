@@ -43,19 +43,19 @@ func sampleScalar(r io.Reader) (*ristretto255.Scalar, error) {
 	var b [scalarSize]byte
 	for attempts := 0; attempts < maxScalarTries; attempts++ {
 		if _, err := io.ReadFull(r, b[:]); err != nil {
-			return nil, fmt.Errorf("%w: scalar randomness: %v", ErrInvalidInput, err)
+			return nil, fmt.Errorf("%w: %w: scalar randomness: %w", ErrInvalidInput, ErrRandomness, err)
 		}
 		b[31] &= 0x0f
 		s, err := ristretto255.NewScalar().SetCanonicalBytes(b[:])
 		if err != nil {
-			return nil, fmt.Errorf("%w: scalar sampling rejected masked bytes", ErrInvalidInput)
+			return nil, fmt.Errorf("%w: %w: scalar sampling rejected masked bytes: %w", ErrInvalidInput, ErrRandomness, err)
 		}
 		if s.Equal(ristretto255.NewScalar().Zero()) == 1 {
 			continue
 		}
 		return s, nil
 	}
-	return nil, fmt.Errorf("%w: scalar randomness produced only zero scalars", ErrInvalidInput)
+	return nil, fmt.Errorf("%w: %w: scalar randomness produced only zero scalars", ErrInvalidInput, ErrRandomness)
 }
 
 func scalarFromCanonical(b []byte) (*ristretto255.Scalar, error) {
@@ -74,6 +74,7 @@ func scalarMult(s *ristretto255.Scalar, p *ristretto255.Element) []byte {
 }
 
 func scalarMultVFY(s *ristretto255.Scalar, encoded []byte) ([]byte, bool) {
+	// Defensive for internal callers; public message decoders enforce pointSize.
 	if len(encoded) != pointSize {
 		return clone(identityEncoding), false
 	}
@@ -97,6 +98,8 @@ func deriveISK(sid, k, transcript []byte) []byte {
 
 func confirmationTag(isk, sid, y, ad []byte) []byte {
 	keyInput := append([]byte("CPaceMac"), sid...)
+	// Raw concatenation follows draft-21. This is unambiguous in this suite
+	// because ISK is fixed at SHA-512's 64-byte output length.
 	keyInput = append(keyInput, isk...)
 	macKey := sha512.Sum512(keyInput)
 	m := hmac.New(sha512.New, macKey[:])
