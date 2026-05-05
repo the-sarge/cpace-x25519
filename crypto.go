@@ -22,6 +22,9 @@ const (
 var identityEncoding = make([]byte, pointSize)
 
 func generatorString(dsi, prs, ci, sid []byte, sInBytes int) []byte {
+	// The trailing subtraction accounts for the length byte of the zero-padding
+	// field. For this draft-21 suite, ZPAD is shorter than 128 bytes, so its
+	// LEB128 length prefix is exactly one byte.
 	zpadLen := sInBytes - len(prependLen(prs)) - len(prependLen(dsi)) - 1
 	if zpadLen < 0 {
 		zpadLen = 0
@@ -90,6 +93,9 @@ func scalarMultVFY(s *ristretto255.Scalar, encoded []byte) ([]byte, bool) {
 }
 
 func deriveISK(sid, k, transcript []byte) []byte {
+	// lvCat fixes the DSI, sid, and K boundaries. The remaining raw transcript
+	// is injective for this profile because transcriptIR/transcriptOC each have
+	// a fixed sequence of length-value fields.
 	material := lvCat([]byte(dsiISK), sid, k)
 	material = append(material, transcript...)
 	sum := sha512.Sum512(material)

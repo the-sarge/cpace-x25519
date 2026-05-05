@@ -30,8 +30,10 @@ type Suite byte
 // Config contains the local inputs for one CPace role.
 //
 // Password, InitiatorID, and ResponderID must be non-empty. Context and
-// AssociatedData may be empty. SessionID may be empty because draft-21 only
-// recommends a unique sid, but callers should provide a fresh, non-secret,
+// AssociatedData may be empty. Both parties must use the same role orientation:
+// InitiatorID is the party that called Start, and ResponderID is the party that
+// called Respond. SessionID may be empty because draft-21 only recommends a
+// unique sid, but callers should provide a fresh, non-secret,
 // parties-agree-on value for every session; an empty sid weakens replay and
 // transcript separation properties. The AssociatedData field is ADa for Start
 // and ADb for Respond. All byte slices are copied by Start and Respond before
@@ -114,7 +116,9 @@ func Start(cfg Config) (*Initiator, []byte, error) {
 }
 
 // Respond consumes message A, creates responder state, and returns message B.
-// Message B includes the responder's explicit key-confirmation tag.
+// Message B includes the responder's explicit key-confirmation tag. A nil
+// error from Respond does not authenticate the initiator; authentication is
+// established only by successful Finish calls.
 func Respond(cfg Config, messageA []byte) (*Responder, []byte, error) {
 	nc, err := normalizeConfig(cfg)
 	if err != nil {
