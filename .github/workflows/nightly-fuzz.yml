@@ -1,0 +1,95 @@
+name: Nightly Fuzz
+
+on:
+  workflow_dispatch:
+  # Enable after confirming the private-repo Actions budget.
+  # schedule:
+  #   - cron: '0 8 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-fuzz-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare fuzz matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.json }}
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Load fuzz target matrix
+        id: matrix
+        shell: bash
+        run: echo "json=$(jq -c '.' .github/fuzz-targets.json)" >> "$GITHUB_OUTPUT"
+
+  fuzz:
+    name: Fuzz (${{ matrix.target }})
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Snapshot corpus state
+        shell: bash
+        run: touch "${RUNNER_TEMP}/fuzz-start-${{ matrix.target }}"
+
+      - name: Run fuzz target
+        id: fuzz
+        continue-on-error: true
+        shell: bash
+        run: go test -race -fuzz="${{ matrix.target }}" -fuzztime=5m "${{ matrix.package }}"
+
+      - name: Find newly captured corpus files
+        id: corpus
+        if: steps.fuzz.outcome == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker="${RUNNER_TEMP}/fuzz-start-${{ matrix.target }}"
+          files="$(find . -type f -path "*/testdata/fuzz/${{ matrix.target }}/*" -newer "${marker}" | sort | sed 's#^\./##')"
+          if [ -n "$files" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            {
+              echo 'files<<EOF'
+              echo "$files"
+              echo EOF
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload newly captured corpus files
+        if: steps.fuzz.outcome == 'failure' && steps.corpus.outputs.found == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: nightly-fuzz-${{ matrix.target }}-corpus
+          path: ${{ steps.corpus.outputs.files }}
+          retention-days: 14
+
+      - name: Fail job on fuzz regression
+        if: steps.fuzz.outcome == 'failure'
+        run: exit 1

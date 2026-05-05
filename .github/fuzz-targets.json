@@ -1,0 +1,9 @@
+[
+  { "target": "FuzzDecodeMessageA", "package": "." },
+  { "target": "FuzzDecodeMessageB", "package": "." },
+  { "target": "FuzzDecodeMessageC", "package": "." },
+  { "target": "FuzzDraftVectorJSONLoader", "package": "." },
+  { "target": "FuzzDraftInvalidVectorJSONLoader", "package": "." },
+  { "target": "FuzzProtocolConsistency", "package": "." },
+  { "target": "FuzzProtocolMismatch", "package": "." }
+]

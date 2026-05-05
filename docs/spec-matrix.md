@@ -28,6 +28,6 @@ Package-owned profile and extensions:
 Known gaps before a production release:
 
 - independent cryptographic review
-- broader fuzzing campaign beyond smoke targets
+- broader fuzzing campaign beyond smoke targets in `.github/fuzz-targets.json`
 - dependency review sign-off
 - external review of package-owned message framing

@@ -31,6 +31,20 @@ requires restarting the exchange.
 `Config.Rand`, when set, must be a CSPRNG that provides fresh entropy for every
 exchange. Deterministic readers are only appropriate in tests.
 
+## Validation
+
+This repository uses `Taskfile.yml` as the local and CI validation facade:
+
+```sh
+task check
+FUZZTIME=30s PARALLEL=2 task fuzz
+```
+
+Fuzz targets live in `.github/fuzz-targets.json`. Pull-request CI runs the full
+check gate plus a short fuzz smoke pass; `.github/workflows/nightly-fuzz.yml`
+provides a manual long-fuzz matrix that uploads newly captured corpus files on
+failure.
+
 ```go
 initiator, msgA, err := cpace.Start(initCfg)
 responder, msgB, err := cpace.Respond(respCfg, msgA)

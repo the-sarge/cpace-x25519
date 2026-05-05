@@ -1,40 +1,47 @@
-name: ci
+name: CI
 
 on:
-  push:
   pull_request:
-  schedule:
-    - cron: '0 8 * * *'
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
+  check:
+    name: Check
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.26.x'
-      - run: go test ./...
-      - run: go test -race ./...
-      - run: go test -run '^$' -fuzz=FuzzDecodeMessageA -fuzztime=10s ./...
-      - run: go test -run '^$' -fuzz=FuzzDecodeMessageB -fuzztime=10s ./...
-      - run: go test -run '^$' -fuzz=FuzzDecodeMessageC -fuzztime=10s ./...
-      - run: go test -run '^$' -fuzz=FuzzDraftVectorJSONLoader -fuzztime=10s ./...
-      - run: go test -run '^$' -fuzz=FuzzDraftInvalidVectorJSONLoader -fuzztime=10s ./...
-      - run: go test -run '^$' -fuzz=FuzzProtocolConsistency -fuzztime=10s ./...
-      - run: go test -run '^$' -fuzz=FuzzProtocolMismatch -fuzztime=10s ./...
-      - run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      - run: govulncheck ./...
-      - run: go install honnef.co/go/tools/cmd/staticcheck@latest
-      - run: staticcheck ./...
+    timeout-minutes: 15
 
-  long-fuzz:
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.2.2
         with:
-          go-version: '1.26.x'
-      - run: go test -run '^$' -fuzz=FuzzProtocolConsistency -fuzztime=6m ./...
-      - run: go test -run '^$' -fuzz=FuzzProtocolMismatch -fuzztime=6m ./...
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install task
+        run: go install github.com/go-task/task/v3/cmd/task@v3.50.0
+
+      - name: Install validation tools
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
+          go install honnef.co/go/tools/cmd/staticcheck@v0.7.0
+
+      - name: Run validation gate
+        run: task check
+
+      - name: Run fuzz smoke
+        run: FUZZTIME=10s PARALLEL=2 task fuzz
+
