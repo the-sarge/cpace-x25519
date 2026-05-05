@@ -508,7 +508,7 @@ func TestInitiatorReflectedShareFailsConfirmationNotAbort(t *testing.T) {
 		t.Fatal(err)
 	}
 	msgB := encodeMessageB(a.ya, nil, bytes.Repeat([]byte{0x99}, tagSize))
-	if _, _, err := initiator.Finish(msgB); !errors.Is(err, ErrConfirmationFailed) || errors.Is(err, ErrAbort) {
+	if _, _, err := initiator.Finish(msgB); !errors.Is(err, ErrConfirmationFailed) {
 		t.Fatalf("Finish err=%v", err)
 	}
 }

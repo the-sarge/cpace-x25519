@@ -20,7 +20,7 @@ var draft21RistrettoGeneratorJSON []byte
 var draft21RistrettoInvalidJSON []byte
 
 const (
-	draft21RistrettoGeneratorJSONSHA256 = "297435c72d6c059e6cc9f8b1a3203593d970ae28ca3b333f918e80d9b177116c"
+	draft21RistrettoGeneratorJSONSHA256 = "05c8a34bd623fbdefd7fbffcd261d2420bd34363efa301d0b0dd9817f7f47c94"
 	draft21RistrettoVectorJSONSHA256    = "dc74177668cc2374beaf57fcb6e4c08a908238bab6b74d8edf8c86e04bc663ae"
 	draft21RistrettoInvalidJSONSHA256   = "6288f7ff96dfb8c2d6c4d743927c5fe6ac4aecbc56da2d1f00f27104000b6dfd"
 )
