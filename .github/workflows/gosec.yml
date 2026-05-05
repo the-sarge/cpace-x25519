@@ -38,7 +38,21 @@ jobs:
         run: go install github.com/go-task/task/v3/cmd/task@v3.50.0
 
       - name: Install gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.26.1
 
       - name: Run advisory gosec scan
-        run: task gosec
+        id: gosec
+        continue-on-error: true
+        run: task gosec GOSEC='gosec -fmt sarif -out gosec.sarif'
+
+      - name: Upload gosec SARIF artifact
+        if: always() && hashFiles('gosec.sarif') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: gosec-sarif
+          path: gosec.sarif
+          retention-days: 14
+
+      - name: Report advisory gosec result
+        if: steps.gosec.outcome == 'failure'
+        run: exit 1
