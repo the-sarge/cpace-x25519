@@ -12,6 +12,17 @@ The next phase is policy and API decisions. Do not implement these as incidental
 cleanup: each item changes package semantics, compatibility, or caller
 responsibility.
 
+## Policy PR Shape
+
+Each policy PR should include:
+
+- the decision being made and why the rejected alternatives are not being used;
+- the compatibility effect for existing callers and draft-21 vectors;
+- any migration note needed by downstream integrations;
+- focused tests for the changed behavior and unchanged compatibility paths;
+- README, changelog, and security/spec documentation updates when the public
+  contract changes.
+
 ## Policy Decisions
 
 | Area | Current behavior | Decision needed |
