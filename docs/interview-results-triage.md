@@ -7,6 +7,12 @@ parallel review agents. Treat `interview_results.md` as raw synthesis. Some
 reported "during-interview" changes were made only in agent sandboxes and are
 not present in the current tree.
 
+## Status
+
+This triage is historical. The decision-free action plan was implemented in
+PRs #2-#8, and landing notes were recorded in `DEV-JOURNAL.md`. The current
+living plan for remaining policy/API work is `docs/project-plan.md`.
+
 ## Current Tree Corrections
 
 Verified against this checkout on 2026-05-05:
