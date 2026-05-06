@@ -41,11 +41,7 @@ All rows below are closed and preserved as the policy/API decision record.
 
 ## Recommended PR Order
 
-1. Security/spec audit.
-   Review `docs/security-assessment.md` and `docs/spec-matrix.md` against the
-   exact release candidate commit.
-
-2. External review package.
+1. External review package.
    Prepare reviewer handoff notes for draft-compatible behavior, package-owned
    framing/profile choices, unsupported scope, and remaining release blockers.
 
@@ -55,6 +51,7 @@ All rows below are closed and preserved as the policy/API decision record.
 | --- | --- | --- |
 | Dependency review | `docs/dependency-review.md` records `govulncheck -test -show verbose ./...` and advisory `gosec v2.26.1` results for commit `06f21c51645f54e2b7bde7c5b538479463be5d0e`. | Repeat on the exact release tag if dependencies, toolchain, or parser/security-relevant code changes. |
 | Long fuzz evidence | `docs/fuzz-evidence.md` records all 14 registered targets on local smoke and long ARM/Intel runs for commit `06f21c51645f54e2b7bde7c5b538479463be5d0e`. | Repeat if parser, protocol, fuzz harness, dependency, or toolchain changes before release. |
+| Security/spec audit | `docs/security-spec-audit.md` records review of `docs/security-assessment.md` and `docs/spec-matrix.md` against implementation commit `4a8f629e59f0cc5c8f9351abacfa511fe6e4f441`. | Repeat if protocol code, parser/framing code, package-profile docs, dependencies, toolchain, or the targeted draft revision changes. |
 
 ## Release Readiness
 

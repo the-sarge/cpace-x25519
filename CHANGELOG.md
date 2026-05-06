@@ -52,3 +52,6 @@
   `FUZZ_RACE=0` long campaigns after race-instrumented tests pass.
 - Record fuzz evidence for all 14 registered fuzz targets, including a local
   smoke run and long ARM/Intel runs.
+- Audit the security assessment and spec matrix against the merged
+  release-readiness implementation and record the result in
+  `docs/security-spec-audit.md`.

@@ -53,3 +53,20 @@ This session also starts recording fuzz evidence as a first-class artifact:
 local smoke coverage plus long runs for all registered targets on ARM and Intel
 hardware. The remaining release-readiness items are the security/spec audit and
 external review handoff.
+
+---
+
+## cpace.S4 - 2026-05-06 12:20 EDT
+
+**Main:** `4a8f629`
+**Board:** Security/spec audit for release readiness.
+**Planner:** Josh
+
+Reviewed the security assessment and spec matrix against the merged
+release-readiness implementation, the draft-21 source, and the recorded
+dependency/fuzz evidence. No security/spec drift was found.
+
+This session records the audit as `docs/security-spec-audit.md`, removes the
+security/spec audit from the remaining release-readiness gaps, and leaves
+external review handoff plus independent cryptographic review as the remaining
+production-readiness blockers.

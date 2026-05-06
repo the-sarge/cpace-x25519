@@ -1,6 +1,8 @@
 # Security Assessment
 
-Status: initial self-assessment for an auditable draft implementation.
+Status: self-assessment for an auditable draft implementation. Reviewed
+against commit `4a8f629e59f0cc5c8f9351abacfa511fe6e4f441` on 2026-05-06;
+see `docs/security-spec-audit.md`.
 
 ## Cryptographic Scope
 

@@ -19,8 +19,10 @@ range and should be treated as draft implementation snapshots.
 Before any production-readiness claim, the project must complete long fuzzing,
 dependency review, security/spec documentation audit, external review of
 package-owned framing/profile choices, and independent cryptographic review.
-Track that work in `docs/project-plan.md`; dependency and fuzz evidence is
-recorded in `docs/dependency-review.md` and `docs/fuzz-evidence.md`.
+Dependency, fuzz, and security/spec audit evidence is recorded in
+`docs/dependency-review.md`, `docs/fuzz-evidence.md`, and
+`docs/security-spec-audit.md`; remaining work is tracked in
+`docs/project-plan.md`.
 
 Supported scope for the initial implementation:
 
