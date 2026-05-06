@@ -2,9 +2,8 @@ name: Gosec Advisory
 
 on:
   workflow_dispatch:
-  # Keep advisory security scans manual until self-hosted runners are available.
-  # schedule:
-  #   - cron: '0 10 * * 1'
+  schedule:
+    - cron: '0 10 * * 1'
 
 permissions:
   contents: read

@@ -2,9 +2,8 @@ name: Nightly Fuzz
 
 on:
   workflow_dispatch:
-  # Enable after confirming the private-repo Actions budget.
-  # schedule:
-  #   - cron: '0 8 * * *'
+  schedule:
+    - cron: '0 8 * * *'
 
 permissions:
   contents: read
