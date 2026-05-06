@@ -2,6 +2,10 @@
 
 Target: `draft-irtf-cfrg-cpace-21`, published April 23, 2026.
 
+Audit: reviewed against implementation commit
+`4a8f629e59f0cc5c8f9351abacfa511fe6e4f441` on 2026-05-06; see
+`docs/security-spec-audit.md`.
+
 | Draft requirement | Implementation | Tests |
 | --- | --- | --- |
 | Use `transcript_ir(Ya,ADa,Yb,ADb)` in initiator-responder mode | `transcriptIR` in `strings.go`; symmetric transcript kept internal for vectors | `TestStringUtilitiesDraftVectors`, `TestRistrettoDraft21Vectors` |
@@ -29,7 +33,5 @@ Package-owned profile and extensions:
 Known gaps before a production release:
 
 - independent cryptographic review
-- security/spec audit against the exact release candidate commit
-- external review of package-owned message framing
-- application integration guidance for any outer PAKE/version negotiation and
-  downgrade protection
+- external review of package-owned message framing, CI/profile choices, and
+  outer PAKE/version negotiation guidance

@@ -96,8 +96,9 @@ campaigns after `task check` has already covered race-instrumented tests.
 Release-readiness work should record exact evidence: commit SHA, command or
 workflow, duration for fuzzing, target count, and residual risks. Dependency
 review evidence lives in `docs/dependency-review.md`; fuzz campaign evidence
-lives in `docs/fuzz-evidence.md`. The next planned readiness steps are
-security/spec audit and external review handoff.
+lives in `docs/fuzz-evidence.md`; security/spec audit evidence lives in
+`docs/security-spec-audit.md`. The next planned readiness step is external
+review handoff.
 
 ```go
 initiator, msgA, err := cpace.Start(initCfg)
