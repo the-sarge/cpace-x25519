@@ -87,13 +87,16 @@ FUZZTIME=30s PARALLEL=2 task fuzz
 FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=8m PARALLEL=2 task fuzz
 ```
 
-Fuzz targets live in `.github/fuzz-targets.json`. Until self-hosted runners are
-available, GitHub-hosted pull-request CI is intentionally light: code changes
-run `go test ./...`, and Markdown-only PRs run docs validation without setting
-up Go. Run the full local gate, fuzzing, vulnerability scan, and advisory
+Fuzz targets live in `.github/fuzz-targets.json`. GitHub-hosted pull-request CI
+is intentionally light because it runs untrusted fork code: code changes run
+`go test ./...`, and Markdown-only PRs run docs validation without setting up
+Go. Scheduled hosted lanes run `govulncheck`, advisory `gosec`, and a
+5-minute-per-target fuzz regression pass as background signal. Run the full
+local gate, longer maintainer-machine fuzzing, vulnerability scan, and advisory
 `gosec` scan locally before release-oriented changes. The default fuzz lane
 keeps the race detector on for smoke runs; use `FUZZ_RACE=0` for longer
-campaigns after `task check` has already covered race-instrumented tests.
+campaigns after `task check` has already covered race-instrumented tests. See
+`docs/ci-policy.md` for the hosted and self-hosted runner threat model.
 
 Release-readiness work should record exact evidence: commit SHA, command or
 workflow, duration for fuzzing, target count, and residual risks. Dependency
