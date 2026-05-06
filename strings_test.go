@@ -38,8 +38,8 @@ func TestLEB128ReaderRejectsMalformed(t *testing.T) {
 		{wireFormatV1, wireSuite, roleC},
 		{wireFormatV1, wireSuite, roleC, 0x80},
 		{wireFormatV1, wireSuite, roleC, 0x80, 0x00},
+		append([]byte{wireFormatV1, wireSuite, roleC, 0xc0, 0x00}, bytes.Repeat([]byte{0x99}, tagSize)...),
 		{wireFormatV1, wireSuite, roleC, 0x80, 0x80, 0x80, 0x80, 0x00},
-		append([]byte{wireFormatV1, wireSuite, roleC}, encodeLEB128(maxFieldLength+1)...),
 	}
 	for _, tc := range cases {
 		if _, err := decodeMessageC(tc); err == nil {

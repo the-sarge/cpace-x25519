@@ -11,6 +11,9 @@
 //
 // Scalar randomness always comes from crypto/rand.Reader; the package does not
 // accept caller-supplied randomness through the public API.
+// Config and wire fields have package-owned per-field size caps; associated
+// data is capped at 64 KiB and smaller identity/context fields are capped more
+// tightly.
 //
 // Config.SessionID must be non-empty by default. Config.AllowEmptySessionID is
 // only for draft-21 compatibility tests or deliberately compatible profiles

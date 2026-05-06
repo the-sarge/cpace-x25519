@@ -31,17 +31,13 @@ Each policy PR should include:
 | Empty `SessionID` | Rejected by default; `AllowEmptySessionID` preserves explicit draft-21 compatibility. | Done. Callers must opt into weaker empty-sid behavior deliberately. |
 | Session lifecycle | `Session.Close` clears the session ISK best-effort and future `Export` calls fail with `ErrSessionClosed`. | Done. Non-secret metadata remains available after close. |
 | Peer metadata | `PeerAssociatedData` and `PeerID` expose copied metadata bound into the confirmed exchange. | Done. Local AD/ID accessors are deferred until a concrete caller need appears. |
-| Confirmation tag role separation | Draft-compatible tag input is unchanged. | Keep draft-compatible tags, or add role labels as a package-profile hardening break. |
-| `maxFieldLength` | Parser cap is 1 MiB. | Keep, lower, or make configurable. |
+| Confirmation tag role separation | Draft-compatible tag input is unchanged. | Done. Keep draft-compatible tags; no package-added role labels. |
+| Field size limits | Package-owned per-field caps: password and IDs 4 KiB, context and session ID 1 KiB, AD 64 KiB, public shares/tags exact-sized. | Done. Caps remain non-configurable and are not aggregate message limits. |
 | Scalar sampling | Masked canonical 32-byte sampling with zero retry. | Keep for draft conformance, or investigate a `SetUniformBytes`-based approach and prove compatibility/distribution properties. |
 
 ## Recommended PR Order
 
-1. Framing and confirmation profile choices.
-   Decide `maxFieldLength` and confirmation tag role separation after the
-   compatibility posture is explicit.
-
-2. Scalar sampling investigation.
+1. Scalar sampling investigation.
    Treat any change as a protocol-conformance project, not a mechanical
    refactor. Keep this separate from API policy changes.
 

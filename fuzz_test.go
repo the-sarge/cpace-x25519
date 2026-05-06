@@ -255,9 +255,9 @@ func FuzzMessageARoundTrip(f *testing.F) {
 		}
 		msg := encodeMessageA(sid, ya, ada)
 		got, err := decodeMessageA(msg)
-		if len(ya) != pointSize {
+		if len(sid) > maxSessionIDLength || len(ya) != pointSize || len(ada) > maxAssociatedDataLength {
 			if err == nil {
-				t.Fatalf("decodeMessageA accepted point length %d", len(ya))
+				t.Fatalf("decodeMessageA accepted lengths sid=%d ya=%d ada=%d", len(sid), len(ya), len(ada))
 			}
 			return
 		}
@@ -280,9 +280,9 @@ func FuzzMessageBRoundTrip(f *testing.F) {
 		}
 		msg := encodeMessageB(yb, adb, tag)
 		got, err := decodeMessageB(msg)
-		if len(yb) != pointSize || len(tag) != tagSize {
+		if len(yb) != pointSize || len(adb) > maxAssociatedDataLength || len(tag) != tagSize {
 			if err == nil {
-				t.Fatalf("decodeMessageB accepted point/tag lengths %d/%d", len(yb), len(tag))
+				t.Fatalf("decodeMessageB accepted lengths yb=%d adb=%d tag=%d", len(yb), len(adb), len(tag))
 			}
 			return
 		}

@@ -3,15 +3,25 @@ package cpace
 import "fmt"
 
 const (
-	wireFormatV1           byte = 0xc1
-	wireSuite              byte = byte(SuiteCPaceRistretto255SHA512)
-	roleA                  byte = 0x01
-	roleB                  byte = 0x02
-	roleC                  byte = 0x03
-	maxFieldLengthLog2          = 20
-	maxFieldLength              = 1 << maxFieldLengthLog2
-	maxLEB128BytesForField      = (maxFieldLengthLog2 + 7) / 7
+	wireFormatV1 byte = 0xc1
+	wireSuite    byte = byte(SuiteCPaceRistretto255SHA512)
+	roleA        byte = 0x01
+	roleB        byte = 0x02
+	roleC        byte = 0x03
+
+	maxPasswordLength       = 4 << 10
+	maxIDLength             = 4 << 10
+	maxContextLength        = 1 << 10
+	maxSessionIDLength      = 1 << 10
+	maxAssociatedDataLength = 64 << 10
+
+	// maxLEB128BytesForField is a uniform length-prefix ceiling that must cover
+	// maxAssociatedDataLength, the largest package field cap. The caps are
+	// per-field, not aggregate message limits.
+	maxLEB128BytesForField = 3
 )
+
+const _ = uint((1 << (7 * maxLEB128BytesForField)) - 1 - maxAssociatedDataLength)
 
 type messageA struct {
 	sid []byte
@@ -56,20 +66,17 @@ func decodeMessageA(in []byte) (messageA, error) {
 	if err != nil {
 		return messageA{}, err
 	}
-	sid, err := r.readField()
+	sid, err := r.readField(maxSessionIDLength, "message A session id")
 	if err != nil {
 		return messageA{}, err
 	}
-	ya, err := r.readField()
+	ya, err := r.readExactField(pointSize, "message A point")
 	if err != nil {
 		return messageA{}, err
 	}
-	ada, err := r.readField()
+	ada, err := r.readField(maxAssociatedDataLength, "message A associated data")
 	if err != nil {
 		return messageA{}, err
-	}
-	if len(ya) != pointSize {
-		return messageA{}, fmt.Errorf("%w: message A point length", ErrMessage)
 	}
 	if err := r.done(); err != nil {
 		return messageA{}, err
@@ -82,23 +89,17 @@ func decodeMessageB(in []byte) (messageB, error) {
 	if err != nil {
 		return messageB{}, err
 	}
-	yb, err := r.readField()
+	yb, err := r.readExactField(pointSize, "message B point")
 	if err != nil {
 		return messageB{}, err
 	}
-	adb, err := r.readField()
+	adb, err := r.readField(maxAssociatedDataLength, "message B associated data")
 	if err != nil {
 		return messageB{}, err
 	}
-	tag, err := r.readField()
+	tag, err := r.readExactField(tagSize, "message B tag")
 	if err != nil {
 		return messageB{}, err
-	}
-	if len(yb) != pointSize {
-		return messageB{}, fmt.Errorf("%w: message B point length", ErrMessage)
-	}
-	if len(tag) != tagSize {
-		return messageB{}, fmt.Errorf("%w: message B tag length", ErrMessage)
 	}
 	if err := r.done(); err != nil {
 		return messageB{}, err
@@ -111,12 +112,9 @@ func decodeMessageC(in []byte) (messageC, error) {
 	if err != nil {
 		return messageC{}, err
 	}
-	tag, err := r.readField()
+	tag, err := r.readExactField(tagSize, "message C tag")
 	if err != nil {
 		return messageC{}, err
-	}
-	if len(tag) != tagSize {
-		return messageC{}, fmt.Errorf("%w: message C tag length", ErrMessage)
 	}
 	if err := r.done(); err != nil {
 		return messageC{}, err
@@ -145,19 +143,35 @@ func newMessageReader(in []byte, wantRole byte) (*messageReader, error) {
 	return &messageReader{buf: in, off: 3}, nil
 }
 
-func (r *messageReader) readField() ([]byte, error) {
+func (r *messageReader) readField(maxLen int, name string) ([]byte, error) {
 	n, err := r.readLEB128()
 	if err != nil {
 		return nil, err
 	}
-	if n > maxFieldLength {
-		return nil, fmt.Errorf("%w: field too large", ErrMessage)
+	if n > uint64(maxLen) {
+		return nil, fmt.Errorf("%w: %s field too large", ErrMessage, name)
 	}
 	if len(r.buf)-r.off < int(n) {
-		return nil, fmt.Errorf("%w: truncated field", ErrMessage)
+		return nil, fmt.Errorf("%w: truncated %s field", ErrMessage, name)
 	}
 	out := clone(r.buf[r.off : r.off+int(n)])
 	r.off += int(n)
+	return out, nil
+}
+
+func (r *messageReader) readExactField(wantLen int, name string) ([]byte, error) {
+	n, err := r.readLEB128()
+	if err != nil {
+		return nil, err
+	}
+	if n != uint64(wantLen) {
+		return nil, fmt.Errorf("%w: %s length", ErrMessage, name)
+	}
+	if len(r.buf)-r.off < wantLen {
+		return nil, fmt.Errorf("%w: truncated %s field", ErrMessage, name)
+	}
+	out := clone(r.buf[r.off : r.off+wantLen])
+	r.off += wantLen
 	return out, nil
 }
 
