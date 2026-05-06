@@ -30,8 +30,10 @@ type Suite byte
 // Config contains the local inputs for one CPace role.
 //
 // Password, InitiatorID, and ResponderID must be non-empty. Context and
-// AssociatedData may be empty. SessionID may be empty because draft-21 only
-// recommends a unique sid, but callers should provide a fresh, non-secret,
+// AssociatedData may be empty. Both parties must use the same role orientation:
+// InitiatorID is the party that called Start, and ResponderID is the party that
+// called Respond. SessionID may be empty because draft-21 only recommends a
+// unique sid, but callers should provide a fresh, non-secret,
 // parties-agree-on value for every session; an empty sid weakens replay and
 // transcript separation properties. The AssociatedData field is ADa for Start
 // and ADb for Respond. All byte slices are copied by Start and Respond before
@@ -95,8 +97,12 @@ func Start(cfg Config) (*Initiator, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	defer clearBytes(nc.password)
 
 	g := calculateGenerator(nc.password, nc.ci, nc.sid)
+	defer clearElement(g)
+	clearBytes(nc.password)
+	nc.password = nil
 	y, err := sampleScalar(nc.rand)
 	if err != nil {
 		return nil, nil, err
@@ -114,12 +120,15 @@ func Start(cfg Config) (*Initiator, []byte, error) {
 }
 
 // Respond consumes message A, creates responder state, and returns message B.
-// Message B includes the responder's explicit key-confirmation tag.
+// Message B includes the responder's explicit key-confirmation tag. A nil
+// error from Respond does not authenticate the initiator; authentication is
+// established only by successful Finish calls.
 func Respond(cfg Config, messageA []byte) (*Responder, []byte, error) {
 	nc, err := normalizeConfig(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
+	defer clearBytes(nc.password)
 	a, err := decodeMessageA(messageA)
 	if err != nil {
 		return nil, nil, err
@@ -127,14 +136,22 @@ func Respond(cfg Config, messageA []byte) (*Responder, []byte, error) {
 	if !bytes.Equal(a.sid, nc.sid) {
 		return nil, nil, fmt.Errorf("%w: session id mismatch", ErrMessage)
 	}
+	if _, ok := decodePublicShare(a.ya); !ok {
+		return nil, nil, fmt.Errorf("%w: invalid initiator share", ErrAbort)
+	}
 
 	g := calculateGenerator(nc.password, nc.ci, nc.sid)
+	defer clearElement(g)
+	clearBytes(nc.password)
+	nc.password = nil
 	y, err := sampleScalar(nc.rand)
 	if err != nil {
 		return nil, nil, err
 	}
+	defer clearScalar(y)
 	yb := scalarMult(y, g)
 	k, ok := scalarMultVFY(y, a.ya)
+	defer clearBytes(k)
 	if !ok {
 		return nil, nil, fmt.Errorf("%w: invalid initiator share", ErrAbort)
 	}
@@ -165,11 +182,17 @@ func (i *Initiator) Finish(messageB []byte) ([]byte, *Session, error) {
 	if err := i.consume(); err != nil {
 		return nil, nil, err
 	}
+	scalar := i.scalar
+	defer func() {
+		clearScalar(scalar)
+		i.scalar = nil
+	}()
 	b, err := decodeMessageB(messageB)
 	if err != nil {
 		return nil, nil, err
 	}
-	k, ok := scalarMultVFY(i.scalar, b.yb)
+	k, ok := scalarMultVFY(scalar, b.yb)
+	defer clearBytes(k)
 	if !ok {
 		return nil, nil, fmt.Errorf("%w: invalid responder share", ErrAbort)
 	}
@@ -177,11 +200,13 @@ func (i *Initiator) Finish(messageB []byte) ([]byte, *Session, error) {
 	isk := deriveISK(i.sid, k, tr)
 	expectedB := confirmationTag(isk, i.sid, b.yb, b.adb)
 	if !hmac.Equal(expectedB, b.tag) {
+		clearBytes(isk)
 		return nil, nil, ErrConfirmationFailed
 	}
 	tagA := confirmationTag(isk, i.sid, i.ya, i.ada)
 	msgC := encodeMessageC(tagA)
 	sess := newSession(isk, tr)
+	clearBytes(isk)
 	return msgC, sess, nil
 }
 
@@ -195,6 +220,12 @@ func (r *Responder) Finish(messageC []byte) (*Session, error) {
 	if err := r.consume(); err != nil {
 		return nil, err
 	}
+	defer func() {
+		clearBytes(r.isk)
+		clearBytes(r.transcript)
+		r.isk = nil
+		r.transcript = nil
+	}()
 	c, err := decodeMessageC(messageC)
 	if err != nil {
 		return nil, err
@@ -203,7 +234,8 @@ func (r *Responder) Finish(messageC []byte) (*Session, error) {
 	if !hmac.Equal(expectedA, c.tag) {
 		return nil, ErrConfirmationFailed
 	}
-	return newSession(r.isk, r.transcript), nil
+	sess := newSession(r.isk, r.transcript)
+	return sess, nil
 }
 
 func (i *Initiator) consume() error {

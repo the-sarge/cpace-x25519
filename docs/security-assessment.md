@@ -25,6 +25,16 @@ package accepts an empty `SessionID` for draft compatibility, but callers should
 provide a fresh, non-secret, parties-agree-on sid for every session. Empty sids
 weaken replay and transcript separation properties.
 
+Any outer application negotiation of PAKE version, ciphersuite, protocol mode,
+or whether CPace is used needs downgrade protection outside this package. The
+package authenticates only the inputs it is given and has no negotiation API.
+
+Both parties must use a consistent role-ID orientation: `InitiatorID` names the
+party running `Start`, and `ResponderID` names the party running `Respond`. If
+each side puts itself first, the CI values differ and confirmation fails. Role
+labels such as `"client"` and `"server"` are not enough as global identities for
+all users or deployments; callers should bind stable party identities.
+
 Scalar sampling masks bits above group size 252 and rejects zero. This creates a
 secret-dependent loop only for the all-zero masked scalar case. That event has
 negligible probability with a uniform random reader, but the behavior should be
@@ -33,16 +43,20 @@ reviewed for hostile or deterministic random sources. Sampling failure wraps
 
 ## Memory Handling
 
-All mutable public inputs and received message fields are copied. The Go runtime
-does not guarantee secure zeroization, pinning, or avoidance of copies made by
-the compiler or garbage collector. This package does not claim resistance to a
-local memory disclosure adversary.
+All mutable public inputs and received message fields are copied. The
+implementation clears selected owned byte-slice temporaries, consumed scalar
+state, derived generator elements, and consumed responder state on a best-effort
+basis. The Go runtime does not guarantee secure zeroization, pinning, or
+avoidance of copies made by the compiler or garbage collector. This package
+does not claim resistance to a local memory disclosure adversary.
 
 ## Key Access
 
 Raw `K`, scalar values, and ISK are not exposed through the public API. Exported
-application material is derived from the confirmed ISK using HKDF-SHA512. A
-session is returned only after key confirmation succeeds.
+application material is derived from the confirmed ISK using HKDF-SHA512 and is
+deterministic for a given label and context; it is not fresh randomness or a
+randomness pool. A session is returned only after key confirmation succeeds.
+`Respond` success alone does not authenticate the peer.
 
 ## Framing
 
@@ -57,8 +71,8 @@ point lengths, and invalid tag lengths.
 - `github.com/gtank/ristretto255 v0.2.0`
 - `filippo.io/edwards25519 v1.2.0` as an indirect dependency
 
-Dependency review is not complete. Run `govulncheck ./...` before any release.
-Initial notes are recorded in `docs/dependency-review.md`.
+Dependency review is not complete. Run `govulncheck -test ./...` before any
+release. Initial notes are recorded in `docs/dependency-review.md`.
 
 ## Release Bar
 
@@ -69,7 +83,7 @@ Do not mark a release production-ready until:
 - parser and protocol fuzz targets have completed a meaningful run
 - every target in `.github/fuzz-targets.json` has run for more than five
   minutes on release hardware or the manual long-fuzz workflow
-- `govulncheck ./...` and `staticcheck ./...` pass
+- `govulncheck -test ./...` and `staticcheck ./...` pass
 - this assessment and `docs/spec-matrix.md` are reviewed
 - no critical or high independent review findings remain
 

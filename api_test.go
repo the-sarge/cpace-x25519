@@ -33,6 +33,16 @@ func (r failingReader) Read([]byte) (int, error) {
 	return 0, r.err
 }
 
+type countingFailingReader struct {
+	reads int
+	err   error
+}
+
+func (r *countingFailingReader) Read([]byte) (int, error) {
+	r.reads++
+	return 0, r.err
+}
+
 func testConfig() Config {
 	return Config{
 		Password:    []byte("password"),
@@ -113,6 +123,66 @@ func TestMutableInputsAreCopied(t *testing.T) {
 	}
 	if _, err := responder.Finish(msgC); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestFinishCleanupDoesNotAliasReturnedSessions(t *testing.T) {
+	initCfg := testConfig()
+	initCfg.AssociatedData = []byte("ADa")
+	initCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x11}, 32)}
+	respCfg := testConfig()
+	respCfg.AssociatedData = []byte("ADb")
+	respCfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x22}, 32)}
+
+	initiator, msgA, err := Start(initCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initiatorScalar := initiator.scalar
+	responder, msgB, err := Respond(respCfg, msgA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responderISK := responder.isk
+	responderTranscript := responder.transcript
+
+	msgC, sI, err := initiator.Finish(msgB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if initiator.scalar != nil {
+		t.Fatal("initiator scalar reference retained after Finish")
+	}
+	if initiatorScalar == nil || !allZero(initiatorScalar.Bytes()) {
+		t.Fatal("consumed initiator scalar was not cleared")
+	}
+
+	sR, err := responder.Finish(msgC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if responder.isk != nil || responder.transcript != nil {
+		t.Fatal("responder retained cleared state references after Finish")
+	}
+	if !allZero(responderISK) {
+		t.Fatal("responder-owned ISK was not cleared")
+	}
+	if !allZero(responderTranscript) {
+		t.Fatal("responder-owned transcript was not cleared")
+	}
+	if allZero(sI.isk) || allZero(sR.isk) {
+		t.Fatal("returned session ISK was cleared through an alias")
+	}
+	kI, err := sI.Export([]byte("label"), []byte("ctx"), 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kR, err := sR.Export([]byte("label"), []byte("ctx"), 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(kI, kR) {
+		t.Fatal("exports differ after cleanup")
 	}
 }
 
@@ -471,6 +541,32 @@ func TestProtocolAbortsOnInvalidRistrettoEncoding(t *testing.T) {
 	}
 }
 
+func TestResponderPrevalidatesInvalidInitiatorShareBeforeRandomness(t *testing.T) {
+	invalid := mustLoadDraftInvalidVector(t)
+	cases := []struct {
+		name string
+		ya   []byte
+	}{
+		{"non-canonical", invalid.InvalidY1},
+		{"identity", invalid.InvalidY2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := testConfig()
+			rand := &countingFailingReader{err: io.ErrUnexpectedEOF}
+			cfg.Rand = rand
+			badA := encodeMessageA([]byte("sid"), tc.ya, nil)
+			_, _, err := Respond(cfg, badA)
+			if !errors.Is(err, ErrAbort) || errors.Is(err, ErrRandomness) {
+				t.Fatalf("Respond err=%v", err)
+			}
+			if rand.reads != 0 {
+				t.Fatalf("Respond read randomness %d times before rejecting share", rand.reads)
+			}
+		})
+	}
+}
+
 func TestInitiatorAbortsOnInvalidResponderShare(t *testing.T) {
 	invalid := mustLoadDraftInvalidVector(t)
 	cases := []struct {
@@ -493,6 +589,23 @@ func TestInitiatorAbortsOnInvalidResponderShare(t *testing.T) {
 				t.Fatalf("Finish err=%v", err)
 			}
 		})
+	}
+}
+
+func TestInitiatorReflectedShareFailsConfirmationNotAbort(t *testing.T) {
+	cfg := testConfig()
+	cfg.Rand = &repeatingReader{buf: bytes.Repeat([]byte{0x11}, 32)}
+	initiator, msgA, err := Start(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := decodeMessageA(msgA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msgB := encodeMessageB(a.ya, nil, bytes.Repeat([]byte{0x99}, tagSize))
+	if _, _, err := initiator.Finish(msgB); !errors.Is(err, ErrConfirmationFailed) {
+		t.Fatalf("Finish err=%v", err)
 	}
 }
 
@@ -576,4 +689,13 @@ func completeExchange(t *testing.T, initCfg, respCfg Config) (*Session, *Session
 		t.Fatal(err)
 	}
 	return sI, sR
+}
+
+func allZero(in []byte) bool {
+	for _, b := range in {
+		if b != 0 {
+			return false
+		}
+	}
+	return true
 }
