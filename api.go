@@ -131,6 +131,9 @@ func Respond(cfg Config, messageA []byte) (*Responder, []byte, error) {
 	if !bytes.Equal(a.sid, nc.sid) {
 		return nil, nil, fmt.Errorf("%w: session id mismatch", ErrMessage)
 	}
+	if _, ok := decodePublicShare(a.ya); !ok {
+		return nil, nil, fmt.Errorf("%w: invalid initiator share", ErrAbort)
+	}
 
 	g := calculateGenerator(nc.password, nc.ci, nc.sid)
 	y, err := sampleScalar(nc.rand)

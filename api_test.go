@@ -33,6 +33,16 @@ func (r failingReader) Read([]byte) (int, error) {
 	return 0, r.err
 }
 
+type countingFailingReader struct {
+	reads int
+	err   error
+}
+
+func (r *countingFailingReader) Read([]byte) (int, error) {
+	r.reads++
+	return 0, r.err
+}
+
 func testConfig() Config {
 	return Config{
 		Password:    []byte("password"),
@@ -468,6 +478,32 @@ func TestProtocolAbortsOnInvalidRistrettoEncoding(t *testing.T) {
 	badA := encodeMessageA([]byte("sid"), invalid.InvalidY1, nil)
 	if _, _, err := Respond(cfg, badA); !errors.Is(err, ErrAbort) {
 		t.Fatalf("Respond err=%v", err)
+	}
+}
+
+func TestResponderPrevalidatesInvalidInitiatorShareBeforeRandomness(t *testing.T) {
+	invalid := mustLoadDraftInvalidVector(t)
+	cases := []struct {
+		name string
+		ya   []byte
+	}{
+		{"non-canonical", invalid.InvalidY1},
+		{"identity", invalid.InvalidY2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := testConfig()
+			rand := &countingFailingReader{err: io.ErrUnexpectedEOF}
+			cfg.Rand = rand
+			badA := encodeMessageA([]byte("sid"), tc.ya, nil)
+			_, _, err := Respond(cfg, badA)
+			if !errors.Is(err, ErrAbort) || errors.Is(err, ErrRandomness) {
+				t.Fatalf("Respond err=%v", err)
+			}
+			if rand.reads != 0 {
+				t.Fatalf("Respond read randomness %d times before rejecting share", rand.reads)
+			}
+		})
 	}
 }
 
