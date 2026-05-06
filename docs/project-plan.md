@@ -74,6 +74,7 @@ Before any production-readiness claim:
 - CodeQL.
 - Capslock.
 - OSS-Fuzz.
+- Longer continuous fuzzing campaigns.
 - Offline Sage-derived extended vector dataset.
 - Allocation measurements on hot paths before adding permanent allocation
   tests.

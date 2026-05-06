@@ -36,13 +36,13 @@ not the release-bar long-fuzz evidence by itself.
 | `m4mini.local` | `darwin/arm64` | `2026-05-06T12:35:36Z` | `2026-05-06T13:31:42Z` | `FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=8m PARALLEL=2 task fuzz` | PASS: all 14 targets |
 | `iMacPro.local` | `darwin/amd64` | `2026-05-06T12:35:36Z` | `2026-05-06T13:31:44Z` | `FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=8m PARALLEL=2 task fuzz` | PASS: all 14 targets |
 
-Each long run uses the same 14-target registry. With `PARALLEL=2`, the wall
-clock duration is expected to be roughly seven batches of 8 minutes, plus Go
-test startup overhead. `FUZZ_RACE=0` leaves race detection to `task check` and
-uses the long campaign for input-space exploration. `GOMAXPROCS=4` keeps each
-fuzzing subprocess from oversubscribing the shared host while still running
-every target for more than the five-minute release-bar minimum. The per-target
-duration is the release-bar-relevant value.
+Each long run uses the same 14-target registry. With 14 targets and
+`PARALLEL=2`, each run executes seven target batches. The recorded wall-clock
+duration is about 56 minutes, matching seven 8-minute batches and confirming
+that every target ran the full `FUZZTIME=8m`, above the five-minute release-bar
+minimum. `FUZZ_RACE=0` leaves race detection to `task check` and uses the long
+campaign for input-space exploration. `GOMAXPROCS=4` keeps each fuzzing
+subprocess from oversubscribing the shared host.
 
 ## Residual Risk
 
