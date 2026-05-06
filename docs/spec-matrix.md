@@ -23,7 +23,7 @@ Package-owned profile and extensions:
 | `cpace-go` CI construction from draft version, suite, role labels, identities, and context | Package profile over draft-21 CI input, not a generic raw-CI interface | transcript-locking mismatch tests |
 | Binary wire framing with format byte `0xc1`, suite byte, role byte, and draft LEB128 fields | Package-owned application framing | `TestWireFormatPrefixByte`, parser tests |
 | `Session.Export` using HKDF-SHA512 over confirmed ISK | Package extension following the draft recommendation to process ISK with a KDF | `TestConfirmedExchangeAndExport`, example |
-| `Session.TranscriptID` as draft `CPaceSidOutput` | Public accessor for draft optional session identifier output | vector and exchange tests |
+| `Session.TranscriptID` as draft `CPaceSidOutput` | Public accessor for draft optional session identifier output; not a complete channel binding for outer negotiation | vector and exchange tests |
 
 Known gaps before a production release:
 
@@ -31,3 +31,5 @@ Known gaps before a production release:
 - broader fuzzing campaign beyond smoke targets in `.github/fuzz-targets.json`
 - dependency review sign-off
 - external review of package-owned message framing
+- application integration guidance for any outer PAKE/version negotiation and
+  downgrade protection

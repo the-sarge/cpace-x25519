@@ -25,6 +25,16 @@ package accepts an empty `SessionID` for draft compatibility, but callers should
 provide a fresh, non-secret, parties-agree-on sid for every session. Empty sids
 weaken replay and transcript separation properties.
 
+Any outer application negotiation of PAKE version, ciphersuite, protocol mode,
+or whether CPace is used needs downgrade protection outside this package. The
+package authenticates only the inputs it is given and has no negotiation API.
+
+Both parties must use a consistent role-ID orientation: `InitiatorID` names the
+party running `Start`, and `ResponderID` names the party running `Respond`. If
+each side puts itself first, the CI values differ and confirmation fails. Role
+labels such as `"client"` and `"server"` are not enough as global identities for
+all users or deployments; callers should bind stable party identities.
+
 Scalar sampling masks bits above group size 252 and rejects zero. This creates a
 secret-dependent loop only for the all-zero masked scalar case. That event has
 negligible probability with a uniform random reader, but the behavior should be
@@ -41,8 +51,10 @@ local memory disclosure adversary.
 ## Key Access
 
 Raw `K`, scalar values, and ISK are not exposed through the public API. Exported
-application material is derived from the confirmed ISK using HKDF-SHA512. A
-session is returned only after key confirmation succeeds.
+application material is derived from the confirmed ISK using HKDF-SHA512 and is
+deterministic for a given label and context; it is not fresh randomness or a
+randomness pool. A session is returned only after key confirmation succeeds.
+`Respond` success alone does not authenticate the peer.
 
 ## Framing
 

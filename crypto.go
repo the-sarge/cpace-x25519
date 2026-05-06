@@ -22,6 +22,9 @@ const (
 var identityEncoding = make([]byte, pointSize)
 
 func generatorString(dsi, prs, ci, sid []byte, sInBytes int) []byte {
+	// The trailing subtraction accounts for the length byte of the zero-padding
+	// field. For this draft-21 suite, ZPAD is shorter than 128 bytes, so its
+	// LEB128 length prefix is exactly one byte.
 	zpadLen := sInBytes - len(prependLen(prs)) - len(prependLen(dsi)) - 1
 	if zpadLen < 0 {
 		zpadLen = 0
