@@ -65,6 +65,33 @@ func respondTestResponder(cfg Config, messageA []byte) (*Responder, []byte, erro
 	return respondWithRandom(cfg, messageA, repeatingRand(0x22))
 }
 
+func TestInternalRandomHelpersDefaultNilRandomness(t *testing.T) {
+	initCfg := testConfig()
+	initCfg.AssociatedData = []byte("ADa")
+	respCfg := testConfig()
+	respCfg.AssociatedData = []byte("ADb")
+
+	initiator, msgA, err := startWithRandom(initCfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responder, msgB, err := respondWithRandom(respCfg, msgA, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msgC, sI, err := initiator.Finish(msgB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sR, err := responder.Finish(msgC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(sI.TranscriptID(), sR.TranscriptID()) {
+		t.Fatal("transcript ids differ")
+	}
+}
+
 func TestConfirmedExchangeAndExport(t *testing.T) {
 	initCfg := testConfig()
 	initCfg.AssociatedData = []byte("ADa")
