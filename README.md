@@ -61,6 +61,12 @@ exchange; it is not parsed from peer-controlled wire data.
 Scalar randomness is always drawn from Go's `crypto/rand.Reader`. Callers do
 not provide randomness to `Start` or `Respond`.
 
+Input and wire fields have package-owned per-field caps: passwords and party
+IDs are limited to 4 KiB, context and session IDs to 1 KiB, and associated data
+to 64 KiB. These are not aggregate message-size limits. Associated data should
+bind protocol context, not carry large payloads; represent large external
+artifacts with a digest, Merkle root, exporter, or other fixed-size commitment.
+
 ## Validation
 
 This repository uses `Taskfile.yml` as the local validation facade:

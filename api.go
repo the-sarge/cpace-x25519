@@ -38,7 +38,10 @@ type Suite byte
 // only for draft-21 compatibility tests or profiles that have deliberately
 // accepted the weaker empty-sid behavior. Scalar randomness always comes from
 // crypto/rand.Reader. The AssociatedData field is ADa for Start and ADb for
-// Respond. All byte slices are copied by Start and Respond before use.
+// Respond. Field lengths are capped at 4 KiB for Password and IDs, 1 KiB for
+// Context and SessionID, and 64 KiB for AssociatedData. Inputs exceeding these
+// caps are rejected before copying; accepted byte slices are copied by Start
+// and Respond before use.
 type Config struct {
 	Password            []byte
 	InitiatorID         []byte
@@ -296,13 +299,23 @@ func normalizeConfig(cfg Config) (normalizedConfig, error) {
 	if len(cfg.SessionID) == 0 && !cfg.AllowEmptySessionID {
 		return normalizedConfig{}, fmt.Errorf("%w: %w", ErrInvalidInput, ErrEmptySessionID)
 	}
-	if len(cfg.Password) > maxFieldLength ||
-		len(cfg.InitiatorID) > maxFieldLength ||
-		len(cfg.ResponderID) > maxFieldLength ||
-		len(cfg.Context) > maxFieldLength ||
-		len(cfg.SessionID) > maxFieldLength ||
-		len(cfg.AssociatedData) > maxFieldLength {
-		return normalizedConfig{}, fmt.Errorf("%w: field too large", ErrInvalidInput)
+	if len(cfg.Password) > maxPasswordLength {
+		return normalizedConfig{}, fmt.Errorf("%w: password too large", ErrInvalidInput)
+	}
+	if len(cfg.InitiatorID) > maxIDLength {
+		return normalizedConfig{}, fmt.Errorf("%w: initiator id too large", ErrInvalidInput)
+	}
+	if len(cfg.ResponderID) > maxIDLength {
+		return normalizedConfig{}, fmt.Errorf("%w: responder id too large", ErrInvalidInput)
+	}
+	if len(cfg.Context) > maxContextLength {
+		return normalizedConfig{}, fmt.Errorf("%w: context too large", ErrInvalidInput)
+	}
+	if len(cfg.SessionID) > maxSessionIDLength {
+		return normalizedConfig{}, fmt.Errorf("%w: session id too large", ErrInvalidInput)
+	}
+	if len(cfg.AssociatedData) > maxAssociatedDataLength {
+		return normalizedConfig{}, fmt.Errorf("%w: associated data too large", ErrInvalidInput)
 	}
 	return normalizedConfig{
 		password:    clone(cfg.Password),

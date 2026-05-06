@@ -36,3 +36,7 @@
 - Add `Session.Close`, `ErrSessionClosed`, `PeerAssociatedData`, and `PeerID`;
   closing a session clears session-owned key material best-effort and prevents
   future `Export` calls.
+- Keep confirmation tags draft-compatible and replace the former 1 MiB generic
+  field cap with non-configurable per-field caps: 4 KiB for passwords and IDs,
+  1 KiB for context and session IDs, 64 KiB for associated data, and exact
+  public-share/tag lengths on the wire.

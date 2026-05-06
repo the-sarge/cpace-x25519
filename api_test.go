@@ -512,6 +512,37 @@ func TestInputValidation(t *testing.T) {
 	}
 }
 
+func TestConfigFieldSizeLimits(t *testing.T) {
+	cases := []struct {
+		name string
+		max  int
+		edit func(*Config, []byte)
+	}{
+		{"password", maxPasswordLength, func(c *Config, b []byte) { c.Password = b }},
+		{"initiator id", maxIDLength, func(c *Config, b []byte) { c.InitiatorID = b }},
+		{"responder id", maxIDLength, func(c *Config, b []byte) { c.ResponderID = b }},
+		{"context", maxContextLength, func(c *Config, b []byte) { c.Context = b }},
+		{"session id", maxSessionIDLength, func(c *Config, b []byte) { c.SessionID = b }},
+		{"associated data", maxAssociatedDataLength, func(c *Config, b []byte) { c.AssociatedData = b }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name+" max", func(t *testing.T) {
+			cfg := testConfig()
+			tc.edit(&cfg, bytes.Repeat([]byte{0x42}, tc.max))
+			if _, _, err := startTestInitiator(cfg); err != nil {
+				t.Fatalf("Start rejected max-size field: %v", err)
+			}
+		})
+		t.Run(tc.name+" oversized", func(t *testing.T) {
+			cfg := testConfig()
+			tc.edit(&cfg, bytes.Repeat([]byte{0x42}, tc.max+1))
+			if _, _, err := startTestInitiator(cfg); !errors.Is(err, ErrInvalidInput) {
+				t.Fatalf("Start err=%v", err)
+			}
+		})
+	}
+}
+
 func TestScalarSamplingRejectsRepeatedZero(t *testing.T) {
 	if _, err := sampleScalar(&repeatingReader{buf: []byte{0}}); !errors.Is(err, ErrRandomness) ||
 		errors.Is(err, ErrInvalidInput) {
@@ -796,8 +827,63 @@ func TestMessageParserRejectsMalformed(t *testing.T) {
 	}
 }
 
+func TestMessageParserFieldSizeLimits(t *testing.T) {
+	point := bytes.Repeat([]byte{0x42}, pointSize)
+	tag := bytes.Repeat([]byte{0x99}, tagSize)
+
+	msgA := encodeMessageA(bytes.Repeat([]byte{0x11}, maxSessionIDLength), point, bytes.Repeat([]byte{0x22}, maxAssociatedDataLength))
+	if _, err := decodeMessageA(msgA); err != nil {
+		t.Fatalf("decode A max-size fields: %v", err)
+	}
+	casesA := []struct {
+		name string
+		msg  []byte
+	}{
+		{"sid oversized", encodeMessageA(bytes.Repeat([]byte{0x11}, maxSessionIDLength+1), point, nil)},
+		{"point oversized", encodeMessageA([]byte("sid"), bytes.Repeat([]byte{0x42}, pointSize+1), nil)},
+		{"ad oversized", encodeMessageA([]byte("sid"), point, bytes.Repeat([]byte{0x22}, maxAssociatedDataLength+1))},
+	}
+	for _, tc := range casesA {
+		t.Run("A "+tc.name, func(t *testing.T) {
+			if _, err := decodeMessageA(tc.msg); !errors.Is(err, ErrMessage) {
+				t.Fatalf("decode A err=%v", err)
+			}
+		})
+	}
+
+	msgB := encodeMessageB(point, bytes.Repeat([]byte{0x33}, maxAssociatedDataLength), tag)
+	if _, err := decodeMessageB(msgB); err != nil {
+		t.Fatalf("decode B max-size fields: %v", err)
+	}
+	casesB := []struct {
+		name string
+		msg  []byte
+	}{
+		{"point oversized", encodeMessageB(bytes.Repeat([]byte{0x42}, pointSize+1), nil, tag)},
+		{"ad oversized", encodeMessageB(point, bytes.Repeat([]byte{0x33}, maxAssociatedDataLength+1), tag)},
+		{"tag oversized", encodeMessageB(point, nil, bytes.Repeat([]byte{0x99}, tagSize+1))},
+	}
+	for _, tc := range casesB {
+		t.Run("B "+tc.name, func(t *testing.T) {
+			if _, err := decodeMessageB(tc.msg); !errors.Is(err, ErrMessage) {
+				t.Fatalf("decode B err=%v", err)
+			}
+		})
+	}
+
+	if _, err := decodeMessageC(encodeMessageC(tag)); err != nil {
+		t.Fatalf("decode C exact tag: %v", err)
+	}
+	if _, err := decodeMessageC(encodeMessageC(bytes.Repeat([]byte{0x99}, tagSize+1))); !errors.Is(err, ErrMessage) {
+		t.Fatalf("decode C oversized tag err=%v", err)
+	}
+}
+
 func TestMessageParsersRejectMalformedBAndC(t *testing.T) {
 	msgB := encodeMessageB(bytes.Repeat([]byte{0x42}, pointSize), []byte("ADb"), bytes.Repeat([]byte{0x99}, tagSize))
+	oversizedBAd := []byte{wireFormatV1, wireSuite, roleB}
+	oversizedBAd = append(oversizedBAd, prependLen(bytes.Repeat([]byte{0x42}, pointSize))...)
+	oversizedBAd = append(oversizedBAd, encodeLEB128(maxAssociatedDataLength+1)...)
 	casesB := []struct {
 		name string
 		msg  []byte
@@ -811,7 +897,7 @@ func TestMessageParsersRejectMalformedBAndC(t *testing.T) {
 		{"point len", encodeMessageB(bytes.Repeat([]byte{0x42}, pointSize-1), nil, bytes.Repeat([]byte{0x99}, tagSize))},
 		{"tag len", encodeMessageB(bytes.Repeat([]byte{0x42}, pointSize), nil, bytes.Repeat([]byte{0x99}, tagSize-1))},
 		{"leb128", []byte{wireFormatV1, wireSuite, roleB, 0x80, 0x00}},
-		{"oversized", append([]byte{wireFormatV1, wireSuite, roleB}, encodeLEB128(maxFieldLength+1)...)},
+		{"oversized ad", oversizedBAd},
 	}
 	for _, tc := range casesB {
 		t.Run("B "+tc.name, func(t *testing.T) {
@@ -834,7 +920,7 @@ func TestMessageParsersRejectMalformedBAndC(t *testing.T) {
 		{"swapped format suite", append([]byte{wireSuite, wireFormatV1}, msgC[2:]...)},
 		{"tag len", encodeMessageC(bytes.Repeat([]byte{0x99}, tagSize-1))},
 		{"leb128", []byte{wireFormatV1, wireSuite, roleC, 0x80, 0x00}},
-		{"oversized", append([]byte{wireFormatV1, wireSuite, roleC}, encodeLEB128(maxFieldLength+1)...)},
+		{"oversized tag", encodeMessageC(bytes.Repeat([]byte{0x99}, tagSize+1))},
 	}
 	for _, tc := range casesC {
 		t.Run("C "+tc.name, func(t *testing.T) {
