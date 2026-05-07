@@ -10,6 +10,8 @@
 - Add Developer Certificate of Origin signoff policy and PR validation.
 - Add coordinated vulnerability disclosure response timeframes to
   `SECURITY.md`.
+- Add a project secrets and credentials policy covering storage, access, and
+  rotation.
 
 ## v0.1.1 - 2026-05-06
 
