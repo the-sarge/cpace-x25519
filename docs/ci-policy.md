@@ -19,7 +19,8 @@ Hosted CI runs on these events:
 
 - Pull requests to `main`: required `Check` runs for every PR. Code changes run
   `go test ./...`; docs-only PRs run whitespace and Markdown validation. The
-  DCO workflow also checks every PR commit for a `Signed-off-by` trailer.
+  DCO workflow checks every PR commit for a `Signed-off-by` trailer.
+  `Dependency Gate` runs SCA tooling, and `SAST Gate` runs blocking gosec SAST.
 - Pull requests that touch Go code or Go module files: CodeQL and Staticcheck
   Advisory run as background signal.
 - Pushes to `main`: required `Check` runs again, and CodeQL analyzes the main
@@ -33,22 +34,31 @@ Hosted CI runs on these events:
 Maintainer-controlled long fuzzing is run outside the required PR gate and
 recorded in `docs/fuzz-evidence.md` when it supports a release-readiness claim.
 
-## Required PR Gate
+## Required PR Gates
 
-The required PR gate is the `Check` job in `.github/workflows/ci.yml`. It runs
-on GitHub-hosted Ubuntu runners with read-only repository permissions. Code
-changes run `go test ./...`; docs-only PRs run whitespace and Markdown
-validation without setting up Go.
+The required PR gates are:
 
-Keep this lane short, deterministic, and least-privilege. New security or
-analysis tools should start as background signal before being considered for
-the required gate.
+- `Check` in `.github/workflows/ci.yml`. It runs on GitHub-hosted Ubuntu
+  runners with read-only repository permissions. Code changes run
+  `go test ./...`; docs-only PRs run whitespace and Markdown validation without
+  setting up Go.
+- `DCO` in `.github/workflows/dco.yml`. It checks every PR commit for a
+  `Signed-off-by` trailer.
+- `Dependency Gate` in `.github/workflows/dependency-gate.yml`. It runs GitHub
+  Dependency Review, `go mod verify`, and `govulncheck -test ./...`.
+- `SAST Gate` in `.github/workflows/sast-gate.yml`. It runs blocking
+  `gosec ./...`.
+
+Keep required lanes short, deterministic, and least-privilege. New security or
+analysis tools should start as background signal before being considered for a
+required gate.
 
 ## Background Signal
 
 `Vulnerability Scan`, `Gosec Advisory`, and `Nightly Fuzz` run on
 GitHub-hosted runners through both `workflow_dispatch` and scheduled triggers.
-These lanes are advisory unless a later policy change promotes them.
+These lanes provide scheduled background signal in addition to the required PR
+gates.
 
 The scheduled fuzz lane is a short 5-minute-per-target regression run. It can
 catch crashes and upload new failure corpus files, but it is not long-fuzz
