@@ -8,6 +8,17 @@
   exact-candidate evidence refresh.
 - Add the OpenSSF Best Practices Baseline badge to the README.
 - Add Developer Certificate of Origin signoff policy and PR validation.
+- Add coordinated vulnerability disclosure response timeframes to
+  `SECURITY.md`.
+- Add a project secrets and credentials policy covering storage, access, and
+  rotation.
+- Add release verification instructions for signed Git tags and future release
+  assets.
+- Document the expected release signer identity for release verification.
+- Document support scope and duration for `v0.x` prereleases.
+- Add governance, CI, test-update, SCA/SAST threshold, VEX, SBOM, multi-repo,
+  and attack-surface policy docs for OpenSSF review.
+- Clarify SSH allowed-signers setup for release tag verification.
 
 ## v0.1.1 - 2026-05-06
 
