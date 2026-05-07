@@ -12,6 +12,8 @@
   `SECURITY.md`.
 - Add a project secrets and credentials policy covering storage, access, and
   rotation.
+- Add release verification instructions for signed Git tags and future release
+  assets.
 
 ## v0.1.1 - 2026-05-06
 

@@ -107,7 +107,8 @@ review evidence lives in `docs/dependency-review.md`; fuzz campaign evidence
 lives in `docs/fuzz-evidence.md`; security/spec audit evidence lives in
 `docs/security-spec-audit.md`. External reviewer scope and review questions
 are summarized in `docs/external-review-handoff.md`; security boundaries are
-summarized in `docs/threat-model.md`.
+summarized in `docs/threat-model.md`. Downstream release verification
+instructions live in `docs/release-verification.md`.
 
 ```go
 initiator, msgA, err := cpace.Start(initCfg)

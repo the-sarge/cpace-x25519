@@ -104,7 +104,8 @@ Create the GitHub release or prerelease. Notes should state:
 - the supported CPace draft, suite, and mode;
 - whether Go API, protocol behavior, dependencies, or release evidence changed;
 - validation workflow run URL;
-- signed-tag verification expectation;
+- signed-tag verification expectation and a link to
+  `docs/release-verification.md`;
 - remaining blockers, if any.
 
 Keep tags in the `v0.x` range until independent review is complete and the
