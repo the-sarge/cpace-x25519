@@ -14,6 +14,7 @@
   rotation.
 - Add release verification instructions for signed Git tags and future release
   assets.
+- Document the expected release signer identity for release verification.
 
 ## v0.1.1 - 2026-05-06
 

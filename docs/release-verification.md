@@ -16,6 +16,15 @@ git verify-tag vX.Y.Z
 Expected output includes a good SSH signature for
 `the-sarge@the-sarge.com`.
 
+The expected release signer identity is:
+
+- Joshua Sargent
+- `the-sarge@the-sarge.com`
+
+If `git verify-tag` reports a different signer identity or cannot verify the
+signature, do not treat the release as authentic until the discrepancy is
+resolved.
+
 To inspect the signed tag and the commit it names:
 
 ```sh
@@ -34,6 +43,33 @@ Expected output:
 ```text
 tag
 ```
+
+## Verify Release Author Identity
+
+Official release tags should be authored by the project maintainer identity
+listed above. Inspect the tagger identity:
+
+```sh
+git for-each-ref refs/tags/vX.Y.Z \
+  --format='%(taggername) <%(taggeremail)>'
+```
+
+Expected output:
+
+```text
+Joshua Sargent <the-sarge@the-sarge.com>
+```
+
+Then verify the tag signature:
+
+```sh
+git verify-tag vX.Y.Z
+```
+
+The signature identity and tagger identity should both correspond to the
+expected maintainer identity. If a future release is produced by automation,
+the release notes must identify that process and the process signing identity
+before the release is considered official.
 
 ## Verify Source Content
 
