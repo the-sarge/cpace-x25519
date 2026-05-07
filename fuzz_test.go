@@ -2,11 +2,112 @@ package cpace
 
 import (
 	"bytes"
+	_ "embed"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
+	"io"
 	"testing"
 )
 
+//go:embed testdata/draft21-ristretto255-sha512.json
+var draft21RistrettoVectorJSON []byte
+
+//go:embed testdata/draft21-ristretto255-invalid.json
+var draft21RistrettoInvalidJSON []byte
+
 const fuzzProtocolInputCap = 4096
+
+type draftVector map[string][]byte
+
+type draftInvalidVector struct {
+	Valid     map[string][]byte
+	InvalidY1 []byte
+	InvalidY2 []byte
+}
+
+type repeatingReader struct {
+	buf []byte
+	off int
+}
+
+func (r *repeatingReader) Read(p []byte) (int, error) {
+	for i := range p {
+		if len(r.buf) == 0 {
+			p[i] = 1
+			continue
+		}
+		p[i] = r.buf[r.off%len(r.buf)]
+		r.off++
+	}
+	return len(p), nil
+}
+
+func testConfig() Config {
+	return Config{
+		Password:    []byte("password"),
+		InitiatorID: []byte("initiator"),
+		ResponderID: []byte("responder"),
+		Context:     []byte("context"),
+		SessionID:   []byte("sid"),
+	}
+}
+
+func repeatingRand(fill byte) io.Reader {
+	return &repeatingReader{buf: bytes.Repeat([]byte{fill}, scalarSize)}
+}
+
+func startTestInitiator(cfg Config) (*Initiator, []byte, error) {
+	return startWithRandom(cfg, repeatingRand(0x11))
+}
+
+func respondTestResponder(cfg Config, messageA []byte) (*Responder, []byte, error) {
+	return respondWithRandom(cfg, messageA, repeatingRand(0x22))
+}
+
+func loadDraftVectorJSON(in []byte) (draftVector, error) {
+	var raw map[string]string
+	if err := json.Unmarshal(in, &raw); err != nil {
+		return nil, err
+	}
+	out := make(draftVector, len(raw))
+	for k, v := range raw {
+		decoded, err := hex.DecodeString(v)
+		if err != nil {
+			return nil, err
+		}
+		out[k] = decoded
+	}
+	return out, nil
+}
+
+func loadDraftInvalidVectorJSON(in []byte) (draftInvalidVector, error) {
+	var raw struct {
+		Valid     map[string]string `json:"Valid"`
+		InvalidY1 string            `json:"Invalid Y1"`
+		InvalidY2 string            `json:"Invalid Y2"`
+	}
+	if err := json.Unmarshal(in, &raw); err != nil {
+		return draftInvalidVector{}, err
+	}
+	valid := make(map[string][]byte, len(raw.Valid))
+	for k, v := range raw.Valid {
+		decoded, err := hex.DecodeString(v)
+		if err != nil {
+			return draftInvalidVector{}, err
+		}
+		valid[k] = decoded
+	}
+	invalidY1, err := hex.DecodeString(raw.InvalidY1)
+	if err != nil {
+		return draftInvalidVector{}, err
+	}
+	invalidY2, err := hex.DecodeString(raw.InvalidY2)
+	if err != nil {
+		return draftInvalidVector{}, err
+	}
+	return draftInvalidVector{Valid: valid, InvalidY1: invalidY1, InvalidY2: invalidY2}, nil
+}
 
 func FuzzDecodeMessageA(f *testing.F) {
 	_, _, _, msgA, msgB, _ := makeFuzzExchange(f)
@@ -218,11 +319,18 @@ func FuzzResponderFinishWithFuzzedMessageC(f *testing.F) {
 
 func FuzzScalarMultVFY(f *testing.F) {
 	invalid := fuzzDraftInvalidVector(f)
-	f.Add(invalid.Valid["X"])
-	f.Add(invalid.InvalidY1)
-	f.Add(invalid.InvalidY2)
+	validX := invalid.Valid["X"]
+	if len(validX) == pointSize {
+		f.Add(validX)
+		f.Add(validX[:pointSize-1])
+	}
+	if len(invalid.InvalidY1) > 0 {
+		f.Add(invalid.InvalidY1)
+	}
+	if len(invalid.InvalidY2) > 0 {
+		f.Add(invalid.InvalidY2)
+	}
 	f.Add([]byte{})
-	f.Add(invalid.Valid["X"][:pointSize-1])
 	f.Add(bytes.Repeat([]byte{0xff}, pointSize))
 
 	s, err := scalarFromCanonical(invalid.Valid["s"])
@@ -321,8 +429,22 @@ func FuzzMessageCRoundTrip(f *testing.F) {
 	})
 }
 
-func makeFuzzExchange(tb testing.TB) (*Initiator, *Responder, *Session, []byte, []byte, []byte) {
-	tb.Helper()
+type fuzzFataler interface {
+	Fatalf(string, ...any)
+}
+
+type fuzzHelper interface {
+	Helper()
+}
+
+func markFuzzHelper(tb fuzzFataler) {
+	if h, ok := tb.(fuzzHelper); ok {
+		h.Helper()
+	}
+}
+
+func makeFuzzExchange(tb fuzzFataler) (*Initiator, *Responder, *Session, []byte, []byte, []byte) {
+	markFuzzHelper(tb)
 	initiator, msgA, err := startTestInitiator(fuzzInitiatorConfig())
 	if err != nil {
 		tb.Fatalf("Start failed for fixed fuzz config: %v", err)
@@ -350,8 +472,8 @@ func fuzzResponderConfig() Config {
 	return cfg
 }
 
-func fuzzDraftInvalidVector(tb testing.TB) draftInvalidVector {
-	tb.Helper()
+func fuzzDraftInvalidVector(tb fuzzFataler) draftInvalidVector {
+	markFuzzHelper(tb)
 	v, err := loadDraftInvalidVectorJSON(draft21RistrettoInvalidJSON)
 	if err != nil {
 		tb.Fatalf("invalid vector fixture failed to load: %v", err)

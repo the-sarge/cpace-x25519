@@ -31,6 +31,8 @@ cryptographic review before any production-ready claim.
   identity orientation, and session-output guidance.
 - `docs/dependency-review.md` for dependency and vulnerability scan evidence.
 - `docs/fuzz-evidence.md` for local smoke and long-fuzz campaign evidence.
+- `docs/capslock-report.md` for static capability-analysis evidence.
+- `docs/performance.md` for local benchmark and allocation-measurement guidance.
 - `docs/ci-policy.md` for hosted-runner policy, advisory lanes, long-fuzz
   evidence, and signed release tags.
 - `docs/release-checklist.md` for exact-candidate release evidence steps.
@@ -91,6 +93,10 @@ dependency review, long fuzzing, and security/spec audit against the exact
 release candidate before any production-readiness claim, or sooner if protocol,
 parser/framing, fuzz harness, dependency, toolchain, or package-profile docs
 change.
+
+Capslock capability-analysis evidence is recorded in
+`docs/capslock-report.md` for main commit
+`39ccb58f827d88f6742628c1fadf9375539fb017`.
 
 ## Review Questions
 

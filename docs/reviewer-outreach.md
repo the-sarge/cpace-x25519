@@ -63,6 +63,8 @@ Primary files for review:
 - `docs/dependency-review.md`
 - `docs/fuzz-evidence.md`
 - `docs/security-spec-audit.md`
+- `docs/capslock-report.md`
+- `docs/performance.md`
 
 Open release blockers:
 
