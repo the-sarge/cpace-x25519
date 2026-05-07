@@ -40,6 +40,9 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Download modules
+        run: go mod download
+
       - name: Verify module downloads
         run: go mod verify
 

@@ -17,6 +17,9 @@ jobs:
     name: SAST Gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -33,4 +36,17 @@ jobs:
         run: go install github.com/securego/gosec/v2/cmd/gosec@v2.26.1
 
       - name: Run gosec
-        run: gosec ./...
+        id: gosec
+        continue-on-error: true
+        run: gosec -tests -fmt sarif -out gosec.sarif ./...
+
+      - name: Upload gosec SARIF to code scanning
+        if: always() && hashFiles('gosec.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@e46ed2cbd01164d986452f91f178727624ae40d7 # v4.35.3
+        with:
+          sarif_file: gosec.sarif
+          category: sast-gate
+
+      - name: Report gosec result
+        if: steps.gosec.outcome == 'failure'
+        run: exit 1

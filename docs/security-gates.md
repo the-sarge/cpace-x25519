@@ -6,7 +6,7 @@ those checks.
 
 ## Current Automation
 
-Required pull-request gates:
+Pull-request gates:
 
 - required PR `Check` runs tests for code changes and docs validation for
   docs-only changes;
@@ -81,8 +81,10 @@ must be fixed before release unless they are documented as false positives or
 non-exploitable. Suppressions should be narrow, reviewable, and linked to the
 evidence explaining why they are safe.
 
-The required `SAST Gate` status check runs `gosec ./...` on pull requests and
-blocks merge when gosec reports a security weakness.
+The required `SAST Gate` status check runs `gosec -tests ./...` on pull
+requests and blocks merge when gosec reports a security weakness. Same-repo
+runs also upload SARIF to Code Scanning for triage; fork PRs skip SARIF upload
+to avoid granting write permissions to untrusted code.
 
 ## Pre-Release Policy
 
