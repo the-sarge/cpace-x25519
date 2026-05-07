@@ -9,6 +9,26 @@ paths, or embargoed findings in public issues or pull requests. Public issues
 are appropriate for non-sensitive bugs, documentation gaps, external review
 questions, and release-readiness tracking.
 
+## Coordinated Vulnerability Disclosure
+
+The project follows coordinated vulnerability disclosure for confirmed or
+suspected vulnerabilities.
+
+Expected response timeline:
+
+- Acknowledge private vulnerability reports within 7 calendar days.
+- Provide initial triage or status within 14 calendar days.
+- Provide status updates at least every 30 calendar days while a confirmed
+  issue remains unresolved.
+- Coordinate public disclosure timing with the reporter.
+- Aim to publish a fix, mitigation, advisory, or documented rationale within 90
+  calendar days for confirmed vulnerabilities, unless active exploitation,
+  report complexity, or reviewer coordination requires a different timeline.
+
+Reports should include the affected version or commit, reproduction steps or
+proof-of-concept details when safe to share privately, expected impact, and any
+requested embargo or coordination constraints.
+
 This repository is an unaudited implementation of an active Internet-Draft:
 `draft-irtf-cfrg-cpace-21`, published April 23, 2026. Do not describe it as
 production-ready until independent cryptographic review is complete.

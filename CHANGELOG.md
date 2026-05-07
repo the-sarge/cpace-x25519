@@ -8,6 +8,8 @@
   exact-candidate evidence refresh.
 - Add the OpenSSF Best Practices Baseline badge to the README.
 - Add Developer Certificate of Origin signoff policy and PR validation.
+- Add coordinated vulnerability disclosure response timeframes to
+  `SECURITY.md`.
 
 ## v0.1.1 - 2026-05-06
 
