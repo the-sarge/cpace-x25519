@@ -90,7 +90,7 @@ listed above. Inspect the tagger identity:
 
 ```sh
 git for-each-ref refs/tags/vX.Y.Z \
-  --format='%(taggername) <%(taggeremail)>'
+  --format='%(taggername) %(taggeremail)'
 ```
 
 Expected output:
