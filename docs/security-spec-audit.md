@@ -4,20 +4,26 @@ Date: 2026-05-08
 
 Target module: `github.com/the-sarge/cpace`
 
-Audit commit: `737bc56ffba81e2df5e9caa0df1ff180bfdb594b`
+Implementation baseline: `737bc56ffba81e2df5e9caa0df1ff180bfdb594b`
+
+Documentation/evidence baseline: PR #43 head or merge commit containing this
+file.
 
 Toolchain: Go 1.26.3
+
+Evidence transcript: `docs/evidence/go1263-20260508/local-analysis.log`
 
 Draft source: `draft-irtf-cfrg-cpace-21`
 (`https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-cpace-21`)
 
 ## Scope
 
-This audit checked `docs/security-assessment.md` and `docs/spec-matrix.md`
-against the implementation, tests, refreshed Go 1.26.3 release evidence, and
-the draft-21 text. It is a documentation and conformance audit, not an
-independent cryptographic review. This is a self-audit by the project
-maintainer, distinct from independent cryptographic review or external review.
+This audit checked the PR #43 versions of `docs/security-assessment.md` and
+`docs/spec-matrix.md` against the implementation baseline, tests, refreshed Go
+1.26.3 release evidence, and the draft-21 text. It is a documentation and
+conformance audit, not an independent cryptographic review. This is a
+self-audit by the project maintainer, distinct from independent cryptographic
+review or external review.
 
 The audit covered:
 
@@ -32,9 +38,11 @@ The audit covered:
 
 ## Result
 
-No security/spec drift was found at the audit commit.
+No security/spec drift was found at the implementation baseline.
 
-`task check` passes under Go 1.26.3 at the audit commit.
+`task check` passes under Go 1.26.3 for PR #43. The clean-worktree evidence
+transcript records dependency, gosec, and Capslock commands at the
+implementation baseline.
 
 The security assessment and spec matrix accurately describe the current
 implementation:

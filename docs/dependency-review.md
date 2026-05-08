@@ -10,6 +10,8 @@ Review worktree: clean detached worktree at the review commit.
 
 Toolchain: Go 1.26.3 (`darwin/arm64`)
 
+Transcript: `docs/evidence/go1263-20260508/local-analysis.log`
+
 Dependencies:
 
 | Module | Version | Role | Notes |
@@ -60,6 +62,11 @@ Summary:
   Nosec  : 0
   Issues : 0
 ```
+
+The `Gosec : dev` summary value is the string emitted by the upstream gosec
+binary for this invocation. The transcript also records `go version -m` module
+metadata for an installed copy of the same pinned command, showing
+`github.com/securego/gosec/v2 v2.26.1`.
 
 The Go 1.26.3 security release was treated as a toolchain evidence trigger. No
 dependency versions changed from the previous review.

@@ -13,6 +13,8 @@ This report refreshes the earlier Go 1.26.2 Capslock evidence after the Go
 1.26.3 security toolchain release. The refresh was run from a clean detached
 worktree at the package-code baseline.
 
+Transcript: `docs/evidence/go1263-20260508/local-analysis.log`
+
 ## Tool
 
 ```sh

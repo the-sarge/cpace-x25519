@@ -4,9 +4,11 @@ Date: 2026-05-08
 
 Target module: `github.com/the-sarge/cpace`
 
-Reference tag: `v0.1.1`
+Last released tag: `v0.1.1`
 
-Reference commit: `74b82cbc65a1ea6186f2732749c9c5e5b03eecc3`
+Last released commit: `74b82cbc65a1ea6186f2732749c9c5e5b03eecc3`
+
+Current evidence baseline: `737bc56ffba81e2df5e9caa0df1ff180bfdb594b`
 
 Status: auditable draft implementation. This package has not had independent
 cryptographic review and is not production-ready.
@@ -32,6 +34,8 @@ cryptographic review before any production-ready claim.
 - `docs/dependency-review.md` for dependency and vulnerability scan evidence.
 - `docs/fuzz-evidence.md` for local smoke and long-fuzz campaign evidence.
 - `docs/capslock-report.md` for static capability-analysis evidence.
+- `docs/evidence/go1263-20260508/` for raw Go 1.26.3 transcript files and
+  SHA-256 digests.
 - `docs/performance.md` for local benchmark and allocation-measurement guidance.
 - `docs/ci-policy.md` for hosted-runner policy, advisory lanes, long-fuzz
   evidence, and signed release tags.
@@ -96,7 +100,8 @@ claim, or sooner if protocol, parser/framing, fuzz harness, dependency,
 toolchain, or package-profile docs change.
 
 Capslock capability-analysis evidence is recorded in
-`docs/capslock-report.md` for the same current `main` package-code commit.
+`docs/capslock-report.md` for
+`737bc56ffba81e2df5e9caa0df1ff180bfdb594b`.
 
 OSS-Fuzz onboarding is open upstream in `google/oss-fuzz#15480`. The upstream
 PR helper build, header check, and Google CLA check passed; merge is waiting on

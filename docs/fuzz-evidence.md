@@ -20,15 +20,21 @@ targets under Go 1.26.3 on ARM and Intel hosts.
 
 | Host | Platform | Toolchain | Started | Finished | Result |
 | --- | --- | --- | --- | --- | --- |
-| `m4mini.local` | `Darwin/arm64` | Go 1.26.3, Task 3.50.0 | `2026-05-08T09:09:50Z` | `2026-05-08T16:09:59Z` | PASS: all 14 targets, `RC=0` |
-| `iMacPro.local` | `Darwin/x86_64` | Go 1.26.3, Task 3.50.0 | `2026-05-08T09:09:50Z` | `2026-05-08T16:10:10Z` | PASS: all 14 targets, `RC=0` |
+| `m4mini.local` | `darwin/arm64` | Go 1.26.3, Task 3.50.0 | `2026-05-08T09:09:50Z` | `2026-05-08T16:09:59Z` | PASS: all 14 targets, `RC=0` |
+| `iMacPro.local` | `darwin/amd64` | Go 1.26.3, Task 3.50.0 | `2026-05-08T09:09:50Z` | `2026-05-08T16:10:10Z` | PASS: all 14 targets, `RC=0` |
 
 With 14 targets, `PARALLEL=2`, and `FUZZTIME=1h`, the command executes seven
-target batches. The recorded wall-clock duration is about seven hours on each
-host, matching the expected schedule and confirming that every target ran the
-full `FUZZTIME=1h`. `FUZZ_RACE=0` leaves race detection to `task check` and
-uses the long campaign for input-space exploration. `GOMAXPROCS=4` keeps each
-fuzzing subprocess from oversubscribing the host.
+one-hour target batches. The recorded wall-clock duration on each host matches
+that expected schedule and is consistent with each target receiving the
+configured `FUZZTIME=1h`. `FUZZ_RACE=0` leaves race detection to `task check`
+and uses the long campaign for input-space exploration. `GOMAXPROCS=4` keeps
+each fuzzing subprocess from oversubscribing the host.
+
+Raw maintainer-machine logs and SHA-256 digests are committed under
+`docs/evidence/go1263-20260508/`. The `task fuzz` logs preserve host, commit,
+Go version, Task version, command, timestamps, return code, and the synthesized
+per-target PASS set, but they do not preserve Go's per-target fuzz counter
+output.
 
 Both logs recorded the full target pass set:
 
@@ -59,7 +65,7 @@ been superseded by the paired Go 1.26.3 candidate runs above.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `mbp128.local` | `darwin/arm64` | `955855b58424a8868d318096149be615bb3989da` | Go 1.26.2, Task 3.50.0 | `2026-05-08T02:34:04Z` | `2026-05-08T03:30:17Z` | `FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=8m PARALLEL=2 task fuzz` | PASS: all 14 targets |
 
-The earlier paired ARM/Intel long campaign remains historical evidence exact to
+The earlier paired ARM/Intel long campaign remains historical evidence for
 commit `06f21c51645f54e2b7bde7c5b538479463be5d0e`. It does not cover the PR #40
 fuzz-harness refactor or OSS-Fuzz seed-guard changes.
 

@@ -161,7 +161,7 @@ single-architecture risk plainly instead of relabeling older runs as current.
 
 The OSS-Fuzz handoff is now staged locally and open upstream with CLA, header,
 and helper-build checks green. Today also started paired one-hour
-maintainer-machine fuzz campaigns on `m4mini.local` and `imacpro` against
+maintainer-machine fuzz campaigns on `m4mini.local` and `iMacPro.local` against
 `737bc56`, and corrected the README badge from the numeric OSPS Baseline
 endpoint to the OpenSSF Best Practices `passing` endpoint.
 
@@ -199,7 +199,7 @@ Capslock under Go 1.26.3 before treating the evidence packet as current again.
 **Planner:** Josh
 
 Completed the Go 1.26.3 evidence refresh after the paired maintainer-machine
-fuzz campaigns finished cleanly on `m4mini.local` and `imacpro`. Both hosts ran
+fuzz campaigns finished cleanly on `m4mini.local` and `iMacPro.local`. Both hosts ran
 all 14 registered fuzz targets for `FUZZTIME=1h` with `PARALLEL=2` and
 recorded `RC=0`.
 

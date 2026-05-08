@@ -6,7 +6,7 @@
   templates, a pull-request template, and reviewer outreach notes.
 - Add threat-model and release-checklist docs for external review and future
   exact-candidate evidence refresh.
-- Add the OpenSSF Best Practices badge to the README.
+- Add the OpenSSF Best Practices Baseline badge to the README.
 - Add Developer Certificate of Origin signoff policy and PR validation.
 - Add coordinated vulnerability disclosure response timeframes to
   `SECURITY.md`.
@@ -35,6 +35,8 @@
 - Refresh dependency, gosec, Capslock, security/spec, and paired ARM/Intel
   one-hour fuzz evidence under Go 1.26.3 after the Go toolchain security
   release.
+- Switch the README badge from the OpenSSF Baseline endpoint to the OpenSSF
+  Best Practices `passing` endpoint.
 - Move private local planning/interview/review artifacts into the private
   `the-sarge/meta` archive and remove stale public-repo ignore rules for those
   root files.
