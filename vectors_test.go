@@ -10,22 +10,14 @@ import (
 	"testing"
 )
 
-//go:embed testdata/draft21-ristretto255-sha512.json
-var draft21RistrettoVectorJSON []byte
-
 //go:embed testdata/draft21-ristretto255-generator.json
 var draft21RistrettoGeneratorJSON []byte
-
-//go:embed testdata/draft21-ristretto255-invalid.json
-var draft21RistrettoInvalidJSON []byte
 
 const (
 	draft21RistrettoGeneratorJSONSHA256 = "05c8a34bd623fbdefd7fbffcd261d2420bd34363efa301d0b0dd9817f7f47c94"
 	draft21RistrettoVectorJSONSHA256    = "dc74177668cc2374beaf57fcb6e4c08a908238bab6b74d8edf8c86e04bc663ae"
 	draft21RistrettoInvalidJSONSHA256   = "6288f7ff96dfb8c2d6c4d743927c5fe6ac4aecbc56da2d1f00f27104000b6dfd"
 )
-
-type draftVector map[string][]byte
 
 type draftGeneratorVector struct {
 	H               string
@@ -40,12 +32,6 @@ type draftGeneratorVector struct {
 	EncodedG        []byte
 }
 
-type draftInvalidVector struct {
-	Valid     map[string][]byte
-	InvalidY1 []byte
-	InvalidY2 []byte
-}
-
 func hx(t *testing.T, s string) []byte {
 	t.Helper()
 	out, err := hex.DecodeString(s)
@@ -53,22 +39,6 @@ func hx(t *testing.T, s string) []byte {
 		t.Fatal(err)
 	}
 	return out
-}
-
-func loadDraftVectorJSON(in []byte) (draftVector, error) {
-	var raw map[string]string
-	if err := json.Unmarshal(in, &raw); err != nil {
-		return nil, err
-	}
-	out := make(draftVector, len(raw))
-	for k, v := range raw {
-		decoded, err := hex.DecodeString(v)
-		if err != nil {
-			return nil, err
-		}
-		out[k] = decoded
-	}
-	return out, nil
 }
 
 func loadDraftGeneratorJSON(in []byte) (draftGeneratorVector, error) {
@@ -149,34 +119,6 @@ func loadDraftGeneratorJSON(in []byte) (draftGeneratorVector, error) {
 		HashResult:      hashResult,
 		EncodedG:        encodedG,
 	}, nil
-}
-
-func loadDraftInvalidVectorJSON(in []byte) (draftInvalidVector, error) {
-	var raw struct {
-		Valid     map[string]string `json:"Valid"`
-		InvalidY1 string            `json:"Invalid Y1"`
-		InvalidY2 string            `json:"Invalid Y2"`
-	}
-	if err := json.Unmarshal(in, &raw); err != nil {
-		return draftInvalidVector{}, err
-	}
-	valid := make(map[string][]byte, len(raw.Valid))
-	for k, v := range raw.Valid {
-		decoded, err := hex.DecodeString(v)
-		if err != nil {
-			return draftInvalidVector{}, err
-		}
-		valid[k] = decoded
-	}
-	invalidY1, err := hex.DecodeString(raw.InvalidY1)
-	if err != nil {
-		return draftInvalidVector{}, err
-	}
-	invalidY2, err := hex.DecodeString(raw.InvalidY2)
-	if err != nil {
-		return draftInvalidVector{}, err
-	}
-	return draftInvalidVector{Valid: valid, InvalidY1: invalidY1, InvalidY2: invalidY2}, nil
 }
 
 func pinnedJSONHash(in []byte) string {

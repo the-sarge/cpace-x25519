@@ -23,6 +23,13 @@
   review, covering GitHub Dependency Review, module verification,
   `govulncheck`, blocking `gosec -tests`, and same-repository gosec SARIF
   upload.
+- Add benchmark coverage and a `task bench` facade for hot protocol, exporter,
+  and parser paths with `-benchmem`.
+- Add godoc examples for exporter domain separation, transcript IDs,
+  confirmation-failure handling, and session close behavior.
+- Add Capslock capability-analysis evidence for the external-review packet.
+- Stage OSS-Fuzz project files for the existing native Go fuzz targets and
+  validate them with the local OSS-Fuzz helper flow.
 
 ## v0.1.1 - 2026-05-06
 

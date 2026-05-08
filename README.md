@@ -86,6 +86,7 @@ task quick
 task check
 task check:changed
 task docs:check
+task bench
 FUZZTIME=30s PARALLEL=2 task fuzz
 FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=8m PARALLEL=2 task fuzz
 ```
@@ -105,8 +106,10 @@ Release-readiness work should record exact evidence: commit SHA, command or
 workflow, duration for fuzzing, target count, and residual risks. Dependency
 review evidence lives in `docs/dependency-review.md`; fuzz campaign evidence
 lives in `docs/fuzz-evidence.md`; security/spec audit evidence lives in
-`docs/security-spec-audit.md`. External reviewer scope and review questions
-are summarized in `docs/external-review-handoff.md`; security boundaries are
+`docs/security-spec-audit.md`; Capslock capability-analysis evidence lives in
+`docs/capslock-report.md`; local benchmark guidance lives in
+`docs/performance.md`. External reviewer scope and review questions are
+summarized in `docs/external-review-handoff.md`; security boundaries are
 summarized in `docs/threat-model.md`. Downstream release verification
 instructions live in `docs/release-verification.md`. Project governance,
 security-gate, and VEX policies live in `docs/governance.md`,

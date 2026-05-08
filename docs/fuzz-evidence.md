@@ -48,8 +48,15 @@ subprocess from oversubscribing the shared host.
 
 The long runs are release-readiness evidence for the exact code commit above.
 Repeat them if parser, protocol, fuzz harness, dependency, or toolchain changes
-land before a release tag. Longer continuous fuzzing and OSS-Fuzz remain later
-investigations.
+land before a release tag. Longer continuous fuzzing and OSS-Fuzz upstream
+onboarding remain later investigations.
+
+PR #40 changes the fuzz harness to make the native Go fuzz targets
+self-contained for OSS-Fuzz and to guard one scalar-vector seed setup path. The
+long-fuzz campaign above was not refreshed for that PR commit; use it as
+historical release-readiness evidence for `06f21c51645f54e2b7bde7c5b538479463be5d0e`
+only. Refresh long-fuzz evidence against the exact candidate before making any
+stronger release-readiness claim.
 
 Earlier local and remote attempts included 4-hour local `m4max` runs, 15-minute
 remote ARM/Intel runs, and race-enabled 8-minute remote runs on intermediate

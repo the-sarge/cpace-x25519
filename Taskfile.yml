@@ -4,6 +4,7 @@
 #   task quick
 #   task check
 #   task check:changed
+#   task bench
 #
 # Fuzzing:
 #   task fuzz FUZZTIME=30s PARALLEL=2
@@ -22,6 +23,9 @@ vars:
   GOVULNCHECK: '{{.GOVULNCHECK | default "govulncheck"}}'
   STATICCHECK: '{{.STATICCHECK | default "staticcheck"}}'
   FUZZTIME: '{{.FUZZTIME | default "30s"}}'
+  BENCH: '{{.BENCH | default "."}}'
+  BENCHCOUNT: '{{.BENCHCOUNT | default "1"}}'
+  BENCHTIME: '{{.BENCHTIME | default "1s"}}'
 
 tasks:
   default:
@@ -42,6 +46,11 @@ tasks:
     desc: Run tests with the race detector
     cmds:
       - go test -race ./...
+
+  bench:
+    desc: Run benchmarks with allocation metrics
+    cmds:
+      - go test -run '^$' -bench '{{.BENCH}}' -benchmem -benchtime '{{.BENCHTIME}}' -count '{{.BENCHCOUNT}}' ./...
 
   lint:
     desc: Run formatting, Go, and structural linters

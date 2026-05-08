@@ -10,23 +10,6 @@ import (
 	"time"
 )
 
-type repeatingReader struct {
-	buf []byte
-	off int
-}
-
-func (r *repeatingReader) Read(p []byte) (int, error) {
-	for i := range p {
-		if len(r.buf) == 0 {
-			p[i] = 1
-			continue
-		}
-		p[i] = r.buf[r.off%len(r.buf)]
-		r.off++
-	}
-	return len(p), nil
-}
-
 type failingReader struct {
 	err error
 }
@@ -43,28 +26,6 @@ type countingFailingReader struct {
 func (r *countingFailingReader) Read([]byte) (int, error) {
 	r.reads++
 	return 0, r.err
-}
-
-func testConfig() Config {
-	return Config{
-		Password:    []byte("password"),
-		InitiatorID: []byte("initiator"),
-		ResponderID: []byte("responder"),
-		Context:     []byte("context"),
-		SessionID:   []byte("sid"),
-	}
-}
-
-func repeatingRand(fill byte) io.Reader {
-	return &repeatingReader{buf: bytes.Repeat([]byte{fill}, scalarSize)}
-}
-
-func startTestInitiator(cfg Config) (*Initiator, []byte, error) {
-	return startWithRandom(cfg, repeatingRand(0x11))
-}
-
-func respondTestResponder(cfg Config, messageA []byte) (*Responder, []byte, error) {
-	return respondWithRandom(cfg, messageA, repeatingRand(0x22))
 }
 
 func TestInternalRandomHelpersDefaultNilRandomness(t *testing.T) {

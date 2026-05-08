@@ -63,6 +63,9 @@ All rows below are closed and preserved as the policy/API decision record.
 | External review handoff | `docs/external-review-handoff.md` summarizes supported scope, package-owned choices, evidence, review questions, and remaining release blockers for external reviewers. | The handoff is a review input, not a completed review. Findings still need to be tracked and resolved. |
 | Threat model | `docs/threat-model.md` records assets, in-scope attackers, non-goals, security boundaries, and reviewer focus areas. | This is a self-authored review input, not an external assessment. Reviewers should check that the model matches real integration risks. |
 | Release checklist | `docs/release-checklist.md` records exact-candidate validation, evidence refresh, signed-tag, release-validation, and GitHub-release steps. | The checklist must be executed against a future candidate before making stronger release-readiness claims. |
+| Capslock capability analysis | `docs/capslock-report.md` records Capslock `v0.3.2` results for main commit `39ccb58f827d88f6742628c1fadf9375539fb017`. | Capslock is experimental review signal, not a release gate. Repeat if dependencies, imports, randomness, HKDF/HMAC usage, or the Go toolchain change. |
+| Performance benchmarks | `bench_test.go` and `task bench` cover full round trips, protocol phases, exporters, and message encoding/decoding with `-benchmem`. | Benchmark results are local comparison evidence, not release gates. Record host, Go version, exact command, and commit when sharing numbers. |
+| OSS-Fuzz staging | `ossfuzz/` stages upstream project files for all 14 native Go fuzz targets. Local `build_fuzzers` and `check_build` validation passed with the repository mounted into a temporary `google/oss-fuzz` checkout on 2026-05-07. | Upstream onboarding still requires copying these files to `google/oss-fuzz/projects/cpace` and opening the OSS-Fuzz PR. |
 
 ## Release Readiness
 
@@ -79,9 +82,6 @@ Before any production-readiness claim:
 
 ## Later Investigation
 
-- Capslock.
-- OSS-Fuzz.
+- OSS-Fuzz upstream onboarding.
 - Longer continuous fuzzing campaigns.
 - Offline Sage-derived extended vector dataset.
-- Allocation measurements on hot paths before adding permanent allocation
-  tests.
