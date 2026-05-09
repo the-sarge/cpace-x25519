@@ -17,6 +17,23 @@ Use one or both of these modes for exact-candidate evidence:
 For maintainer-machine evidence, prefer committed raw transcripts plus
 checksums. Add detached signatures for `SHA256SUMS` when practical.
 
+## Workflow-Artifact Evidence
+
+When using workflow artifacts or workflow runs as evidence, summary docs should
+record:
+
+- workflow file path;
+- workflow run ID and URL;
+- exact target commit SHA;
+- triggering event and ref;
+- expected jobs or checks;
+- artifact retention period or permanence limitation;
+- summary document that records the workflow link;
+- fallback evidence if the workflow run or artifact is later unavailable.
+
+If the workflow run itself is the durable evidence, state which logs, check
+conclusions, or uploaded artifacts are being cited.
+
 ## Transcript Bundle Shape
 
 Each committed bundle should include:
@@ -26,6 +43,10 @@ Each committed bundle should include:
 - Raw logs or transcripts for the commands used as evidence.
 - `SHA256SUMS`, covering every raw transcript in the bundle.
 - `SHA256SUMS.sig`, when detached signing is practical.
+
+When detached signatures are used, prefer the signer identity documented in
+`docs/release-verification.md`. Name the signing tool, signer identity, and key
+fingerprint in the bundle README, or document the exception.
 
 Raw logs should preserve:
 
@@ -61,10 +82,13 @@ When a Go toolchain update triggers an evidence refresh, run the draft/RFC
 vector lane under both the old and new toolchains when both are available:
 
 ```sh
-go test -run 'Test(StringUtilitiesDraftVectors|EmbeddedDraft.*|RistrettoDraft21Vectors|ScalarMultVFYDraftInvalidVectors)$' -count=1 ./...
+go test -v -run 'Test(StringUtilitiesDraftVectors|EmbeddedDraft.*|RistrettoDraft21Vectors|ScalarMultVFYDraftInvalidVectors)$' -count=1 ./...
 ```
 
-Preserve raw logs for both runs and record whether the results are bit-identical
-across toolchains. If the previous toolchain is unavailable, say that explicitly
-in the bundle README and in `docs/security-spec-audit.md`; do not imply
-cross-toolchain identity from current-toolchain validation alone.
+The `-v` flag is intentional so the transcript enumerates each matched vector
+test by name. Preserve raw logs for both runs and record whether the results are
+bit-identical across toolchains. If the previous toolchain is unavailable, say
+that explicitly in the workflow run summary or bundle README, depending on the
+evidence mode, and under `Toolchain Vector Stability` in
+`docs/security-spec-audit.md`; do not imply cross-toolchain identity from
+current-toolchain validation alone.

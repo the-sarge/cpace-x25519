@@ -47,11 +47,12 @@ All rows below are closed and preserved as the policy/API decision record.
    scope, current evidence, and remaining release blockers. Track findings in
    focused follow-up PRs.
 2. Evidence-process hardening for issue #44.
-   Land the reusable evidence-bundle policy and cross-toolchain vector-stability
-   checklist before the next exact-candidate refresh. Keep the issue open until
-   the next candidate packet includes raw artifacts or immutable workflow links,
-   checksums, and the vector-stability result or an explicit unavailable-toolchain
-   rationale.
+   PR #48 covers phase 1: a reusable evidence-bundle policy and
+   cross-toolchain vector-stability checklist. Phase 2 remains applying that
+   policy to the next exact-candidate packet. Keep the issue open until the
+   packet includes committed raw artifacts with `SHA256SUMS`, or immutable
+   workflow links following `docs/evidence/README.md`, plus the
+   vector-stability result or an explicit unavailable-toolchain rationale.
 3. Exact-candidate evidence refresh.
    After any review-driven changes, repeat dependency review, long fuzzing, and
    security/spec audit against the exact release-candidate commit before making
