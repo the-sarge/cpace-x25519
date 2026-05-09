@@ -41,8 +41,9 @@ The public tracking issues for those review areas are:
 - `https://github.com/the-sarge/cpace/issues/30`
 - `https://github.com/the-sarge/cpace/issues/31`
 
-The latest public prerelease is `v0.1.1`, an SSH-signed annotated tag with CI
-and security-process hardening only. It does not claim production readiness.
+The latest public prerelease is `v0.1.2`, an SSH-signed annotated tag with the
+external-review packet and refreshed Go 1.26.3 evidence. It does not claim
+production readiness.
 
 Please report private vulnerabilities through the channels in `SECURITY.md`.
 Public review notes that are not sensitive can be opened as GitHub issues.

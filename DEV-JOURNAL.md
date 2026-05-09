@@ -254,3 +254,21 @@ Paired maintainer-machine fuzz campaigns ran all 14 registered targets with
 and `iMacPro.local`. Both logs recorded `RC=0` and the full target PASS set.
 Raw transcripts and SHA-256 digests are preserved under
 `docs/evidence/v012-candidate-20260508/`.
+
+---
+
+## cpace.S14 - 2026-05-09 00:38 EDT
+
+**Main:** `4e661bc`
+**Board:** v0.1.2 public review packet aligned after release.
+**Planner:** Josh
+
+After publishing the signed annotated `v0.1.2` prerelease, aligned the external
+review handoff, reviewer outreach note, and project plan with the current
+release state. The review packet now points at tag commit `4e661bc`, Release
+Validation run `25588835119`, and the package-code evidence baseline
+`2e09774`.
+
+No package code or evidence artifact changed in this follow-up. The release
+remains an auditable prerelease and not a production-readiness claim; external
+review and independent cryptographic review remain the blockers.
