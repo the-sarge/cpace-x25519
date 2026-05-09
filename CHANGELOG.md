@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Update external-review handoff and reviewer outreach notes to point at the
+  published `v0.1.2` prerelease.
+
 ## v0.1.2 - 2026-05-08
 
 - Add external review handoff notes, public contribution guidance, issue

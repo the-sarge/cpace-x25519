@@ -1,18 +1,19 @@
 # External Review Handoff
 
-Date: 2026-05-08
+Date: 2026-05-09
 
 Target module: `github.com/the-sarge/cpace`
 
-Last released tag: `v0.1.1`
+Last released tag: `v0.1.2`
 
-Last released commit: `74b82cbc65a1ea6186f2732749c9c5e5b03eecc3`
+Last released commit: `4e661bc1f925ebedf1f270668129d85bab73e468`
 
-Current recorded evidence baseline:
+Current package-code evidence baseline:
 `2e09774f171dde8c62763d6e35a258b0fef88801`
 
-Evidence status: refreshed for the v0.1.2 package-code candidate. This is still
-an unaudited prerelease evidence packet, not a production-readiness claim.
+Evidence status: refreshed for the v0.1.2 package-code candidate and packaged
+in the signed `v0.1.2` prerelease. This is still an unaudited prerelease
+evidence packet, not a production-readiness claim.
 
 Status: auditable draft implementation. This package has not had independent
 cryptographic review and is not production-ready.
@@ -38,8 +39,8 @@ cryptographic review before any production-ready claim.
 - `docs/dependency-review.md` for dependency and vulnerability scan evidence.
 - `docs/fuzz-evidence.md` for local smoke and long-fuzz campaign evidence.
 - `docs/capslock-report.md` for static capability-analysis evidence.
-- `docs/evidence/go1263-20260508/` for raw Go 1.26.3 transcript files and
-  SHA-256 digests.
+- `docs/evidence/v012-candidate-20260508/` for raw v0.1.2 candidate transcript
+  files and SHA-256 digests.
 - `docs/performance.md` for local benchmark and allocation-measurement guidance.
 - `docs/ci-policy.md` for hosted-runner policy, advisory lanes, long-fuzz
   evidence, and signed release tags.
@@ -83,16 +84,16 @@ outer negotiation that happens before CPace inputs are fixed.
 
 ## Evidence Snapshot
 
-`v0.1.1` is an SSH-signed annotated prerelease tag at commit
-`74b82cbc65a1ea6186f2732749c9c5e5b03eecc3`. The tag-triggered Release
+`v0.1.2` is an SSH-signed annotated prerelease tag at commit
+`4e661bc1f925ebedf1f270668129d85bab73e468`. The tag-triggered Release
 Validation workflow passed `Check`, `Race`, `Govulncheck`, and `Gosec`; the
 Gosec job uploaded SARIF to GitHub Code Scanning:
 
-`https://github.com/the-sarge/cpace/actions/runs/25465518681`
+`https://github.com/the-sarge/cpace/actions/runs/25588835119`
 
-The `v0.1.1` prerelease contains CI and documentation hardening only. It does
-not change the Go API, protocol behavior, or dependencies from the earlier
-draft snapshot.
+The `v0.1.2` prerelease contains the external-review packet, Go 1.26
+modernization, and refreshed evidence. It has no intended Go API,
+wire/protocol, dependency, or vector behavior change.
 
 Go 1.26.3 dependency, gosec, long-fuzz, Capslock, and security/spec evidence is
 recorded for v0.1.2 package-code candidate
