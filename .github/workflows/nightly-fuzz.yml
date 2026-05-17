@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  GOTOOLCHAIN: local
+
 concurrency:
   group: nightly-fuzz-${{ github.ref }}
   cancel-in-progress: false
@@ -51,6 +54,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Report Go environment
+        run: |
+          go version
+          go env GOTOOLCHAIN GOPROXY GOSUMDB
 
       - name: Snapshot corpus state
         shell: bash

@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  GOTOOLCHAIN: local
+
 concurrency:
   group: vuln-${{ github.ref }}
   cancel-in-progress: false
@@ -28,6 +31,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Report Go environment
+        run: |
+          go version
+          go env GOTOOLCHAIN GOPROXY GOSUMDB
 
       - name: Install task
         run: go install github.com/go-task/task/v3/cmd/task@v3.50.0

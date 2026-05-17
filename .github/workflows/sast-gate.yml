@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  GOTOOLCHAIN: local
+
 concurrency:
   group: sast-gate-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -31,6 +34,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: Report Go environment
+        run: |
+          go version
+          go env GOTOOLCHAIN GOPROXY GOSUMDB
 
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@v2.26.1
