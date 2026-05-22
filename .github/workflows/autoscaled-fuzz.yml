@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       fuzztime:
-        description: Per-target Go fuzz duration
+        description: Per-target Go fuzz duration ([0-9]+[smh], total waves under 240m)
         required: false
         default: 20m
       parallel:
@@ -36,9 +36,108 @@ env:
   GOMAXPROCS: "4"
 
 jobs:
+  validate_inputs:
+    name: Validate fuzz inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Validate dispatch inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          fail() {
+            echo "::error::$1"
+            exit 1
+          }
+
+          fuzztime="${FUZZTIME}"
+          parallel="${PARALLEL}"
+          fuzz_race="${FUZZ_RACE}"
+
+          case "$fuzztime" in
+            *[smh])
+              fuzztime_value="${fuzztime%?}"
+              fuzztime_unit="${fuzztime: -1}"
+              ;;
+            *)
+              fail "FUZZTIME must match ^[0-9]+[smh]$ (got: '$fuzztime')"
+              ;;
+          esac
+          case "$fuzztime_value" in
+            ''|*[!0-9]*)
+              fail "FUZZTIME must match ^[0-9]+[smh]$ (got: '$fuzztime')"
+              ;;
+          esac
+          case "$fuzztime_value" in
+            *[1-9]*) ;;
+            *)
+              fail "FUZZTIME must be positive (got: '$fuzztime')"
+              ;;
+          esac
+          if [ "${#fuzztime_value}" -gt 6 ]; then
+            fail "FUZZTIME value is too large (got: '$fuzztime')"
+          fi
+
+          case "$parallel" in
+            ''|*[!0-9]*)
+              fail "PARALLEL must match ^[0-9]+$ (got: '$parallel')"
+              ;;
+          esac
+          case "$parallel" in
+            *[1-9]*) ;;
+            *)
+              fail "PARALLEL must be positive (got: '$parallel')"
+              ;;
+          esac
+          if [ "${#parallel}" -gt 6 ]; then
+            fail "PARALLEL value is too large (got: '$parallel')"
+          fi
+
+          case "$fuzz_race" in
+            0|1) ;;
+            *)
+              fail "FUZZ_RACE must match ^[01]$ (got: '$fuzz_race')"
+              ;;
+          esac
+
+          fuzztime_number=$((10#$fuzztime_value))
+          parallel_number=$((10#$parallel))
+          case "$fuzztime_unit" in
+            s) fuzztime_seconds=$fuzztime_number ;;
+            m) fuzztime_seconds=$((fuzztime_number * 60)) ;;
+            h) fuzztime_seconds=$((fuzztime_number * 3600)) ;;
+          esac
+
+          target_count="$(jq -r 'length' .github/fuzz-targets.json)"
+          case "$target_count" in
+            ''|*[!0-9]*)
+              fail ".github/fuzz-targets.json length is not numeric"
+              ;;
+          esac
+          if [ "$target_count" -lt 1 ]; then
+            fail ".github/fuzz-targets.json contains no targets"
+          fi
+
+          waves=$(((target_count + parallel_number - 1) / parallel_number))
+          estimated_seconds=$((waves * fuzztime_seconds))
+          timeout_seconds=$((240 * 60))
+          if [ "$estimated_seconds" -ge "$timeout_seconds" ]; then
+            estimated_minutes=$(((estimated_seconds + 59) / 60))
+            fail "ceil(targets/PARALLEL) * FUZZTIME must stay under 240 minutes (got about ${estimated_minutes}m)"
+          fi
+
+          echo "Validated FUZZTIME=${fuzztime}, PARALLEL=${parallel}, FUZZ_RACE=${fuzz_race}"
+
   fuzz:
     name: Autoscaled fuzz
-    if: github.event_name == 'schedule' || github.ref == 'refs/heads/main'
+    needs: validate_inputs
+    if: (github.event_name == 'schedule' || github.ref == 'refs/heads/main') && needs.validate_inputs.result == 'success'
     runs-on:
       - infra-autoscale-cpace-fuzz-linux
     timeout-minutes: 240
@@ -85,7 +184,10 @@ jobs:
           cache: true
 
       - name: Install Task
-        run: go install github.com/go-task/task/v3/cmd/task@v3.50.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOBIN="$(go env GOPATH)/bin" go install github.com/go-task/task/v3/cmd/task@v3.50.0
 
       - name: Report fuzz plan
         shell: bash

@@ -65,10 +65,11 @@ required gate.
 
 `Vulnerability Scan`, `Gosec Advisory`, and `Nightly Fuzz` run on GitHub-hosted
 runners through both `workflow_dispatch` and scheduled triggers. `Autoscaled
-Fuzz` runs on the self-hosted `infra-autoscale-cpace-fuzz-linux` runner label
-through scheduled triggers and trusted main-branch manual dispatch. These lanes
-provide scheduled drift detection, Code Scanning history, and fuzz regression
-signal in addition to the PR gates.
+Fuzz` validates inputs on a GitHub-hosted preflight job, then runs fuzzing on the
+self-hosted `infra-autoscale-cpace-fuzz-linux` runner label through scheduled
+triggers and trusted main-branch manual dispatch. These lanes provide scheduled
+drift detection, Code Scanning history, and fuzz regression signal in addition
+to the PR gates.
 
 Manual `Dependency Gate` dispatch runs module verification and `govulncheck`;
 GitHub Dependency Review runs only on pull requests because it compares the PR
@@ -84,7 +85,10 @@ so scheduled runs provide their own race-instrumented fuzz coverage. Trusted
 main-branch manual dispatch can set `FUZZ_RACE=0` for targeted non-race runs.
 Its default `PARALLEL=2` and `GOMAXPROCS=4` settings assume a runner with at
 least eight vCPUs and enough memory for two concurrent race-enabled fuzz
-processes; reduce those values if the autoscaled runner class is smaller.
+processes; reduce those values if the autoscaled runner class is smaller. The
+preflight job rejects manual inputs unless `FUZZTIME` matches `[0-9]+[smh]`,
+`PARALLEL` is a positive integer, `FUZZ_RACE` is `0` or `1`, and
+`ceil(targets/PARALLEL) * FUZZTIME` stays below the 240-minute fuzz job timeout.
 
 ## Long Fuzzing And Release Evidence
 
@@ -105,10 +109,11 @@ GitHub-hosted runners handle untrusted PR validation. Self-hosted runners must
 not run code from untrusted fork PRs.
 
 The current self-hosted lane is `Autoscaled Fuzz`, which uses the
-`infra-autoscale-cpace-fuzz-linux` runner label. Its job-level guard allows only
-scheduled runs and manual dispatches from `refs/heads/main` before the runner is
-requested. That restriction is the trusted `main`-only scheduled/manual mode
-required for self-hosted capacity.
+`infra-autoscale-cpace-fuzz-linux` runner label. Its job-level guard skips the
+checked-in fuzz job except for scheduled runs and manual dispatches from
+`refs/heads/main`. Treat that guard as workflow hygiene and defense in depth:
+the trust boundary is that fork PRs cannot schedule or dispatch this workflow,
+and manual dispatch requires repository write access.
 
 The autoscaled runner image must provide a POSIX/GNU userland and a working C
 compiler for Linux race-detector fuzz builds. At minimum the workflow checks
