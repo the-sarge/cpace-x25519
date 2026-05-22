@@ -79,11 +79,12 @@ It can catch crashes and upload new failure corpus files, but it is not
 long-fuzz release evidence by itself.
 
 The autoscaled fuzz lane is a longer 20-minute-per-target background run. It
-keeps `FUZZ_RACE=1` because it does not run `task check` before fuzzing, so the
-lane is responsible for its own race-instrumented fuzz coverage. Its default
-`PARALLEL=2` and `GOMAXPROCS=4` settings assume a runner with at least eight
-vCPUs and enough memory for two concurrent race-enabled fuzz processes; reduce
-those values if the autoscaled runner class is smaller.
+defaults to `FUZZ_RACE=1` because it does not run `task check` before fuzzing,
+so scheduled runs provide their own race-instrumented fuzz coverage. Trusted
+main-branch manual dispatch can set `FUZZ_RACE=0` for targeted non-race runs.
+Its default `PARALLEL=2` and `GOMAXPROCS=4` settings assume a runner with at
+least eight vCPUs and enough memory for two concurrent race-enabled fuzz
+processes; reduce those values if the autoscaled runner class is smaller.
 
 ## Long Fuzzing And Release Evidence
 
@@ -109,10 +110,11 @@ scheduled runs and manual dispatches from `refs/heads/main` before the runner is
 requested. That restriction is the trusted `main`-only scheduled/manual mode
 required for self-hosted capacity.
 
-The autoscaled runner image must provide a POSIX/GNU userland; at minimum the
-workflow checks for `bash`, `find`, `jq`, `mktemp`, `sed`, `sort`, `touch`, and
-`xargs` before reporting the fuzz plan or invoking `task fuzz`. Go and Task are
-installed by the workflow itself.
+The autoscaled runner image must provide a POSIX/GNU userland and a working C
+compiler for Linux race-detector fuzz builds. At minimum the workflow checks
+for `bash`, `find`, `jq`, `mktemp`, `sed`, `sort`, `touch`, `xargs`, and a C
+compiler (`cc`, `gcc`, or `clang`) before reporting the fuzz plan or invoking
+`task fuzz`. Go and Task are installed by the workflow itself.
 
 Any additional self-hosted lane must either be ephemeral with one job per
 runner instance, or restricted to trusted `main`-only scheduled and manual
