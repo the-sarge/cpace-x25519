@@ -336,3 +336,42 @@ Merged PR #52, `Autoscaled Fuzz`, into `main` as merge commit `2f88a41635f54de93
 
 - Consider the review-loop low/nit follow-ups before relying on the lane for release evidence: broader local `FUZZTIME` forms, more timeout headroom, a `PARALLEL` sanity cap, and a clearer non-main dispatch notice.
 - Capture the first scheduled autoscaled `FUZZ_RACE=1` run as evidence before citing the new lane as release-readiness signal.
+
+---
+
+## CPace core extraction recorded as ADR-0001 - 2026-05-22 12:29 EDT
+
+**Main:** `86053559220d`
+**Actor:** Claude
+
+**Summary:** Recorded the decision to extract a deep, unexported CPace core
+(`initiatorCore` / `responderCore`) so the cryptographic composition and
+persistent-secret lifetime have one home. Documentation only — no code or
+public API change; implementation is deferred. All work is on branch
+`cpace-core-adr`.
+
+**Completed:**
+- Scaffolded the per-repo agent-skills configuration: `AGENTS.md` and
+  `docs/agents/{issue-tracker,triage-labels,domain}.md`.
+- Ran an architecture review of the flat CPace package and produced
+  `CONTEXT.md`, a domain glossary anchored on the "CPace core" concept.
+- Recorded `docs/adr/0001-extract-cpace-core.md` and the implementation plan
+  `docs/cpace-core-plan.md`.
+- Committed the seven new docs as `f76f95b` on branch `cpace-core-adr` and
+  pushed to origin.
+
+**Decisions:**
+- ADR-0001 (CPace core extraction) — accepted. Stateful `initiatorCore` /
+  `responderCore` own persistent-secret lifetime; scratch secrets stay local
+  and eagerly cleared; decoded cryptographic fields cross the seam while wire
+  framing stays in front.
+- The ADR was gated on independent multi-agent review (`ras consider`):
+  phase 1 on the ADR, phase 2 on the plan, and a phase-2 re-run. All three
+  returned "proceed with changes"; no round disputed the architecture. The
+  plan converged at revision 3 and the ADR was flipped `proposed -> accepted`.
+
+**Next:**
+- Open a pull request for `cpace-core-adr` when ready.
+- Implementation follows the six-step build sequence in
+  `docs/cpace-core-plan.md`; deferred until scheduled against the
+  release-readiness work.
