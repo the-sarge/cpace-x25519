@@ -27,14 +27,18 @@ concurrency:
 
 env:
   GOTOOLCHAIN: local
+  # Keep these fallbacks in sync with the workflow_dispatch defaults above;
+  # scheduled events do not provide inputs.
   FUZZTIME: ${{ inputs.fuzztime || '20m' }}
   PARALLEL: ${{ inputs.parallel || '2' }}
+  # This lane keeps race fuzzing enabled because it does not run task check first.
   FUZZ_RACE: ${{ inputs.fuzz_race || '1' }}
   GOMAXPROCS: "4"
 
 jobs:
   fuzz:
     name: Autoscaled fuzz
+    if: github.event_name == 'schedule' || github.ref == 'refs/heads/main'
     runs-on:
       - infra-autoscale-cpace-fuzz-linux
     timeout-minutes: 240
@@ -43,6 +47,21 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
+
+      - name: Check runner dependencies
+        shell: sh
+        run: |
+          set -eu
+          missing=""
+          for tool in bash find jq sed; do
+            if ! command -v "$tool" >/dev/null 2>&1; then
+              missing="${missing} ${tool}"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "missing required runner tools:${missing}" >&2
+            exit 1
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
@@ -102,6 +121,6 @@ jobs:
           path: ${{ steps.corpus.outputs.files }}
           retention-days: 14
 
-      - name: Fail job on fuzz regression
+      - name: Fail job if fuzz step failed
         if: steps.fuzz.outcome == 'failure'
         run: exit 1
