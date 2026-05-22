@@ -1,0 +1,107 @@
+name: Autoscaled Fuzz
+
+on:
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: Per-target Go fuzz duration
+        required: false
+        default: 20m
+      parallel:
+        description: Concurrent fuzz targets
+        required: false
+        default: "2"
+      fuzz_race:
+        description: Run fuzzing with the race detector (1 or 0)
+        required: false
+        default: "1"
+  schedule:
+    - cron: '30 10 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: autoscaled-fuzz-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GOTOOLCHAIN: local
+  FUZZTIME: ${{ inputs.fuzztime || '20m' }}
+  PARALLEL: ${{ inputs.parallel || '2' }}
+  FUZZ_RACE: ${{ inputs.fuzz_race || '1' }}
+  GOMAXPROCS: "4"
+
+jobs:
+  fuzz:
+    name: Autoscaled fuzz
+    runs-on:
+      - infra-autoscale-cpace-fuzz-linux
+    timeout-minutes: 240
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Task
+        run: go install github.com/go-task/task/v3/cmd/task@v3.50.0
+
+      - name: Report fuzz plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "FUZZTIME=${FUZZTIME}"
+          echo "PARALLEL=${PARALLEL}"
+          echo "FUZZ_RACE=${FUZZ_RACE}"
+          echo "GOMAXPROCS=${GOMAXPROCS}"
+          jq -r '.[] | "\(.target) \(.package)"' .github/fuzz-targets.json
+
+      - name: Snapshot corpus state
+        shell: bash
+        run: touch "${RUNNER_TEMP}/fuzz-start"
+
+      - name: Run autoscaled fuzz
+        id: fuzz
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          FUZZ_RACE="${FUZZ_RACE}" PARALLEL="${PARALLEL}" GOMAXPROCS="${GOMAXPROCS}" \
+            "$(go env GOPATH)/bin/task" fuzz FUZZTIME="${FUZZTIME}"
+
+      - name: Find newly captured corpus files
+        id: corpus
+        if: steps.fuzz.outcome == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          files="$(find . -type f -path "*/testdata/fuzz/*/*" -newer "${RUNNER_TEMP}/fuzz-start" | sort | sed 's#^\./##')"
+          if [ -n "$files" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            {
+              echo 'files<<EOF'
+              echo "$files"
+              echo EOF
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload newly captured corpus files
+        if: steps.fuzz.outcome == 'failure' && steps.corpus.outputs.found == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: autoscaled-fuzz-corpus
+          path: ${{ steps.corpus.outputs.files }}
+          retention-days: 14
+
+      - name: Fail job on fuzz regression
+        if: steps.fuzz.outcome == 'failure'
+        run: exit 1
