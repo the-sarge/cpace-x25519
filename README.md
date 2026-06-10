@@ -119,7 +119,9 @@ security-gate, and VEX policies live in `docs/governance.md`,
 initiator, msgA, err := cpace.Start(initCfg)
 responder, msgB, err := cpace.Respond(respCfg, msgA)
 msgC, initSession, err := initiator.Finish(msgB)
+defer initSession.Close()
 respSession, err := responder.Finish(msgC)
+defer respSession.Close()
 key, err := initSession.Export([]byte("application key"), nil, 32)
 ```
 
