@@ -478,3 +478,52 @@ explicit authorization — the merge instruction covered PR #66 only. The merge
 commit `2602be6` is reverted on main; the validated branch is restored at
 `code-review/safe-fixes-2026-05-28` (tip `25223e4`, including the gosec G115
 fix) pending a deliberate merge decision, which will need a fresh PR.
+---
+
+## ADR-0001 revision pass - 2026-06-10 11:17 EDT
+
+**Main:** `9fe2a53`
+**Actor:** Claude
+
+**Summary:** Revised the ADR-0001 record and plan on `cpace-core-adr` per a
+five-perspective branch review (accuracy, architecture, security, governance,
+agent-scaffolding). The architecture is unchanged; every edit is to the record.
+Merged `origin/main` into the branch (journal conflict resolved
+chronologically), so ADRs 0002-0007 are now visible in-branch.
+
+**Completed:**
+- Fixed the four critical record defects: CONTEXT.md re-tensed to target-state
+  and its ISK ownership corrected (initiator ISK is finish-local scratch, never
+  a core field); the acceptance-criteria preamble rewritten as implementation
+  gates rather than an acceptance gate; the do-not-re-litigate bar scoped to
+  the architecture, since the plan's revision 3 postdates the recorded reviews.
+- Closed the binding-enumeration holes: responder ephemeral scalar added to the
+  scratch list and field blacklist; the responder transcript consistently
+  framed as public wire data zeroed as hygiene; the Context section's zeroing
+  description scoped to the two `Finish` methods.
+- Plan executability: verbatim-vs-literal reconciled (finish-local ISK
+  defer canonicalization pinned to the Initiator extraction commit);
+  confirmation-tag goldens captured from `main` in step 1 (draft vectors carry
+  no tags); constant-time and `lvCat`/`prependLen` residual lines added to the
+  manual audit; `Start`/`Respond` scoped out of the defer-cleanup criterion;
+  step-5 red-state and `Ya`-prevalidation interim home clarified; Candidates
+  C/D annotated as unrecorded; `scalarMultVFY` sketches cross-referenced to
+  ADR-0003's pending `([]byte, error)` shape.
+- Scaffolding corrected to repo reality: triage-labels.md rewritten around the
+  live dimensional taxonomy with a do-not-create-labels rule; domain.md's
+  fictional ADR filenames and stale annotations removed; AGENTS.md gains the
+  freeze, evidence-discipline, ADR-gating, and merge-authorization rules.
+
+**Decisions (recorded in ADR-0001):**
+- Zero-value hardening - keep the `core == nil` guards as a narrow policy
+  reopen: `Finish` on a fabricated zero value returns `ErrInvalidInput` without
+  consuming, with changelog note and pinning test required.
+- Sequencing - implementation hard-gated on external reviews #29-#32; the #33
+  exact-candidate refresh (all four evidence artifacts, dependency review/SAST
+  included) applies afterward regardless of unchanged `go.mod`.
+
+**Next:**
+- Confirming `ras consider` round on the revised ADR-0001 + plan; append the
+  run ID to the ADR frontmatter.
+- Open the PR for `cpace-core-adr`; merging it heals the dangling `[[0001]]`
+  links and unblocks the 0004/0007 acceptance flips.
