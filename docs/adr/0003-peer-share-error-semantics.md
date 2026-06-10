@@ -28,7 +28,7 @@ func scalarMultVFY(s *ristretto255.Scalar, encoded []byte) ([]byte, bool) {
 
 with `decodePublicShare(encoded)` at `crypto.go:111-124` returning `(*ristretto255.Element, bool)` and rejecting for any of three reasons: wrong length, non-canonical Ristretto255 encoding, or identity-element encoding.
 
-The function collapses **three distinct attacker-relevant signals** into a single boolean:
+The function collapses **three distinct rejection causes** into a single boolean:
 
 1. **Wrong length** — `len(encoded) != pointSize`. The wire decoder already enforces 32 bytes (`framing.go` `readExactField(pointSize, ...)`), so this branch only fires for an internal-caller bug — a programmer error in framing, not an active attacker. Today it is dead but defensive.
 2. **Non-canonical encoding** — `SetCanonicalBytes` rejection. The peer sent 32 bytes that do not decode as a valid Ristretto255 point. This is either a buggy or malicious peer.
@@ -36,11 +36,13 @@ The function collapses **three distinct attacker-relevant signals** into a singl
 
 A fourth branch — the post-multiply identity check at `crypto.go:104-107` — is dead in prime-order Ristretto255 (for any non-identity `p` and non-zero scalar `s`, `s·p` is non-identity) but kept as defense-in-depth.
 
-All three callers (`api.go:166-168`, `api.go:180-184`, `api.go:222-226`) wrap the bool as a single `fmt.Errorf("%w: invalid initiator/responder share", ErrAbort)`. An operator seeing `cpace: protocol abort: invalid responder share` in production cannot distinguish "we shipped a framing bug to our peers" from "an attacker is on the wire feeding identity points." Both are concerning, but the responses differ.
+There is one direct `decodePublicShare` caller (`api.go:166-168`) and two `scalarMultVFY` callers (`api.go:180-184`, `api.go:222-226`). `respondWithRandom` deliberately validates the initiator's own share twice: first as an early public-share check, then again inside `scalarMultVFY` when computing `K`. Today those callers wrap the bool as a single `fmt.Errorf("%w: invalid initiator/responder share", ErrAbort)`. An operator seeing `cpace: protocol abort: invalid responder share` in production cannot distinguish a malformed Ristretto255 encoding from an identity-element attack. Both are concerning, but the responses differ.
 
 There is also a separate concern at the function's return value: on every failure path `scalarMultVFY` returns `clone(identityEncoding)` (32 zero bytes) as the first return value, with `ok=false`. Every current caller checks `ok` before using the first return, but the silent-fallback shape is the canonical "safe default that masks failure" anti-pattern — a future `k, _ := scalarMultVFY(...)` would key with an all-zeros shared secret.
 
-The error sentinel set in `errors.go:5-34` already exposes `ErrAbort` ("draft abort condition such as an invalid point or neutral-element Diffie-Hellman result"). The proposal does not remove or repurpose `ErrAbort`; it adds finer-grained sentinels that *wrap* `ErrAbort` so existing `errors.Is(err, ErrAbort)` checks remain correct.
+The current identity-encoding return deliberately mirrors draft-21's `G.scalar_mult_vfy` neutral-element convention; the draft invalid-vector case named "Invalid Y2" is the all-zero identity encoding. The proposed divergence is internal-only: protocol abort behavior is unchanged.
+
+The error sentinel set in `errors.go:5-34` already exposes `ErrAbort` ("draft abort condition such as an invalid point or neutral-element Diffie-Hellman result"). The proposal does not remove or repurpose `ErrAbort`; it adds finer-grained plain sentinels whose returned errors also wrap `ErrAbort` so existing `errors.Is(err, ErrAbort)` checks remain correct.
 
 The public API is frozen for v1.0.0 unless this review reopens it. Adding new exported error sentinels is API surface expansion and must be done before the freeze.
 
@@ -48,33 +50,39 @@ The public API is frozen for v1.0.0 unless this review reopens it. Adding new ex
 
 Make two changes to `scalarMultVFY` and its callers, neither of which alters wire format or protocol semantics:
 
-1. **Return `nil` on failure instead of `clone(identityEncoding)`.** No current caller reads the first return when `ok=false`, so this is internally non-breaking. The change removes the silent-fallback shape and ensures any future caller that ignores the bool will fail loudly (nil dereference) instead of silently keying with zeros.
+1. **Return `nil` on failure instead of `clone(identityEncoding)`.** No current caller reads the first return when `ok=false`, so this is internally non-breaking. The change removes the spec-shaped, valid-looking 32-byte fallback and makes misuse distinguishable. The loud-failure property comes from the typed error return, not from `nil`: `lvCat` treats `nil` as a zero-length field, `deriveISK` passes `k` only through `lvCat`/`copy`, and `clearBytes` is `nil`-safe. As optional hardening, `deriveISK` may defensively reject `len(k) != pointSize`, but this ADR does not require that second layer.
 
-2. **Add three exported sentinels in `errors.go`**, each wrapping `ErrAbort`:
-   - `ErrPeerShareLength` — internal-caller bug; peer share length is not `pointSize`.
+2. **Add two exported sentinels in `errors.go`** as plain `errors.New` values:
    - `ErrPeerShareEncoding` — wire decoded but `SetCanonicalBytes` rejected (non-canonical Ristretto255).
    - `ErrPeerShareIdentity` — peer share decoded to the identity element.
 
-   And change the signature of `scalarMultVFY` (and `decodePublicShare`) to return `([]byte, error)` with the appropriate sentinel. The three call sites in `api.go` propagate the wrapped error directly.
+   Each sentinel's doc comment follows the package precedent set by `ErrEmptySessionID`: the sentinel value itself is plain, while the comment states "The returned error also wraps ErrAbort." Uniform sentinel semantics across the package's exported error set outweighs the structural guarantee of pre-wrapped sentinels, and the forgotten-wrap risk is covered by a mandated public-API regression test.
 
-`ErrAbort` is retained. Every new sentinel wraps it via `fmt.Errorf("%w: ...: %w", ErrAbort, ErrPeerShareIdentity)` so callers using `errors.Is(err, ErrAbort)` continue to see all three rejection causes; callers using `errors.Is(err, ErrPeerShareIdentity)` get the finer-grained signal.
+Change the signature of `scalarMultVFY` (and `decodePublicShare`) to return `([]byte, error)` / `(*ristretto255.Element, error)` with all four failure paths specified:
 
-The post-multiply identity check at `crypto.go:104-107` stays in place as defense-in-depth but gains a one-line comment explaining that it is unreachable for prime-order Ristretto255 and is kept against a future suite change.
+- Wrong length returns an internal defensive error, `fmt.Errorf("%w: invalid peer share length", ErrAbort)`, with no exported peer-share sentinel. Malformed wire lengths surface as `ErrMessage` at framing because the wire decoder enforces `pointSize` before any share reaches `decodePublicShare`.
+- Non-canonical encoding returns `nil, fmt.Errorf("%w: %w", ErrAbort, ErrPeerShareEncoding)`.
+- Identity-element input returns `nil, fmt.Errorf("%w: %w", ErrAbort, ErrPeerShareIdentity)`.
+- The post-multiply identity check at `crypto.go:104-107` stays in place as defense-in-depth and returns `nil, fmt.Errorf("%w: neutral-element shared secret", ErrAbort)` with no new exported sentinel. The branch is unreachable for prime-order Ristretto255, so exported surface is not warranted.
+
+`ErrAbort` is retained. The returned errors use exactly one `ErrAbort` wrap plus the plain sentinel where one exists, in the same style as the existing `fmt.Errorf("%w: %w", ErrInvalidInput, ErrEmptySessionID)` layering in `api.go`. API call sites must retain role-context wrapping, for example `fmt.Errorf("%w: invalid initiator share: %w", ErrAbort, ErrPeerShareIdentity)` and `fmt.Errorf("%w: invalid responder share: %w", ErrAbort, ErrPeerShareEncoding)`, so the finer sentinels do not regress initiator-vs-responder triage. The resulting public error-string shape is `cpace: protocol abort: invalid initiator share: cpace: peer share identity` (or the responder/encoding variant), with no duplicated `cpace: protocol abort` prefix.
 
 ## Acceptance criteria
 
-The implementation must satisfy these before this ADR moves `proposed → accepted` *and* before v1.0.0 is tagged:
+Multi-agent review concurrence on this ADR moves it proposed -> accepted (the decision is ratified at review time). The acceptance criteria below are implementation-verification gates: they bind the implementing change and must all be satisfied before v1.0.0 is tagged - not before this ADR is accepted.
 
-- **New sentinels exist** at `errors.go` with doc comments stating each wraps `ErrAbort`.
+- **New sentinels exist** at `errors.go` as plain `errors.New` values for `ErrPeerShareEncoding` and `ErrPeerShareIdentity`, with doc comments stating "The returned error also wraps ErrAbort."
 - **`scalarMultVFY` returns nil-on-failure** with a typed error; no caller path relies on the first return value when the error is non-nil.
-- **`errors.Is(err, ErrAbort)` succeeds** for every error produced by the three reject branches (regression test: `TestPeerShareErrorsWrapErrAbort`).
-- **Each sentinel is reachable from at least one test** — `TestPeerShareErrorEncodingRejection`, `TestPeerShareErrorIdentityRejection`, and one length-mismatch test that may have to use a constructed adversarial wire message that bypasses the wire decoder.
-- **No protocol-visible change.** All existing protocol-level tests including the draft-21 invalid-vector JSON and `FuzzScalarMultVFY` continue to pass.
+- **`TestPeerShareErrorsWrapErrAbort` exercises every production return path through the public API** (`Respond`/`Finish`), not constructed errors, and asserts `errors.Is(err, ErrAbort)`, the appropriate peer-share sentinel where one exists, and the preserved `invalid initiator share` / `invalid responder share` role context.
+- **Each exported sentinel is reachable from at least one test** — `TestPeerShareEncodingRejection` and `TestPeerShareIdentityRejection`.
+- **The internal length defense is tested without pretending it is wire-reachable.** Use a direct internal-helper call for the wrong-length branch and assert an `ErrAbort`-wrapped internal error with no peer-share sentinel; malformed wire lengths continue to surface as `ErrMessage` from framing.
+- **The post-multiply identity branch has an `ErrAbort` guarantee.** A narrow internal test hook, or documented unreachability if no hook is acceptable, verifies that the branch's error satisfies `errors.Is(err, ErrAbort)` and does not introduce a fourth exported sentinel.
+- **No protocol-visible change.** Black-box protocol-level tests, including full exchanges and wire-level rejection, pass unchanged. `FuzzScalarMultVFY`, `TestScalarMultVFYDraftInvalidVectors`, and the `TestDraftVectors` call sites are explicitly updated to the new `([]byte, error)` signature while preserving their invariants: success requires `len(out) == pointSize`, non-identity output, and fixture match; failure requires `out == nil`, the correct sentinel where applicable, and `errors.Is(err, ErrAbort)`.
 - **Wire format unchanged.** No new bytes on the wire, no new acceptance criteria for incoming messages.
 
 ## Considered options
 
-- **A — Add sentinels, return nil on failure (recommended).** Resolves both the silent-fallback shape and the operator-triage information loss. Costs three new exported sentinels and a small refactor of `scalarMultVFY`'s return type. Backward-compatible at the `errors.Is(err, ErrAbort)` level.
+- **A — Add sentinels, return nil on failure (recommended).** Resolves both the silent-fallback shape and the operator-triage information loss. Costs two new exported sentinels and a small refactor of `scalarMultVFY`'s return type. Backward-compatible at the `errors.Is(err, ErrAbort)` level.
 
 - **B — Keep the `bool`, just change the first return to nil.** Removes the silent-fallback shape without expanding the error sentinel surface. Cheaper, but does not resolve the operator-triage problem and leaves identity-element submissions indistinguishable from peer encoding bugs in logs.
 
@@ -85,11 +93,13 @@ The implementation must satisfy these before this ADR moves `proposed → accept
 ## Consequences
 
 - **Option A (recommended):**
-  - Three new exported error sentinels become part of the v1.0.0 surface.
+  - Two new exported error sentinels become part of the v1.0.0 surface.
   - Internal refactor of `scalarMultVFY` signature (unexported, no external impact).
-  - Operators triaging production logs can distinguish "we have a framing bug" from "we have an attacker on the wire."
-  - Future callers cannot silently key with all-zeros.
-  - One new doc paragraph in `docs/integration-guidance.md` explaining the sentinel taxonomy.
+  - Operators triaging local production logs and metrics can distinguish non-canonical public-share encodings from identity-element submissions.
+  - Returning `nil` removes the valid-looking all-zero fallback; future callers still get the loud signal from the typed error return, not from any panic property of `nil`.
+  - The finer error granularity is not a secret-dependent oracle: all three `decodePublicShare` rejection causes are functions only of the encoded public wire bytes, and no secret is an input. The only secret-adjacent branch, the post-multiply identity check, is unreachable in the current prime-order Ristretto255 suite.
+  - Detailed peer-share errors are local observability signals for logs and metrics. Integration guidance must say they are not reflected to the remote peer before confirmation; remote responses stay generic.
+  - Doc updates in `docs/integration-guidance.md`, `docs/security-assessment.md`, and `docs/security-spec-audit.md` explain the sentinel taxonomy, the framing-level `ErrMessage` behavior for malformed wire lengths, the fact that malformed wire lengths never surface as peer-share sentinels, and the intentional internal divergence from draft-21's function-level neutral-element return.
 
 - **Option B:**
   - One-line fix removes the silent-fallback footgun but does not improve operator-side triage.
@@ -104,14 +114,16 @@ The implementation must satisfy these before this ADR moves `proposed → accept
 
 ## Implementation outline (Option A)
 
-1. Add `ErrPeerShareLength`, `ErrPeerShareEncoding`, `ErrPeerShareIdentity` to `errors.go` with doc comments.
-2. Change `decodePublicShare` to return `(*ristretto255.Element, error)` using the new sentinels.
-3. Change `scalarMultVFY` to return `([]byte, error)`, returning `nil` on every failure path; threading the sentinel through.
-4. Update `api.go:166-168, 180-184, 222-226` to propagate the typed error directly (or wrap with a call-site message that still threads `ErrAbort` reachability).
+1. Add `ErrPeerShareEncoding` and `ErrPeerShareIdentity` to `errors.go` as plain `errors.New` sentinels with doc comments that say the returned error also wraps `ErrAbort`.
+2. Change `decodePublicShare` to return `(*ristretto255.Element, error)` using the two new sentinels for encoding and identity rejection, and an internal `ErrAbort`-wrapped error for the wrong-length defensive branch.
+3. Change `scalarMultVFY` to return `([]byte, error)`, returning `nil` on every failure path; thread the appropriate error through, and return `fmt.Errorf("%w: neutral-element shared secret", ErrAbort)` for the unreachable post-multiply identity branch.
+4. Update `api.go:166-168, 180-184, 222-226` so public API errors retain `invalid initiator share` / `invalid responder share` role context and still satisfy `errors.Is(err, ErrAbort)` plus `errors.Is(err, ErrPeerShareEncoding)` or `errors.Is(err, ErrPeerShareIdentity)` where applicable.
 5. Add tests:
-   - `TestPeerShareErrorsWrapErrAbort` — table over each new sentinel asserting both `errors.Is(err, sentinel)` and `errors.Is(err, ErrAbort)`.
+   - `TestPeerShareErrorsWrapErrAbort` — public-API tests over `Respond` and `Finish`, asserting both role-context strings and `errors.Is` behavior for `ErrAbort` plus the applicable peer-share sentinel.
    - `TestPeerShareEncodingRejection` — feed a non-canonical Ristretto255 encoding via wire and assert `ErrPeerShareEncoding`.
    - `TestPeerShareIdentityRejection` — feed the identity encoding via wire and assert `ErrPeerShareIdentity`.
-   - `TestPeerShareLengthRejection` — call the internal helper with a short slice (test-only escape) and assert `ErrPeerShareLength`.
-6. Update `docs/integration-guidance.md` and `docs/security-assessment.md` to describe the sentinel taxonomy.
-7. Add a `CHANGELOG.md` Unreleased entry under "Pre-v1 error surface".
+   - A direct internal-helper length test — call the internal helper with a short slice and assert `errors.Is(err, ErrAbort)` with no peer-share sentinel; malformed wire lengths remain covered by existing framing tests that return `ErrMessage`.
+   - A post-multiply identity branch check — use a narrow internal hook, or document the branch's mathematical unreachability, and ensure the specified error is `ErrAbort`-wrapped with no new sentinel.
+6. Update `fuzz_test.go` and `vectors_test.go` for the new `scalarMultVFY` signature, including `FuzzScalarMultVFY`, `TestScalarMultVFYDraftInvalidVectors`, and the `TestDraftVectors` direct call sites.
+7. Update `docs/integration-guidance.md`, `docs/security-assessment.md`, and `docs/security-spec-audit.md` to describe the sentinel taxonomy, local-only disclosure guidance, malformed wire length behavior as `ErrMessage` rather than any peer-share sentinel, and the intentional update to the "matches documented draft behavior" claim.
+8. Add a `CHANGELOG.md` Unreleased entry under "Pre-v1 error surface".
