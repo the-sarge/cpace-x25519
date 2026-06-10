@@ -12,7 +12,7 @@ confirming the revisions (run `20260522T152641-7d2ca5ac0cd36d5a1062254b`). All
 three returned *proceed with changes*; the disposition tables below record how
 each round's findings were resolved.
 
-Revision 4 (2026-06-10) folds in a five-perspective review of this branch: gating-language and enumeration fixes, two recorded decisions (zero-value hardening; sequencing against the external reviews), confirmation-tag golden capture, and audit-checklist additions. Pending the confirming `ras consider` round recorded in ADR-0001 — implementation must not begin before it passes.
+Revision 4 (2026-06-10) folds in a five-perspective review of this branch (gating-language and enumeration fixes, two recorded decisions — zero-value hardening; sequencing against the external reviews — golden capture, audit-checklist additions) plus the fix-first items from the confirming rounds recorded in ADR-0001's frontmatter: run `20260610T172137` (zero-value clause rewrite for both roles, pinning-test naming, #33 evidence-set alignment, derivation-buffers reconciliation, sequencing rationale) and run `20260610T193900` (guard assigned to step 2, staged red, alias-capture wording, step-6 evidence instruction, 0003 cross-reference expansion and ordering, golden-capture mechanism, named contract tests). The gate: a clean `ras verify` against the confirming rounds, recorded in ADR-0001 — implementation must not begin before it passes.
 
 ## Goal
 
@@ -133,7 +133,7 @@ func (r *Responder) Finish(messageC []byte) (*Session, error) {
 }
 ```
 
-The `i.core == nil` / `r.core == nil` guards are deliberate hardening, recorded in ADR-0001 as a **narrow policy reopen** (decided 2026-06-10). `Initiator` and `Responder` are exported structs, so a caller *can* fabricate a zero value. Today `Finish` on one consumes the single-use state and then: the **initiator** returns `ErrMessage` (malformed message B) or `ErrAbort` (invalid or identity share), panicking on its nil scalar only when the share is valid; the **responder** returns `ErrMessage`/`ErrConfirmationFailed` — or **succeeds** against a crafted message C, because a zero-value responder's expected tag is computed from all-nil inputs with no secret material (a public constant), handing the caller a real `*Session` keyed from a nil ISK whose `Export` output is attacker-predictable. With the guards, `Finish` returns `ErrInvalidInput` **without** consuming — pinned by `TestFinishZeroValueHardening` (build step 5) and a changelog note that must state the forged-tag success path, per the ADR's acceptance criteria. The error text says "uninitialized", not "nil", because the merged guard also fires for a non-nil shell whose `core` is nil; this changes the nil-receiver message text from "nil initiator"/"nil responder" too (error identity is unchanged).
+The `i.core == nil` / `r.core == nil` guards are deliberate hardening, recorded in ADR-0001 as a **narrow policy reopen** (decided 2026-06-10). `Initiator` and `Responder` are exported structs, so a caller *can* fabricate a zero value. Today `Finish` on one consumes the single-use state and then: the **initiator** returns `ErrMessage` (malformed message B) or `ErrAbort` (invalid or identity share), panicking on its nil scalar only when the share is valid; the **responder** returns `ErrMessage`/`ErrConfirmationFailed` — or **succeeds** against a crafted message C, because a zero-value responder's expected tag is computed from all-nil inputs with no secret material (a public constant), handing the caller a real `*Session` keyed from a nil ISK whose `Export` output is attacker-predictable. With the guards, `Finish` returns `ErrInvalidInput` **without** consuming — pinned by `TestFinishZeroValueHardening` (named in the ADR's Zero-value-guard acceptance criterion; written in build step 5) and a changelog note that must state the forged-tag success path, per the ADR's Decision bullet and that same criterion. The error text says "uninitialized", not "nil", because the merged guard also fires for a non-nil shell whose `core` is nil; this changes the nil-receiver message text from "nil initiator"/"nil responder" too (error identity is unchanged).
 
 Two load-bearing invariants the sketches rely on, stated so no implementer relaxes them: **the shells never reassign or nil `.core` after construction** — cleanup nils the core's *fields*, never the pointer — so the unsynchronized `i.core == nil` read is race-free and a second `Finish` still reaches `consume()` and returns `ErrStateUsed`, not `ErrInvalidInput`; and **core methods are never called after `clear()`** — the shell single-use guard is the enforcement boundary, and post-`clear()` core behavior is out of contract (the initiator path would nil-deref; the responder path would compute a tag over a nil ISK).
 
@@ -253,7 +253,7 @@ no `yb` field either: like `adb`, the responder's own share is read nowhere
 after construction. (Today's `Responder` stores both; both are dead weight the
 sketch deliberately drops.)
 
-The sketches show `scalarMultVFY`'s current `([]byte, bool)` shape. ADR-0003 (peer-share error semantics, `proposed`, review gate satisfied) changes it to `([]byte, error)` with exported sentinels and role-context wrapping at call sites. If 0003 is accepted before this plan executes, implement step 2 against the 0003 shape (`k, err := scalarMultVFY(...)`, wrapping per 0003's call-site examples); the seam placement and the clearing structure here are unaffected either way.
+The sketches show the current `([]byte, bool)` shape of `scalarMultVFY` — and the `(*ristretto255.Element, bool)` shape of `decodePublicShare`, which ADR-0003 changes too. ADR-0003 (peer-share error semantics, `proposed`; review gate satisfied per the 2026-06-09 `ras verify` pass recorded in DEV-JOURNAL.md — the ADR's own frontmatter sync is deferred to flip time) changes both helpers to error-returning shapes with exported sentinels and role-context wrapping at call sites. Ordering — acceptance is not implementation: if 0003 is accepted but unimplemented when this plan executes, land 0003's implementation as its own commit(s) **before step 1**, so the baseline oracle and the step-1 goldens capture the 0003 shape — or defer it past step 6; step 2 then moves whichever shape the baseline has, verbatim. Under the 0003 shape the responder prevalidation becomes `if _, err := decodePublicShare(peerYa); err != nil { ... }` and the DH call becomes `k, err := scalarMultVFY(...)`, with role-context wrapping per 0003's call-site examples — wrap the plain sentinel with role context, exactly one `ErrAbort` wrap, no duplicate wrapping. The seam placement and the clearing structure here are unaffected either way.
 
 ## The seam
 
@@ -312,6 +312,13 @@ lands with its tests already in place.
    baseline, capture confirmation-tag goldens for the draft-vector inputs and
    commit them to `testdata/` (see step 4 — the draft vectors carry no tags, so
    these goldens are the only direct bit-equivalence anchor for the tag path).
+   Compute the goldens at the **primitive seam** —
+   `confirmationTag(ISK_IR, sid, Yb, ADb)` and
+   `confirmationTag(ISK_IR, sid, Ya, ADa)`, the way `vectors_test.go` already
+   drives primitives — not via the public pipeline: `normalizeConfig` always
+   derives `ci` through `buildCI`, so the package-built CI can never equal the
+   vector's raw CI, and pipeline-captured tags would not match step 4's core
+   tests.
 2. **Extract `core.go`, one role at a time** (Initiator first), with the
    `io.Reader` constructors **from the first extraction commit** —
    `newInitiatorCore` / `newResponderCore` take `io.Reader`; `startWithRandom` /
@@ -326,7 +333,14 @@ lands with its tests already in place.
    plus panic paths. (b) Today's scalar snapshot (`scalar := i.scalar`) before
    the clearing closure disappears with the move; the interim shell `defer`
    reads `i.core.scalar` at fire time, equivalent because nothing reassigns the
-   field between `consume()` and return. The responder's `Ya` prevalidation
+   field between `consume()` and return. (c) Each role's extraction commit
+   installs the merged `core == nil` guard in the shell `Finish` exactly as
+   sketched — the guard is this plan's only deliberate behavior change
+   (the ADR-recorded reopen), and landing it with the extraction closes the
+   interim window where a zero-value `Finish` would otherwise pass today's
+   `i == nil` check and nil-deref on the interim clearing defer; it is pinned
+   retroactively by `TestFinishZeroValueHardening` in step 5. The responder's
+   `Ya` prevalidation
    moves into `newResponderCore` in the Responder extraction commit — it never
    sits in the shell (step 3 then *pins* the ordering with its test).
    Persistent-secret clearing is **preserved
@@ -355,22 +369,33 @@ lands with its tests already in place.
    and would need direct core-field construction. Primitive-level vector tests
    stay.
 5. **Consolidate persistent-secret clearing into `clear()` — the dangerous
-   step, done test-first.** First write the `clear()`-contract tests (nil-safe,
-   double-`clear()` idempotence, `Finish` parse-failure and confirmation-failure
-   cleanup for both roles), `TestSessionISKSurvivesCoreClear`, and
-   `TestFinishZeroValueHardening` — they fail
-   (red). Then implement `core.clear()` per
+   step, done test-first.** First write the `clear()`-contract tests —
+   `TestClearNilSafe`, `TestClearIdempotent`, and
+   `TestClearOnFinishFailurePaths` (parse-failure and confirmation-failure
+   cleanup for both roles) — plus `TestSessionISKSurvivesCoreClear` and
+   `TestFinishZeroValueHardening`. Then implement `core.clear()` per
    [the contract](#the-clear-contract) and replace the interim `defer`s with
    `defer core.clear()` (green). Step 5 only *consolidates* clearing that is
-   already present — it introduces none. The "red" observation is local-only:
-   the new tests reference `core.clear()`, which does not compile before the
-   implementation half exists, so tests and implementation land in the same
-   commit (red observed by stashing the implementation locally) and every
-   *committed* state stays green per the per-commit gate.
+   already present — it introduces none. Step 5 also writes the changelog
+   entry for the zero-value hardening, stating the forged-tag success path,
+   alongside its pinning test. Red is staged and local-only:
+   the `TestClear*` contract tests reference `core.clear()`, which does not
+   compile before the implementation half exists — their red is a compile
+   failure, observed by stashing the implementation locally, and they land in
+   the same commit as the implementation. `TestFinishZeroValueHardening` and
+   `TestSessionISKSurvivesCoreClear` compile without `clear()`: run them
+   against the pre-consolidation tree first — the hardening test is a
+   *pinning* test (already green, since the guard landed in step 2) and the
+   ISK-isolation and failure-path assertions pin the interim defers' behavior
+   across the consolidation. No step requires running tests in a package
+   state that cannot compile, and every *committed* state stays green per the
+   per-commit gate.
    ⚠️ Tests prove behavior, not zeroization — the manual audit below is
    mandatory.
-6. **Refresh evidence.** Re-run the fuzz corpus; update `docs/fuzz-evidence.md`
-   and `docs/security-spec-audit.md`.
+6. **Interim gate + audit refresh.** Re-run the fuzz corpus as the interim
+   gate; append a clearly-marked interim, non-evidence note to
+   `docs/fuzz-evidence.md` (pending the #33 refresh — do not displace the
+   pinned campaign record), and refresh `docs/security-spec-audit.md`.
 
 ## Tests
 
@@ -395,8 +420,12 @@ lands with its tests already in place.
 - **New — ISK deep-clone isolation test (`TestSessionISKSurvivesCoreClear`):**
   this is a **responder** test — `responderCore` is the only role whose core
   ISK persists until `clear()`. Complete a handshake, build the responder's
-  `Session`, call `responderCore.clear()`, then assert `Session.Export` still
-  returns the correct non-zero bytes while `responderCore.isk` reads as zeroed.
+  `Session`, capture `coreISK := responderCore.isk` **before** calling
+  `responderCore.clear()`, then assert `responderCore.isk == nil`,
+  `allZero(coreISK)` — the backing array was zeroed, not merely dropped — and
+  that `Session.Export` still returns the correct non-zero bytes. (The same
+  pre-clear alias-capture pattern `api_test.go` already uses; field-nil alone
+  would pass an implementation that drops the reference without zeroing.)
   An initiator-side variant, if wanted, asserts a *different* property: after
   `initiatorCore.finish`, `clear()` zeroes the scalar, and the finish-local ISK
   never aliased the Session's cloned ISK. Written test-first in build step 5.
@@ -471,8 +500,8 @@ go test ./... -run TestInternalRandomHelpersDefaultNilRandomness   # nil-guard
 go test ./... -run TestResponderPrevalidatesInvalidInitiatorShareBeforeRandomness
 
 # New tests — must exist before/with step 5, not after
-go test ./... -run TestSessionISKSurvivesCoreClear   # responder-scoped
-go test ./... -run 'TestClear'        # nil-safe, idempotent, failure-path
+go test ./... -run TestSessionISKSurvivesCoreClear   # responder-scoped, alias-capture
+go test ./... -run 'TestClear'        # TestClearNilSafe / TestClearIdempotent / TestClearOnFinishFailurePaths
 go test ./... -run TestFinishZeroValueHardening      # zero-value guard, both roles
 
 # Fuzz — smoke before; the post-refactor run is an interim gate ONLY, not

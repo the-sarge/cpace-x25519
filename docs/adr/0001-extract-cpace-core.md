@@ -5,6 +5,9 @@ review-runs:
   - 20260522T081906-6c67083f870be5ac1f971508 # phase 1 — this ADR
   - 20260522T150534-dc141248a1c30a4d025c1c1f # phase 2 — implementation plan
   - 20260522T152641-7d2ca5ac0cd36d5a1062254b # phase-2 re-run — revised plan
+  - 20260610T172137-413131fe43498aaecb5cd6ae # confirming round 1 (ADR) — fix-first items, applied at 6a5c9d3
+  - 20260610T192533-eec97e2a11bdea7c6cf36c6c # confirming round 2 (ADR) — record-trail/wording items, applied
+  - 20260610T193900-68103126edf3dc34ef188d89 # confirming round 2 (plan) — plan-precision items, applied
 ---
 
 # Extract a deep CPace core
@@ -31,7 +34,7 @@ and the secret-ownership model were validated each time. Implementation follows
 the build sequence in `docs/cpace-core-plan.md`; the acceptance criteria below
 remain binding on it.
 
-**Revisions (2026-06-10).** A five-perspective review of this branch found record-integrity defects (tense, enumeration gaps, gating wording) and two undecided questions; this revision fixes the defects and records the decisions (see *Zero-value hardening* under Decision and *Sequencing against release blockers* below). The architecture is unchanged. The revised ADR and plan text must pass a confirming `ras consider` round before implementation begins; that run will be appended to `review-runs` when it completes.
+**Revisions (2026-06-10).** A five-perspective review of this branch found record-integrity defects (tense, enumeration gaps, gating wording) and two undecided questions; this revision fixes the defects and records the decisions (see *Zero-value hardening* under Decision and *Sequencing against release blockers* below). The architecture is unchanged. Three confirming `ras consider` rounds followed the same day (run IDs in the frontmatter): round 1 on the revised ADR returned six fix-first items, applied at `6a5c9d3`; round 2 on the corrected ADR and plan returned record-trail and plan-precision items, applied in this revision. None disputed the architecture or the recorded decisions. The gate stands until a clean `ras verify` against the round-2 runs confirms resolution; that verify completes the trail, and implementation must not begin before it.
 
 ## Context
 
@@ -64,8 +67,9 @@ deliberate improvement — the initiator's `finish`-local ISK moves from two
 explicit per-path clears to a single `defer`, which also covers panic paths.
 Derivation buffers are likewise scratch, cleared inside the `crypto.go`
 primitives the core calls (`deriveISK`, `confirmationTag`,
-`calculateGenerator`) — with the `lvCat`/`prependLen` intermediates excepted
-as recorded residual risk (see the plan's audit checklist). Storing scratch
+`calculateGenerator`) — with the `lvCat`/`prependLen` intermediates (and
+hmac's internal key-pad copies) excepted as recorded residual risk (see the
+plan's audit checklist). Storing scratch
 secrets on the core to be cleared by `clear()` would extend a plaintext
 secret's lifetime across the network round-trip — a regression, not the goal.
 
@@ -130,10 +134,11 @@ of them is satisfied:
   (confirmation tags, identity checks) remains `hmac.Equal`; no
   `bytes.Equal` / `reflect.DeepEqual` is introduced on such values. Enforced by
   the plan's mandatory manual audit.
-- **Zero-value guard** — a test pins the hardened behavior: `Finish` on a
-  caller-fabricated zero-value `Initiator` / `Responder` returns
-  `ErrInvalidInput` without consuming the single-use state, and the change is
-  noted in the changelog.
+- **Zero-value guard** — `TestFinishZeroValueHardening` pins the hardened
+  behavior: `Finish` on a caller-fabricated zero-value `Initiator` /
+  `Responder` returns `ErrInvalidInput` without consuming the single-use
+  state, and the change is noted in the changelog with the forged-tag success
+  path stated.
 - **Validation order** — the responder core decodes and validates `Ya` before
   deriving the generator or sampling the scalar;
   `TestResponderPrevalidatesInvalidInitiatorShareBeforeRandomness` is preserved
@@ -171,8 +176,10 @@ relocates — so relocating it mid-review invalidates the reviewers' anchors.
 - Before implementation begins, the revised ADR and plan text must pass the
   confirming `ras consider` round noted under Status.
 - After implementation, the exact-candidate evidence refresh (#33) applies in
-  full against the post-refactor commit — long-bar fuzz campaign, dependency
-  review/SAST, security/spec audit, and Capslock — regardless of
+  full against the post-refactor commit — including the long-bar fuzz
+  campaign, dependency review/SAST, security/spec audit, and Capslock (the
+  issue's tag-time items — release-validation workflow and Code Scanning
+  ingestion — apply at the next release candidate) — regardless of
   `go.mod`/`go.sum` being byte-identical. See the plan's *Evidence &
   release-readiness* section.
 
