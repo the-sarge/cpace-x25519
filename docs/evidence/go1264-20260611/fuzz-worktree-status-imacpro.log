@@ -1,0 +1,14 @@
+# Fuzz worktree status — iMacPro.local (Intel leg)
+$ date -u
+2026-06-11T07:15:10Z
+$ git rev-parse HEAD
+933ece246e6170b11e838395bf36f852cba0cd02
+$ git status --short
+?? fuzz-worktree-status-imacpro.log
+$ go version
+go version go1.26.4 darwin/amd64
+$ task --version
+3.51.1
+$ go env GOOS GOARCH
+darwin
+amd64
