@@ -680,3 +680,57 @@ section (the clause anticipated exactly this decision).
 - Implement ADR-0003, then ADR-0001 per docs/cpace-core-plan.md.
 - The OmniFocus cpace project is being reorganized into phase groups to
   mirror this sequencing.
+
+---
+
+## ADR-0003 peer-share error semantics implemented - 2026-06-11 14:30 EDT
+
+**Main:** `33f673f88200`
+**Actor:** Claude (Fable 5)
+
+**Summary:** Implemented ADR-0003 (peer-share error semantics), the first item of the ADR implementation phase. Two exported sentinels distinguish non-canonical peer-share encodings from identity-element submissions; `scalarMultVFY`/`decodePublicShare` return nil plus an `ErrAbort`-wrapped typed error instead of the draft-shaped all-zero fallback; call sites apply the binding issue-#70 sentinel mapping. No wire-format or protocol-visible change. PR opened for Josh's review; merge is Josh's action.
+
+**Completed:**
+- `errors.go`: `ErrPeerShareEncoding` / `ErrPeerShareIdentity` as plain sentinels, doc comments noting the returned errors also wrap `ErrAbort`.
+- `crypto.go`: error-returning `decodePublicShare` / `scalarMultVFY`, nil on every failure path; the wrong-length and post-multiply neutral-element branches stay defensive, `ErrAbort`-wrapped, with no exported sentinel.
+- `api.go`: `wrapPeerShareError` centralizes the call-site mapping (rewrap the plain sentinel with role context via `errors.Is`; pass non-sentinel defensive errors through unchanged) at all three call sites.
+- Tests: `TestPeerShareErrorsWrapErrAbort` (public-API, exact-string pinning of the single-prefix error shape), `TestPeerShareEncodingRejection`, `TestPeerShareIdentityRejection`, `TestPeerShareLengthDefenseInternal`, `TestScalarMultVFYPostMultiplyIdentityDefense`; `FuzzScalarMultVFY` now classifies the expected sentinel from the input bytes; draft-vector call sites migrated.
+- Docs: integration-guidance "Error Triage" section (taxonomy + local-only disclosure), security-assessment "Error Surface" section (including the non-oracle rationale), spec-matrix rows for `scalar_mult_vfy` and invalid-point abort, security-spec-audit post-baseline divergence note, CHANGELOG "Pre-v1 error surface" entry.
+
+**Decisions:**
+- The unreachable post-multiply identity branch is exercised through a zero-scalar direct call — `sampleScalar` rejects zero in production, so no test hook was added to production code.
+- `docs/security-spec-audit.md` received only a dated post-baseline note rather than a re-audit; the consolidated Phase 3 evidence refresh re-audits at the new baseline (evidence discipline per handoff).
+- TDD: red was observed as compile failures naming the missing sentinels before any production change.
+
+**Validation:** `task check` exit 0 (tests + race, vet, staticcheck, ast-grep scan, govulncheck); `task docs:check` exit 0; `gosec -tests ./...` 0 issues (SAST-gate mirror); 15s `FuzzScalarMultVFY` run, 8.6M execs, PASS; `git diff --check` clean.
+
+**Next:**
+- PR review and merge are Josh's actions; a `ras review` pass on the PR is on offer.
+- Then the ADR-0001 six-step build sequence per `docs/cpace-core-plan.md`, then the 0002/0005/0006/0007 implementations.
+- OmniFocus task "Implement ADR-0003: peer-share error semantics" completes only after the PR merges.
+
+---
+
+## ADR-0003 dual review round and authorized merge - 2026-06-11 16:54 EDT
+
+**Main:** `33f673f88200`
+**Actor:** Claude (Fable 5)
+
+**Summary:** PR #78 (ADR-0003 implementation) went through a dual review round at Josh's direction — the pr-review-toolkit four-agent pass (code-reviewer, pr-test-analyzer, silent-failure-hunter, comment-analyzer) and `ras review` run `20260611T202510-1a7eb9b7ffe39194a54be7f5` (codex + claude reviewers, adjudicated). Zero code defects confirmed by either track. The recommended fixes were applied on-branch (commit `9230cb2`) and Josh authorized the merge in the same instruction.
+
+**Completed:**
+- New `TestWrapPeerShareErrorPassesThroughNonSentinelErrors`: pins the pass-through half of the ADR-0003 call-site mapping by value identity; mutation-verified (an error-swallowing mutation of the default branch fails the test; previously two ADR-violating mutations survived the whole suite).
+- New `TestWireLengthRejectionIsMessageNotPeerShare`: wire-fed 31/33-byte shares through `Respond` assert `ErrMessage` with no `ErrAbort`/sentinel leakage, pinning the layering claim end-to-end.
+- `FuzzScalarMultVFY`: cross-sentinel negative assertions; oracle comment now states the fixed non-zero-scalar premise ("do not fuzz the scalar without revisiting this oracle").
+- Comment refinements: prevalidation rationale in `respondWithRandom` (also covers ras C-001's optional note), sentinel-maintenance + non-nil-precondition sentences on `wrapPeerShareError`, post-multiply and zero-scalar-hook phrasing fixes.
+- Docs: date-pinned the security-spec-audit post-baseline note (2026-06-11, PR #78 — the journal had called it "dated" before it was), annotated the amended spec-matrix rows, resolved the ADR-0003 conditional in `docs/cpace-core-plan.md` with a dated annotation (ras Fix First C-002, scoped per adjudication to the annotation only), corrected the CHANGELOG's `decodePublicShare` claim.
+
+**Decisions:**
+- Declined the suggestion to add the observed length to the wrong-length defensive error: the ADR's Decision text specifies that error string verbatim, and deviating would need a re-gate for a wire-unreachable diagnostic.
+- ras C-003 (`identityEncoding` package-level slice) and C-004 (deliberate double decode in `Respond`) stay untouched per adjudication: pre-existing, documented, out of scope under the release-readiness freeze. Follow-up issues are Josh's call; none filed.
+- Journal entry rides in the PR (main is protected); the merge it records was explicitly authorized by Josh in-conversation on 2026-06-11.
+
+**Validation:** `task check` exit 0, `task docs:check` exit 0, `gosec -tests` 0 issues, `git diff --check` clean after the fix commit; the new pass-through test red-green verified via temporary mutation.
+
+**Next:**
+- Merge PR #78 (authorized), complete OmniFocus task `p9jSaKVvoy8`, then the ADR-0001 six-step build sequence per the freshly annotated `docs/cpace-core-plan.md`.

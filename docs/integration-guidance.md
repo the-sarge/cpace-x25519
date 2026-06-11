@@ -56,3 +56,11 @@ already bound into `Config.Context` or `Config.AssociatedData`.
 Use `Session.Export` with domain-specific labels and contexts for application
 keys. Exported bytes are deterministic key material from the confirmed ISK, not
 fresh randomness.
+
+## Error Triage
+
+Peer public-share rejections from `Respond` and `Initiator.Finish` always satisfy `errors.Is(err, ErrAbort)`, and two exported sentinels refine the cause for local triage: `ErrPeerShareEncoding` reports 32 bytes that are not a canonical Ristretto255 encoding (a buggy or malicious peer), and `ErrPeerShareIdentity` reports an encoded identity element (almost certainly an active attacker probing for a forced neutral-element shared secret). The error message keeps the role context — `invalid initiator share` from `Respond`, `invalid responder share` from `Initiator.Finish` — so logs distinguish which share was rejected.
+
+Malformed wire lengths never surface as peer-share sentinels. Framing decodes public-share fields with an exact 32-byte limit and rejects any other length with `ErrMessage` before a share reaches point decoding.
+
+The peer-share sentinels are local observability signals for logs and metrics. Do not reflect the detailed rejection cause to the remote peer before confirmation; keep remote-facing failure responses generic so the error channel does not become a probing surface.
