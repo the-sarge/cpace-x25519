@@ -339,6 +339,45 @@ Merged PR #52, `Autoscaled Fuzz`, into `main` as merge commit `2f88a41635f54de93
 
 ---
 
+## CPace core extraction recorded as ADR-0001 - 2026-05-22 12:29 EDT
+
+**Main:** `86053559220d`
+**Actor:** Claude
+
+**Summary:** Recorded the decision to extract a deep, unexported CPace core
+(`initiatorCore` / `responderCore`) so the cryptographic composition and
+persistent-secret lifetime have one home. Documentation only — no code or
+public API change; implementation is deferred. All work is on branch
+`cpace-core-adr`.
+
+**Completed:**
+- Scaffolded the per-repo agent-skills configuration: `AGENTS.md` and
+  `docs/agents/{issue-tracker,triage-labels,domain}.md`.
+- Ran an architecture review of the flat CPace package and produced
+  `CONTEXT.md`, a domain glossary anchored on the "CPace core" concept.
+- Recorded `docs/adr/0001-extract-cpace-core.md` and the implementation plan
+  `docs/cpace-core-plan.md`.
+- Committed the seven new docs as `f76f95b` on branch `cpace-core-adr` and
+  pushed to origin.
+
+**Decisions:**
+- ADR-0001 (CPace core extraction) — accepted. Stateful `initiatorCore` /
+  `responderCore` own persistent-secret lifetime; scratch secrets stay local
+  and eagerly cleared; decoded cryptographic fields cross the seam while wire
+  framing stays in front.
+- The ADR was gated on independent multi-agent review (`ras consider`):
+  phase 1 on the ADR, phase 2 on the plan, and a phase-2 re-run. All three
+  returned "proceed with changes"; no round disputed the architecture. The
+  plan converged at revision 3 and the ADR was flipped `proposed -> accepted`.
+
+**Next:**
+- Open a pull request for `cpace-core-adr` when ready.
+- Implementation follows the six-step build sequence in
+  `docs/cpace-core-plan.md`; deferred until scheduled against the
+  release-readiness work.
+
+---
+
 ## Autoscaled fuzz moved to GARM - 2026-05-28 09:37 EDT
 
 **Main:** `c9a29ca7d17e`
@@ -439,3 +478,85 @@ explicit authorization — the merge instruction covered PR #66 only. The merge
 commit `2602be6` is reverted on main; the validated branch is restored at
 `code-review/safe-fixes-2026-05-28` (tip `25223e4`, including the gosec G115
 fix) pending a deliberate merge decision, which will need a fresh PR.
+---
+
+## ADR-0001 revision pass - 2026-06-10 11:17 EDT
+
+**Main:** `9fe2a53`
+**Actor:** Claude
+
+**Summary:** Revised the ADR-0001 record and plan on `cpace-core-adr` per a
+five-perspective branch review (accuracy, architecture, security, governance,
+agent-scaffolding). The architecture is unchanged; every edit is to the record.
+Merged `origin/main` into the branch (journal conflict resolved
+chronologically), so ADRs 0002-0007 are now visible in-branch.
+
+**Completed:**
+- Fixed the four critical record defects: CONTEXT.md re-tensed to target-state
+  and its ISK ownership corrected (initiator ISK is finish-local scratch, never
+  a core field); the acceptance-criteria preamble rewritten as implementation
+  gates rather than an acceptance gate; the do-not-re-litigate bar scoped to
+  the architecture, since the plan's revision 3 postdates the recorded reviews.
+- Closed the binding-enumeration holes: responder ephemeral scalar added to the
+  scratch list and field blacklist; the responder transcript consistently
+  framed as public wire data zeroed as hygiene; the Context section's zeroing
+  description scoped to the two `Finish` methods.
+- Plan executability: verbatim-vs-literal reconciled (finish-local ISK
+  defer canonicalization pinned to the Initiator extraction commit);
+  confirmation-tag goldens captured from `main` in step 1 (draft vectors carry
+  no tags); constant-time and `lvCat`/`prependLen` residual lines added to the
+  manual audit; `Start`/`Respond` scoped out of the defer-cleanup criterion;
+  step-5 red-state and `Ya`-prevalidation interim home clarified; Candidates
+  C/D annotated as unrecorded; `scalarMultVFY` sketches cross-referenced to
+  ADR-0003's pending `([]byte, error)` shape.
+- Scaffolding corrected to repo reality: triage-labels.md rewritten around the
+  live dimensional taxonomy with a do-not-create-labels rule; domain.md's
+  fictional ADR filenames and stale annotations removed; AGENTS.md gains the
+  freeze, evidence-discipline, ADR-gating, and merge-authorization rules.
+
+**Decisions (recorded in ADR-0001):**
+- Zero-value hardening - keep the `core == nil` guards as a narrow policy
+  reopen: `Finish` on a fabricated zero value returns `ErrInvalidInput` without
+  consuming, with changelog note and pinning test required.
+- Sequencing - implementation hard-gated on external reviews #29-#32; the #33
+  exact-candidate refresh (all four evidence artifacts, dependency review/SAST
+  included) applies afterward regardless of unchanged `go.mod`.
+
+**Next:**
+- Confirming `ras consider` round on the revised ADR-0001 + plan; append the
+  run ID to the ADR frontmatter.
+- Open the PR for `cpace-core-adr`; merging it heals the dangling `[[0001]]`
+  links and unblocks the 0004/0007 acceptance flips.
+
+---
+
+## ADR-0001 confirming-round gate passed - 2026-06-10 16:37 EDT
+
+**Main:** `9fe2a53`
+**Actor:** Claude
+
+**Summary:** The revised ADR-0001 + plan cleared the confirming-round gate on
+branch `cpace-core-adr`. Four `ras consider` rounds on 2026-06-10 (run IDs in
+the ADR's `review-runs` frontmatter): round 1 (ADR) six fix-first items;
+round 2 (ADR + plan) four record-trail and ten plan-precision items —
+including a reproduced zero-value Responder forged-tag success path, now the
+recorded rationale for the ADR's zero-value reopen, and an interim
+commits-2-4 panic window closed by assigning the core-presence guard to build
+step 2; round 3 ADR **PASS** / plan four step-5 staging items; round 4 plan
+**PASS** with zero findings at `4dc2081`. No round disputed the architecture,
+the zero-value reopen, or the sequencing gate.
+
+**Process notes:** `ras verify` cannot re-gate this pair — the ADR and plan
+are each other's context refs, so any fix pass trips
+`source_identity_mismatch`; the gate was restated as fresh consider rounds.
+Issue #33 and the external-review handoff gained the Capslock line so all
+four artifacts name the same #33 evidence set (issue edit maintainer-
+authorized).
+
+**Open:**
+- C-012 carry-forward (ADR-0003 under-specifies call-site sentinel rewrap) -
+  pending a maintainer decision to file as an ADR-0003 issue.
+- Open the pull request for `cpace-core-adr`; merging heals the `[[0001]]`
+  links on main and unblocks the 0004/0007 acceptance flips.
+- Implementation remains hard-gated on #29-#32 per the ADR's Sequencing
+  section; #33 full refresh applies after.
