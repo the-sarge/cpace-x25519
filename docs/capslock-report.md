@@ -1,19 +1,22 @@
 # Capslock Report
 
-Date: 2026-05-08
+Date: 2026-06-11
 
 Target module: `github.com/the-sarge/cpace`
 
-Package-code baseline: `2e09774f171dde8c62763d6e35a258b0fef88801`
+Package-code baseline: `933ece246e6170b11e838395bf36f852cba0cd02`
 
 Status: external-review evidence. Capslock is experimental static capability
 analysis; this report is review signal, not a release gate.
 
-This report refreshes the Go 1.26.3 Capslock evidence after the Go 1.26
-`go fix` modernization touched `crypto.go` and `framing.go`. The refresh was
-run from a clean detached worktree at the package-code baseline.
+This report refreshes the Capslock evidence after the go1.26.4 toolchain
+security release (2026-06-02) and the security-relevant package-code changes
+merged in PR #73. The refresh was run from a clean worktree at the
+package-code baseline. The capability summary is **identical** to the
+2026-05-08 report — same classes, same counts — confirming no
+capability-surface change from either trigger.
 
-Transcript: `docs/evidence/v012-candidate-20260508/local-analysis.log`
+Transcript: `docs/evidence/go1264-20260611/local-analysis.log`
 
 ## Tool
 
@@ -25,7 +28,7 @@ Result:
 
 ```text
 capslock version v0.3.2
-compiled with Go version go1.26.3
+compiled with Go version go1.26.4
 includes Go tools version v0.43.0
 ```
 
@@ -52,9 +55,9 @@ Verbose output preserved the same capability classes and example call paths:
 ARBITRARY_EXECUTION: 6 references (6 direct, 0 transitive)
 Example callpath:
   github.com/the-sarge/cpace.Respond
-  api.go:147:26:github.com/the-sarge/cpace.respondWithRandom
-  api.go:187:25:github.com/the-sarge/cpace.confirmationTag
-  crypto.go:150:15:crypto/hmac.New
+  api.go:164:26:github.com/the-sarge/cpace.respondWithRandom
+  api.go:206:25:github.com/the-sarge/cpace.confirmationTag
+  crypto.go:158:15:crypto/hmac.New
   hmac.go:48:25:crypto/internal/fips140only.Enforced
   fips140only.go:20:25:crypto/fips140.Enforced
   enforcement.go:37:31:crypto/fips140.isBypassed
@@ -62,10 +65,13 @@ Example callpath:
 UNANALYZED: 5 references (5 direct, 0 transitive)
 Example callpath:
   github.com/the-sarge/cpace.Start
-  api.go:108:24:github.com/the-sarge/cpace.startWithRandom
-  api.go:125:24:github.com/the-sarge/cpace.sampleScalar
+  api.go:122:24:github.com/the-sarge/cpace.startWithRandom
+  api.go:142:24:github.com/the-sarge/cpace.sampleScalar
   crypto.go:59:27:io.ReadFull
 ```
+
+(Line numbers shifted with the PR #73 changes; the call paths and capability
+classes are unchanged.)
 
 The package does not directly expose filesystem, network, subprocess, dynamic
 loading, environment mutation, or other broad operating-system capabilities in

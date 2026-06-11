@@ -1,29 +1,28 @@
 # Security/Spec Audit
 
-Date: 2026-05-08
+Date: 2026-06-11
 
 Target module: `github.com/the-sarge/cpace`
 
-Implementation baseline: `2e09774f171dde8c62763d6e35a258b0fef88801`
+Implementation baseline: `933ece246e6170b11e838395bf36f852cba0cd02`
 
-Documentation/evidence baseline: v0.1.2 evidence PR head or merge commit
-containing this file.
+Documentation/evidence baseline: the merge commit containing this file.
 
-Toolchain: Go 1.26.3
+Toolchain: Go 1.26.4
 
-Evidence transcript: `docs/evidence/v012-candidate-20260508/local-analysis.log`
+Evidence transcript: `docs/evidence/go1264-20260611/local-analysis.log`
 
 Draft source: `draft-irtf-cfrg-cpace-21`
 (`https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-cpace-21`)
 
 ## Scope
 
-This audit checked the v0.1.2 evidence PR versions of
-`docs/security-assessment.md` and `docs/spec-matrix.md` against the
-implementation baseline, tests, refreshed Go 1.26.3 release evidence, and the
-draft-21 text. It is a documentation and conformance audit, not an independent
-cryptographic review. This is a self-audit by the project maintainer, distinct
-from independent cryptographic review or external review.
+This audit checked `docs/security-assessment.md` and `docs/spec-matrix.md` (as
+updated by PR #73, which shipped its own documentation updates alongside its
+code changes) against the implementation baseline, tests, refreshed Go 1.26.4
+release evidence, and the draft-21 text. It is a documentation and conformance
+audit, not an independent cryptographic review. This is a project-side
+self-audit, distinct from independent cryptographic review or external review.
 
 The audit covered:
 
@@ -34,15 +33,19 @@ The audit covered:
 - invalid-share handling and parser rejection behavior;
 - test/vector/fuzz/dependency/Capslock evidence referenced by the
   release-readiness docs;
-- Go 1.26 `go fix` modernization impact after PR #45.
+- the go1.26.4 toolchain security release (2026-06-02) impact;
+- the PR #73 package-code changes (the safe fixes from the 2026-05-27
+  multi-agent review: deferred wipe unification, `sampleScalar` retry,
+  protocol-identity test pins, SAST gate workflow).
 
 ## Result
 
 No security/spec drift was found at the implementation baseline.
 
-`task check` passes under Go 1.26.3 for the v0.1.2 candidate. The
-clean-worktree evidence transcript records dependency, gosec, and Capslock
-commands at the implementation baseline.
+`task check` passes under Go 1.26.4 at the implementation baseline (transcript
+records exit 0 with both test lanes green). The clean-worktree evidence
+transcript records dependency, gosec, and Capslock commands at the
+implementation baseline.
 
 The security assessment and spec matrix accurately describe the current
 implementation:
@@ -57,27 +60,34 @@ implementation:
 - package-owned CI construction, binary framing, non-configurable field caps,
   `Session.Export`, `Session.Close`, `PeerAssociatedData`, and `PeerID` are
   correctly documented as package-profile behavior;
-- dependency, fuzz, and Capslock evidence references point to the refreshed Go
-  1.26.3 evidence documents.
+- dependency and Capslock evidence references point to the refreshed Go 1.26.4
+  evidence documents; the long-fuzz evidence refresh under 1.26.4 is pending
+  the paired maintainer-machine campaigns and is tracked separately.
 
-The Go 1.26.3 release note included security fixes in the `go` command, the
-`pack` tool, and several standard-library packages, plus bug fixes including
-`crypto/fips140`. CPace does not import the named web/template/mail packages;
-it does transitively use Go crypto internals, so evidence remains recorded
-under Go 1.26.3. PR #45 then applied mechanical Go 1.26 `go fix`
-modernizations in `crypto.go`, `framing.go`, and concurrent tests. The
-generator-string clamp, scalar-sampling loop bound, and LEB128 loop bound are
-unchanged in meaning, and `task check` reran the existing draft/RFC vector
-assertions at the implementation baseline. No Go API, wire/protocol,
-dependency, or vector behavior change was found.
+The go1.26.4 release (2026-06-02) is a security release: fixes to
+`crypto/x509`, `mime`, and `net/textproto`, plus bug fixes to
+`crypto/fips140`, the compiler, and the runtime. CPace does not import the
+three patched packages; it does transitively use Go crypto internals including
+`crypto/fips140`, so evidence is re-recorded under Go 1.26.4. Separately,
+PR #73 merged the safe fixes from the 2026-05-27 multi-agent review into
+`api.go`, `crypto.go`, and `session.go` (deferred wipe unification,
+`sampleScalar` retry, protocol-identity test pins); those changes were
+multi-agent-reviewed, shipped with their own security-assessment and
+spec-matrix updates, and pin protocol identity with dedicated tests. At this
+baseline `task check` reran the draft/RFC vector assertions. No Go API,
+wire/protocol, dependency, or vector behavior change was found.
 
 ### Toolchain Vector Stability
 
-For this v0.1.2 audit, draft/RFC vector assertions were rerun under Go 1.26.3.
-Separate old-toolchain and new-toolchain vector logs were not recorded because
-the explicit evidence policy was added after this evidence packet. Future
-toolchain-triggered refreshes should record old/new vector-stability results
-here, or explicitly state why the previous toolchain was unavailable.
+For this refresh, the draft/RFC vector assertions were run under **both**
+toolchains and recorded in the evidence transcript: `go test -count=1 -run
+'Vector' -v ./...` under go1.26.4, and the same command under
+`GOTOOLCHAIN=go1.26.3`. All vector tests pass identically under both
+(`TestStringUtilitiesDraftVectors`, `TestEmbeddedDraftVectorJSON`,
+`TestEmbeddedDraftInvalidVectorJSON`, `TestRistrettoDraft21Vectors`,
+`TestScalarMultVFYDraftInvalidVectors`, and the vector-loader fuzz seeds).
+This is the first refresh to record the old/new pair the evidence policy asks
+for; future toolchain-triggered refreshes should continue the practice.
 
 ## Residual Risk
 

@@ -1,16 +1,16 @@
 # Dependency Review
 
-Date: 2026-05-08
+Date: 2026-06-11
 
 Target module: `github.com/the-sarge/cpace`
 
-Review commit: `2e09774f171dde8c62763d6e35a258b0fef88801`
+Review commit: `933ece246e6170b11e838395bf36f852cba0cd02`
 
-Review worktree: clean detached worktree at the review commit.
+Review worktree: clean worktree at the review commit.
 
-Toolchain: Go 1.26.3 (`darwin/arm64`)
+Toolchain: Go 1.26.4 (`darwin/arm64`)
 
-Transcript: `docs/evidence/v012-candidate-20260508/local-analysis.log`
+Transcript: `docs/evidence/go1264-20260611/local-analysis.log`
 
 Dependencies:
 
@@ -32,7 +32,7 @@ Dependencies:
 `go version` reported:
 
 ```text
-go version go1.26.3 darwin/arm64
+go version go1.26.4 darwin/arm64
 ```
 
 `go list -m all` reported only the main module plus:
@@ -43,14 +43,14 @@ go version go1.26.3 darwin/arm64
 `govulncheck -version` reported:
 
 ```text
-Go: go1.26.3
+Go: go1.26.4
 Scanner: govulncheck@v1.3.0
 DB: https://vuln.go.dev
-DB updated: 2026-05-07 19:21:40 +0000 UTC
+DB updated: 2026-06-02 21:39:47 +0000 UTC
 ```
 
 `govulncheck -test -show verbose ./...` scanned the module, the two dependency
-modules, and the Go 1.26.3 standard library. Result: no vulnerabilities found.
+modules, and the Go 1.26.4 standard library. Result: no vulnerabilities found.
 
 The pinned gosec command reported zero issues:
 
@@ -58,18 +58,21 @@ The pinned gosec command reported zero issues:
 Summary:
   Gosec  : dev
   Files  : 7
-  Lines  : 938
+  Lines  : 968
   Nosec  : 0
   Issues : 0
 ```
 
 The `Gosec : dev` summary value is the string emitted by the upstream gosec
-binary for this invocation. The transcript also records `go version -m` module
-metadata for an installed copy of the same pinned command, showing
-`github.com/securego/gosec/v2 v2.26.1`.
+binary for this pinned `go run …gosec@v2.26.1` invocation. The line count
+increased from 938 to 968 with the PR #73 package-code changes.
 
-This refresh follows the Go 1.26 `go fix` modernization in PR #45. No
-dependency versions changed from the previous review.
+This refresh follows the go1.26.4 toolchain security release (2026-06-02;
+`crypto/x509`, `mime`, `net/textproto` fixes plus `crypto/fips140`, compiler,
+and runtime bug fixes) and the security-relevant package-code changes merged
+in PR #73 (the safe fixes from the 2026-05-27 review: deferred wipe
+unification, `sampleScalar` retry, protocol-identity test pins). No dependency
+versions changed from the previous review.
 
 ## Residual Risk
 
