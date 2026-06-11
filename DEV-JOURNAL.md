@@ -680,3 +680,31 @@ section (the clause anticipated exactly this decision).
 - Implement ADR-0003, then ADR-0001 per docs/cpace-core-plan.md.
 - The OmniFocus cpace project is being reorganized into phase groups to
   mirror this sequencing.
+
+---
+
+## ADR-0003 peer-share error semantics implemented - 2026-06-11 14:30 EDT
+
+**Main:** `33f673f88200`
+**Actor:** Claude (Fable 5)
+
+**Summary:** Implemented ADR-0003 (peer-share error semantics), the first item of the ADR implementation phase. Two exported sentinels distinguish non-canonical peer-share encodings from identity-element submissions; `scalarMultVFY`/`decodePublicShare` return nil plus an `ErrAbort`-wrapped typed error instead of the draft-shaped all-zero fallback; call sites apply the binding issue-#70 sentinel mapping. No wire-format or protocol-visible change. PR opened for Josh's review; merge is Josh's action.
+
+**Completed:**
+- `errors.go`: `ErrPeerShareEncoding` / `ErrPeerShareIdentity` as plain sentinels, doc comments noting the returned errors also wrap `ErrAbort`.
+- `crypto.go`: error-returning `decodePublicShare` / `scalarMultVFY`, nil on every failure path; the wrong-length and post-multiply neutral-element branches stay defensive, `ErrAbort`-wrapped, with no exported sentinel.
+- `api.go`: `wrapPeerShareError` centralizes the call-site mapping (rewrap the plain sentinel with role context via `errors.Is`; pass non-sentinel defensive errors through unchanged) at all three call sites.
+- Tests: `TestPeerShareErrorsWrapErrAbort` (public-API, exact-string pinning of the single-prefix error shape), `TestPeerShareEncodingRejection`, `TestPeerShareIdentityRejection`, `TestPeerShareLengthDefenseInternal`, `TestScalarMultVFYPostMultiplyIdentityDefense`; `FuzzScalarMultVFY` now classifies the expected sentinel from the input bytes; draft-vector call sites migrated.
+- Docs: integration-guidance "Error Triage" section (taxonomy + local-only disclosure), security-assessment "Error Surface" section (including the non-oracle rationale), spec-matrix rows for `scalar_mult_vfy` and invalid-point abort, security-spec-audit post-baseline divergence note, CHANGELOG "Pre-v1 error surface" entry.
+
+**Decisions:**
+- The unreachable post-multiply identity branch is exercised through a zero-scalar direct call — `sampleScalar` rejects zero in production, so no test hook was added to production code.
+- `docs/security-spec-audit.md` received only a dated post-baseline note rather than a re-audit; the consolidated Phase 3 evidence refresh re-audits at the new baseline (evidence discipline per handoff).
+- TDD: red was observed as compile failures naming the missing sentinels before any production change.
+
+**Validation:** `task check` exit 0 (tests + race, vet, staticcheck, ast-grep scan, govulncheck); `task docs:check` exit 0; `gosec -tests ./...` 0 issues (SAST-gate mirror); 15s `FuzzScalarMultVFY` run, 8.6M execs, PASS; `git diff --check` clean.
+
+**Next:**
+- PR review and merge are Josh's actions; a `ras review` pass on the PR is on offer.
+- Then the ADR-0001 six-step build sequence per `docs/cpace-core-plan.md`, then the 0002/0005/0006/0007 implementations.
+- OmniFocus task "Implement ADR-0003: peer-share error semantics" completes only after the PR merges.
