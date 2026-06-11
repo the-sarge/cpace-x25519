@@ -734,3 +734,27 @@ section (the clause anticipated exactly this decision).
 
 **Next:**
 - Merge PR #78 (authorized), complete OmniFocus task `p9jSaKVvoy8`, then the ADR-0001 six-step build sequence per the freshly annotated `docs/cpace-core-plan.md`.
+
+---
+
+## Phase 1 fuzz baseline assembled (go1.26.4 paired campaigns) - 2026-06-11 18:42 EDT
+
+**Main:** `4c60af8753e8`
+**Actor:** Claude (Fable 5)
+
+**Summary:** Phase 1 (pre-refactor baseline evidence) is complete. The paired ARM/Intel go1.26.4 long-fuzz campaigns launched 2026-06-11 ~07:15Z finished cleanly — all 14 registered targets passed on both hosts — and their evidence is assembled into `docs/evidence/go1264-20260611/`, closing the bundle's pending fuzz half. PR opened for Josh's review; merge is Josh's action.
+
+**Completed:**
+- Verified both campaigns finished: `mbp128.local` (ARM) 07:13:34Z → 21:13:55Z, `iMacPro.local` (Intel, via ssh) 07:15:10Z → 21:15:33Z; ~14h00m each, matching the 14-target sequential `FUZZTIME=1h PARALLEL=1` schedule; both logs end `All 14 fuzz targets passed`; both detached worktrees pinned at `933ece2`.
+- Copied `fuzz-{mbp128,imacpro}.log` + both worktree-status captures into the bundle (Intel logs via scp), confirmed no trailing whitespace or CRLF, regenerated `SHA256SUMS` (5 transcripts, self-check OK).
+- Bundle README: dropped the "Pending" note, documented the four new files, and recorded the log-format caveat — raw `task fuzz` transcripts carry no embedded timestamps/rc, so start times come from the status captures and finish times from final log writes observed at copy time.
+- `docs/fuzz-evidence.md`: new "Go 1.26.4 Baseline Paired Long Runs" section is the current paired evidence (supersedes the `2e09774` candidate runs); header re-pinned to `933ece2`; scope note records that ADR-0003 (`4c60af8`) landed after the campaigns and owes a covering campaign at the consolidated post-implementation refresh; Residual Risk updated to say the refresh rule is already triggered.
+
+**Decisions:**
+- The evidence is pinned to `933ece2` (pre-ADR-0003) by design — these runs double as the pre-refactor fuzz baseline for the ADR-0001 build sequence; the post-implementation shape is covered by the Phase 3 consolidated refresh, not piecemeal.
+- Campaign worktrees on both machines are removed only after the logs are pushed (with `/tmp` stash copies as a belt-and-suspenders).
+
+**Validation:** `task docs:check` exit 0; `git diff --check` clean; `shasum -a 256 -c SHA256SUMS` all OK.
+
+**Next:**
+- Josh reviews/merges the evidence PR; then the ADR-0001 six-step build sequence starts against the recorded baseline.
