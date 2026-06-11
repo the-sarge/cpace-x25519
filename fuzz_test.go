@@ -341,15 +341,39 @@ func FuzzScalarMultVFY(f *testing.F) {
 		if len(encoded) > 128 {
 			t.Skip()
 		}
-		out, ok := scalarMultVFY(s, encoded)
-		if len(out) != pointSize {
-			t.Fatalf("scalarMultVFY output length=%d", len(out))
+		out, err := scalarMultVFY(s, encoded)
+		if err == nil {
+			if len(out) != pointSize {
+				t.Fatalf("scalarMultVFY output length=%d", len(out))
+			}
+			if bytes.Equal(out, identityEncoding) {
+				t.Fatalf("scalarMultVFY accepted identity output")
+			}
+			return
 		}
-		if ok && bytes.Equal(out, identityEncoding) {
-			t.Fatalf("scalarMultVFY accepted identity output")
+		if out != nil {
+			t.Fatalf("scalarMultVFY rejection out=%x want nil", out)
 		}
-		if !ok && !bytes.Equal(out, identityEncoding) {
-			t.Fatalf("scalarMultVFY rejection output=%x", out)
+		if !errors.Is(err, ErrAbort) {
+			t.Fatalf("scalarMultVFY rejection err=%v does not wrap ErrAbort", err)
+		}
+		// A canonical decode round-trips its input, so the rejection cause is
+		// fully determined by the encoded bytes: wrong length is the internal
+		// defensive branch, the canonical identity encoding is the identity
+		// sentinel, and anything else 32 bytes long failed canonical decoding.
+		switch {
+		case len(encoded) != pointSize:
+			if errors.Is(err, ErrPeerShareEncoding) || errors.Is(err, ErrPeerShareIdentity) {
+				t.Fatalf("length rejection err=%v wraps a peer-share sentinel", err)
+			}
+		case bytes.Equal(encoded, identityEncoding):
+			if !errors.Is(err, ErrPeerShareIdentity) {
+				t.Fatalf("identity rejection err=%v want ErrPeerShareIdentity", err)
+			}
+		default:
+			if !errors.Is(err, ErrPeerShareEncoding) {
+				t.Fatalf("encoding rejection err=%v want ErrPeerShareEncoding", err)
+			}
 		}
 	})
 }

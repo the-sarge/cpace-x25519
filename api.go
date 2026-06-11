@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha512"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -180,8 +181,8 @@ func respondWithRandom(cfg Config, messageA []byte, random io.Reader) (*Responde
 	if !bytes.Equal(a.sid, nc.sid) {
 		return nil, nil, fmt.Errorf("%w: session id mismatch", ErrMessage)
 	}
-	if _, ok := decodePublicShare(a.ya); !ok {
-		return nil, nil, fmt.Errorf("%w: invalid initiator share", ErrAbort)
+	if _, err := decodePublicShare(a.ya); err != nil {
+		return nil, nil, wrapPeerShareError(err, "initiator")
 	}
 
 	g := calculateGenerator(nc.password, nc.ci, nc.sid)
@@ -196,10 +197,10 @@ func respondWithRandom(cfg Config, messageA []byte, random io.Reader) (*Responde
 	}
 	defer clearScalar(y)
 	yb := scalarMult(y, g)
-	k, ok := scalarMultVFY(y, a.ya)
+	k, err := scalarMultVFY(y, a.ya)
 	defer clearBytes(k)
-	if !ok {
-		return nil, nil, fmt.Errorf("%w: invalid initiator share", ErrAbort)
+	if err != nil {
+		return nil, nil, wrapPeerShareError(err, "initiator")
 	}
 	tr := transcriptIR(a.ya, a.ada, yb, nc.ad)
 	isk := deriveISK(nc.sid, k, tr)
@@ -238,10 +239,10 @@ func (i *Initiator) Finish(messageB []byte) ([]byte, *Session, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	k, ok := scalarMultVFY(scalar, b.yb)
+	k, err := scalarMultVFY(scalar, b.yb)
 	defer clearBytes(k)
-	if !ok {
-		return nil, nil, fmt.Errorf("%w: invalid responder share", ErrAbort)
+	if err != nil {
+		return nil, nil, wrapPeerShareError(err, "responder")
 	}
 	tr := transcriptIR(i.ya, i.ada, b.yb, b.adb)
 	isk := deriveISK(i.sid, k, tr)
@@ -380,4 +381,21 @@ func clone(in []byte) []byte {
 	out := make([]byte, len(in))
 	copy(out, in)
 	return out
+}
+
+// wrapPeerShareError applies the ADR-0003 call-site sentinel mapping: the two
+// exported peer-share sentinels are rewrapped from the plain sentinel — never
+// from the helper's already-ErrAbort-wrapped error, which would duplicate the
+// "cpace: protocol abort" prefix — with role context added. Non-sentinel
+// defensive errors (wrong length, post-multiply neutral element) pass through
+// unchanged: they already wrap ErrAbort and are unreachable from the wire.
+func wrapPeerShareError(err error, role string) error {
+	switch {
+	case errors.Is(err, ErrPeerShareEncoding):
+		return fmt.Errorf("%w: invalid %s share: %w", ErrAbort, role, ErrPeerShareEncoding)
+	case errors.Is(err, ErrPeerShareIdentity):
+		return fmt.Errorf("%w: invalid %s share: %w", ErrAbort, role, ErrPeerShareIdentity)
+	default:
+		return err
+	}
 }

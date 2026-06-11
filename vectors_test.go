@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"testing"
 )
 
@@ -263,13 +264,13 @@ func TestRistrettoDraft21Vectors(t *testing.T) {
 		t.Fatalf("Yb got %x want %x", Yb, wantYb)
 	}
 
-	k1, ok := scalarMultVFY(ya, Yb)
-	if !ok {
-		t.Fatal("scalarMultVFY(ya,Yb) failed")
+	k1, err := scalarMultVFY(ya, Yb)
+	if err != nil {
+		t.Fatalf("scalarMultVFY(ya,Yb): %v", err)
 	}
-	k2, ok := scalarMultVFY(yb, Ya)
-	if !ok {
-		t.Fatal("scalarMultVFY(yb,Ya) failed")
+	k2, err := scalarMultVFY(yb, Ya)
+	if err != nil {
+		t.Fatalf("scalarMultVFY(yb,Ya): %v", err)
 	}
 	wantK := v["K"]
 	if !bytes.Equal(k1, wantK) || !bytes.Equal(k2, wantK) {
@@ -318,18 +319,25 @@ func TestScalarMultVFYDraftInvalidVectors(t *testing.T) {
 		t.Fatal(err)
 	}
 	valid := v.Valid["X"]
-	got, ok := scalarMultVFY(s, valid)
+	got, err := scalarMultVFY(s, valid)
 	want := v.Valid["G.scalar_mult_vfy(s,X)"]
-	if !ok || !bytes.Equal(got, want) {
-		t.Fatalf("valid scalar_mult_vfy got ok=%v %x want %x", ok, got, want)
+	if err != nil || !bytes.Equal(got, want) {
+		t.Fatalf("valid scalar_mult_vfy got err=%v %x want %x", err, got, want)
 	}
-	for _, invalid := range [][]byte{
-		v.InvalidY1,
-		v.InvalidY2,
+	for _, tc := range []struct {
+		name     string
+		encoded  []byte
+		sentinel error
+	}{
+		{"Y1 non-canonical", v.InvalidY1, ErrPeerShareEncoding},
+		{"Y2 identity", v.InvalidY2, ErrPeerShareIdentity},
 	} {
-		got, ok := scalarMultVFY(s, invalid)
-		if ok || !bytes.Equal(got, identityEncoding) {
-			t.Fatalf("invalid scalar_mult_vfy got ok=%v %x", ok, got)
+		got, err := scalarMultVFY(s, tc.encoded)
+		if got != nil {
+			t.Fatalf("%s: invalid scalar_mult_vfy out=%x want nil", tc.name, got)
+		}
+		if !errors.Is(err, ErrAbort) || !errors.Is(err, tc.sentinel) {
+			t.Fatalf("%s: invalid scalar_mult_vfy err=%v want ErrAbort and %v", tc.name, err, tc.sentinel)
 		}
 	}
 }

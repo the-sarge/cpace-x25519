@@ -29,6 +29,15 @@ var (
 	// neutral-element Diffie-Hellman result.
 	ErrAbort = errors.New("cpace: protocol abort")
 
+	// ErrPeerShareEncoding reports a peer public share that is not a
+	// canonical Ristretto255 encoding. The returned error also wraps
+	// ErrAbort.
+	ErrPeerShareEncoding = errors.New("cpace: peer share encoding")
+
+	// ErrPeerShareIdentity reports a peer public share that decoded to the
+	// Ristretto255 identity element. The returned error also wraps ErrAbort.
+	ErrPeerShareIdentity = errors.New("cpace: peer share identity")
+
 	// ErrConfirmationFailed reports failed explicit key confirmation.
 	ErrConfirmationFailed = errors.New("cpace: key confirmation failed")
 )

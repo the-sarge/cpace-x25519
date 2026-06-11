@@ -81,6 +81,14 @@ Merkle root, exporter, or other fixed-size commitment.
 Confirmation tags intentionally remain draft-compatible. This package does not
 add extra role-label inputs to the draft-21 confirmation MACs.
 
+## Error Surface
+
+Peer-share rejections wrap `ErrAbort`, and the public API adds one of two exported sentinels for local triage: `ErrPeerShareEncoding` for a non-canonical Ristretto255 encoding and `ErrPeerShareIdentity` for an identity-element submission. Errors from `Respond` and `Initiator.Finish` retain `invalid initiator share` / `invalid responder share` role context. Malformed wire lengths are rejected by framing as `ErrMessage` and never surface as peer-share sentinels; the internal wrong-length branch of share decoding is defensive, `ErrAbort`-wrapped, and unreachable from the wire.
+
+The finer rejection granularity is not a secret-dependent oracle: every classification is a function only of the encoded public wire bytes, with no secret input. The only secret-adjacent branch, the post-multiply neutral-element check, is unreachable for prime-order Ristretto255 and is kept as defense-in-depth behind an `ErrAbort`-wrapped error.
+
+Internally `scalarMultVFY` returns nil with a typed error on failure instead of draft-21's function-level neutral-element return convention. The divergence is intentional and internal-only: protocol abort behavior is unchanged and the draft's invalid-share vectors, including the neutral-element case, are still rejected. Detailed peer-share errors are for local logs and metrics; integrations must not reflect them to the remote peer before confirmation (see `docs/integration-guidance.md`).
+
 ## Dependencies
 
 - `github.com/gtank/ristretto255 v0.2.0`
