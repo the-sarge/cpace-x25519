@@ -1157,12 +1157,60 @@ func assertLengthDefenseError(t *testing.T, n int, err error) {
 	}
 }
 
+func TestWrapPeerShareErrorPassesThroughNonSentinelErrors(t *testing.T) {
+	// The ADR-0003 call-site mapping sanctions exactly two behaviors: rewrap
+	// the two exported sentinels with role context, and pass every other
+	// error through unchanged. Pin the pass-through half with the two real
+	// non-sentinel errors the helpers can produce, asserting value identity
+	// so both a role-context rewrap (the duplicated-prefix shape) and an
+	// error-swallowing regression fail loudly.
+	invalid := mustLoadDraftInvalidVector(t)
+	_, lengthErr := decodePublicShare(make([]byte, pointSize-1))
+	if lengthErr == nil {
+		t.Fatal("expected length defense error")
+	}
+	_, neutralErr := scalarMultVFY(ristretto255.NewScalar().Zero(), invalid.Valid["X"])
+	if neutralErr == nil {
+		t.Fatal("expected post-multiply neutral-element error")
+	}
+	for _, tc := range []struct {
+		name string
+		err  error
+	}{
+		{"wrong length", lengthErr},
+		{"post-multiply neutral element", neutralErr},
+	} {
+		for _, role := range []string{"initiator", "responder"} {
+			if got := wrapPeerShareError(tc.err, role); got != tc.err {
+				t.Fatalf("%s/%s: wrapPeerShareError returned %v, want the identical error value", tc.name, role, got)
+			}
+		}
+	}
+}
+
+func TestWireLengthRejectionIsMessageNotPeerShare(t *testing.T) {
+	// Pins the layering claim made by ADR-0003 and docs/integration-guidance.md:
+	// malformed wire lengths surface as ErrMessage from framing and never as
+	// ErrAbort or a peer-share sentinel.
+	for _, n := range []int{pointSize - 1, pointSize + 1} {
+		badA := encodeMessageA([]byte("sid"), make([]byte, n), nil)
+		_, _, err := Respond(testConfig(), badA)
+		if !errors.Is(err, ErrMessage) {
+			t.Fatalf("len=%d: Respond err=%v want ErrMessage", n, err)
+		}
+		if errors.Is(err, ErrAbort) || errors.Is(err, ErrPeerShareEncoding) || errors.Is(err, ErrPeerShareIdentity) {
+			t.Fatalf("len=%d: wire-length rejection err=%v leaked an abort-layer error", n, err)
+		}
+	}
+}
+
 func TestScalarMultVFYPostMultiplyIdentityDefense(t *testing.T) {
 	// For prime-order Ristretto255 the post-multiply identity branch is
 	// unreachable from the wire: s·p is non-identity for any decoded
 	// (non-identity) p and any scalar sampleScalar can return, since zero
-	// samples are rejected. A zero scalar is therefore the narrow internal
-	// hook that forces s·p to the identity and exercises the branch.
+	// samples are rejected. A zero scalar — an input sampleScalar can never
+	// produce — is therefore the one direct-call input that forces s·p to
+	// the identity and exercises the branch.
 	invalid := mustLoadDraftInvalidVector(t)
 	out, err := scalarMultVFY(ristretto255.NewScalar().Zero(), invalid.Valid["X"])
 	if out != nil {

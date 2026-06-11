@@ -181,6 +181,9 @@ func respondWithRandom(cfg Config, messageA []byte, random io.Reader) (*Responde
 	if !bytes.Equal(a.sid, nc.sid) {
 		return nil, nil, fmt.Errorf("%w: session id mismatch", ErrMessage)
 	}
+	// Prevalidate the initiator share before sampling the responder scalar;
+	// scalarMultVFY revalidates the same bytes when computing K, so its
+	// sentinel branches below are defense-in-depth only.
 	if _, err := decodePublicShare(a.ya); err != nil {
 		return nil, nil, wrapPeerShareError(err, "initiator")
 	}
@@ -389,6 +392,8 @@ func clone(in []byte) []byte {
 // "cpace: protocol abort" prefix — with role context added. Non-sentinel
 // defensive errors (wrong length, post-multiply neutral element) pass through
 // unchanged: they already wrap ErrAbort and are unreachable from the wire.
+// Callers pass a non-nil error; a new peer-share sentinel added in
+// decodePublicShare must get a case here, or it surfaces without role context.
 func wrapPeerShareError(err error, role string) error {
 	switch {
 	case errors.Is(err, ErrPeerShareEncoding):

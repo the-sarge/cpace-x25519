@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Pre-v1 error surface: add exported `ErrPeerShareEncoding` and `ErrPeerShareIdentity` sentinels distinguishing non-canonical peer public shares from identity-element submissions (ADR-0003). Peer-share rejections from `Respond`/`Initiator.Finish` continue to wrap `ErrAbort` and retain initiator/responder role context; the internal `scalarMultVFY`/`decodePublicShare` helpers now return nil plus a typed error instead of the draft-shaped all-zero fallback. Malformed wire lengths still surface as `ErrMessage` from framing. No wire-format or protocol-visible change.
+- Pre-v1 error surface: add exported `ErrPeerShareEncoding` and `ErrPeerShareIdentity` sentinels distinguishing non-canonical peer public shares from identity-element submissions (ADR-0003). Peer-share rejections from `Respond`/`Initiator.Finish` continue to wrap `ErrAbort` and retain initiator/responder role context; the internal `scalarMultVFY`/`decodePublicShare` helpers now return a typed error, and `scalarMultVFY` returns nil instead of the draft-shaped all-zero fallback. Malformed wire lengths still surface as `ErrMessage` from framing. No wire-format or protocol-visible change.
 - Bump the pinned toolchain directive to Go 1.26.4 after the 2026-06-02 Go
   security release (`crypto/x509`, `mime`, and `net/textproto` fixes, plus
   `crypto/fips140`, compiler, and runtime bug fixes). CI already runs 1.26.4

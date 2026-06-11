@@ -357,22 +357,25 @@ func FuzzScalarMultVFY(f *testing.F) {
 		if !errors.Is(err, ErrAbort) {
 			t.Fatalf("scalarMultVFY rejection err=%v does not wrap ErrAbort", err)
 		}
-		// A canonical decode round-trips its input, so the rejection cause is
-		// fully determined by the encoded bytes: wrong length is the internal
+		// A canonical decode round-trips its input, and the harness scalar is
+		// the fixed non-zero draft-fixture scalar, so the post-multiply
+		// identity branch is unreachable and the rejection cause is fully
+		// determined by the encoded bytes: wrong length is the internal
 		// defensive branch, the canonical identity encoding is the identity
-		// sentinel, and anything else 32 bytes long failed canonical decoding.
+		// sentinel, and anything else 32 bytes long failed canonical
+		// decoding. Do not fuzz the scalar without revisiting this oracle.
 		switch {
 		case len(encoded) != pointSize:
 			if errors.Is(err, ErrPeerShareEncoding) || errors.Is(err, ErrPeerShareIdentity) {
 				t.Fatalf("length rejection err=%v wraps a peer-share sentinel", err)
 			}
 		case bytes.Equal(encoded, identityEncoding):
-			if !errors.Is(err, ErrPeerShareIdentity) {
-				t.Fatalf("identity rejection err=%v want ErrPeerShareIdentity", err)
+			if !errors.Is(err, ErrPeerShareIdentity) || errors.Is(err, ErrPeerShareEncoding) {
+				t.Fatalf("identity rejection err=%v want ErrPeerShareIdentity only", err)
 			}
 		default:
-			if !errors.Is(err, ErrPeerShareEncoding) {
-				t.Fatalf("encoding rejection err=%v want ErrPeerShareEncoding", err)
+			if !errors.Is(err, ErrPeerShareEncoding) || errors.Is(err, ErrPeerShareIdentity) {
+				t.Fatalf("encoding rejection err=%v want ErrPeerShareEncoding only", err)
 			}
 		}
 	})

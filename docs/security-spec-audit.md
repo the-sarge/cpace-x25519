@@ -91,7 +91,7 @@ for; future toolchain-triggered refreshes should continue the practice.
 
 ## Post-Baseline Changes
 
-ADR-0003 (peer-share error semantics) was implemented after this audit's implementation baseline. It adds the exported `ErrPeerShareEncoding`/`ErrPeerShareIdentity` sentinels and changes the internal `scalarMultVFY` failure convention to nil plus an `ErrAbort`-wrapped error — an intentional internal-only divergence from draft-21's function-level neutral-element return with no protocol-visible change; the `scalar_mult_vfy` abort behavior audited above is unchanged. Read the "match the documented draft-21 profile" claim with that divergence in mind; the consolidated post-implementation evidence refresh will re-audit at the new baseline.
+ADR-0003 (peer-share error semantics, implemented 2026-06-11, PR #78) landed after this audit's implementation baseline. It adds the exported `ErrPeerShareEncoding`/`ErrPeerShareIdentity` sentinels and changes the internal `scalarMultVFY` failure convention to nil plus an `ErrAbort`-wrapped error — an intentional internal-only divergence from draft-21's function-level neutral-element return with no protocol-visible change; the `scalar_mult_vfy` abort behavior audited above is unchanged. Read the "match the documented draft-21 profile" claim with that divergence in mind; the consolidated post-implementation evidence refresh will re-audit at the new baseline.
 
 ## Residual Risk
 

@@ -107,9 +107,10 @@ func scalarMultVFY(s *ristretto255.Scalar, encoded []byte) ([]byte, error) {
 	}
 	out := ristretto255.NewIdentityElement().ScalarMult(s, p).Bytes()
 	if hmac.Equal(out, identityEncoding) {
-		// Unreachable for prime-order Ristretto255: s·p is non-identity for
-		// any decoded (non-identity) p and any scalar sampleScalar can
-		// return. Kept as defense-in-depth.
+		// Unreachable in production for prime-order Ristretto255: every
+		// scalar sampleScalar can return is non-zero mod the group order, so
+		// s·p is non-identity for any decoded (non-identity) p. Kept as
+		// defense-in-depth; tests exercise it with a zero scalar.
 		return nil, fmt.Errorf("%w: neutral-element shared secret", ErrAbort)
 	}
 	return out, nil
