@@ -849,3 +849,34 @@ ADR-0005 is implemented and merged. PR #86 pinned the `Session.Export` length co
 **Next**
 
 Complete the ADR-0005 OmniFocus task and keep the broader release evidence caveat intact: stronger release claims still require refreshing pinned dependency-review, fuzz, and security-audit evidence against the exact candidate commit.
+
+---
+
+## ADR-0006 nil Close contract merged - 2026-06-12 17:25 EDT
+
+**Main:** `655fc2e02cc0`
+**Actor:** Codex
+
+**Summary**
+
+ADR-0006 is implemented and merged. PR #88 makes `(*Session)(nil).Close()` return `nil`, while preserving strict handling for fabricated non-nil zero-value sessions and leaving `Session.Export` plus nil accessors unchanged.
+
+**Completed**
+
+- Merged PR #88 as `655fc2e02cc04cf8cd5072ee71d8de7fe0a50f1d`; implementation head was `a1f7183d37b560a2b9dc84e5970271da5ab0dda7`.
+- Updated `Session.Close` so a nil receiver is a successful no-op, while `&Session{}` and `new(Session)` still return `ErrInvalidInput` with the preserved `nil session` diagnostic.
+- Updated the `Session.Close` doc comment to state the nil-safe contract, and expanded the nil-receiver test matrix to pin `Close`, `Export`, `TranscriptID`, `PeerAssociatedData`, `PeerID`, and zero-value `Close`/`Export` behavior.
+- Added the Unreleased changelog entry recording the pre-v1 `Close` nil-receiver contract change.
+- Drove the change with `ras implement` run `20260612T195857-c0f5fb1dca2c2d83977f4554`; RAS review `20260612T200145-9ae901603f6c0c52cfcc2eeb` found the doc-comment nit and exposed the diagnostic-policy ambiguity, and fresh RAS review `20260612T201738-080738618939b3e1ffcc51ac` required the final byte-identical zero-value `nil session` behavior.
+
+**Validation**
+
+- GitHub checks on PR #88 were green at `a1f7183`: CI Check, DCO, Dependency Gate, SAST Gate, CodeQL Analyze/CodeQL, Staticcheck, and macOS/Windows smoke; the gosec CodeQL child check was neutral as expected.
+- Local gates passed at `a1f7183`: `go test -run 'TestNilReceiverMethods|TestNilReceiverFinishAndExport' ./...`, `go doc . Session.Close`, `go test ./...`, `go test -race ./...`, `task check`, `gosec -tests ./...`, `git diff --check`, and a formal `apidiff` export-data comparison against `origin/main` with no API diff.
+- RAS verification of review `20260612T201738-080738618939b3e1ffcc51ac` passed cleanly at `a1f7183`, with no still-open findings and no new concerns.
+- Interim fuzz gate `FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=8m PARALLEL=2 task fuzz` passed all 14 configured fuzz targets at `a1f7183`.
+
+**Next**
+
+- Complete the ADR-0006 OmniFocus task `fg42mN_gyWG` after this journal update lands.
+- Continue with ADR-0007, then run the Phase 3 consolidated evidence refresh; stronger release claims still require refreshing pinned dependency-review, fuzz, and security-audit evidence against the exact candidate commit.
