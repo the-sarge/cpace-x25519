@@ -529,8 +529,9 @@ git diff --exit-code -- go.mod go.sum    # expect clean: no dependency change
 #    core secret (responderCore.transcript is public wire data zeroed alongside
 #    it as hygiene), both zeroed-then-nilled by responderCore.clear()
 #  - initiatorCore.finish: defer clearBytes(isk) immediately after deriveISK
-#  - startWithRandom / respondWithRandom retain defer clearBytes(nc.password)
-#    as a backstop covering core-constructor error and panic paths
+#  - startWithRandom / respondWithRandom retain the password backstop covering
+#    core-constructor error and panic paths (implemented as main's broader
+#    defer nc.wipe(), a strict superset of the sketches' clearBytes(nc.password))
 #  - confirmation-tag and identity comparisons remain hmac.Equal; no
 #    bytes.Equal / reflect.DeepEqual on secret-derived values
 #  - trace both clear() methods and every shell defer site

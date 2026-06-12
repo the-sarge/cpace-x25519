@@ -535,7 +535,7 @@ func TestClearOnFinishFailurePaths(t *testing.T) {
 	})
 
 	t.Run("responder parse failure", func(t *testing.T) {
-		initiator, msgA, err := startTestInitiator(testConfig())
+		_, msgA, err := startTestInitiator(testConfig())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -557,7 +557,6 @@ func TestClearOnFinishFailurePaths(t *testing.T) {
 		if !allZero(responderTranscript) {
 			t.Fatal("responder transcript was not cleared after parse failure")
 		}
-		_ = initiator
 	})
 
 	t.Run("responder confirmation failure", func(t *testing.T) {

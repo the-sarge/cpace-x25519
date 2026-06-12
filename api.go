@@ -55,6 +55,10 @@ type Initiator struct {
 	mu   sync.Mutex
 	used bool
 
+	// core is never reassigned or nil'd after construction: clear() zeroes
+	// and nils the core's fields, not this pointer. The unsynchronized
+	// core == nil check in Finish and the ErrStateUsed-after-use semantics
+	// both rely on this.
 	core *initiatorCore
 }
 
@@ -63,6 +67,8 @@ type Responder struct {
 	mu   sync.Mutex
 	used bool
 
+	// core is never reassigned or nil'd after construction — same invariant
+	// as Initiator.core.
 	core *responderCore
 }
 
@@ -91,10 +97,11 @@ type normalizedConfig struct {
 }
 
 // wipe performs best-effort zeroization of every byte slice owned by the
-// normalized config. Called via defer at the top of Start/Respond so that all
-// cloned input bytes are cleared on every exit path, including failure paths
-// and panics. Idempotent against fields that have already been cleared and
-// set to nil earlier in the function.
+// normalized config. Called via defer in startWithRandom and respondWithRandom
+// so that all cloned input bytes are cleared on every exit path — including
+// core-constructor error returns and panics. Idempotent against fields whose
+// backing arrays were already zeroed behind the core seam (the password is
+// eagerly cleared inside the core constructors).
 func (nc *normalizedConfig) wipe() {
 	clearBytes(nc.password)
 	clearBytes(nc.initiatorID)

@@ -176,7 +176,7 @@ func TestEmbeddedDraftGeneratorJSON(t *testing.T) {
 
 func TestEmbeddedDraftConfirmationTagGoldens(t *testing.T) {
 	// Hash pins package-local confirmation-tag goldens captured at the
-	// primitive seam from the draft-21 Appendix B.3.11.1 vector.
+	// primitive seam from the draft-21 Appendix B.3.9 vector.
 	if got := pinnedJSONHash(draft21RistrettoConfirmationTagJSON); got != draft21RistrettoConfirmationTagJSONSHA256 {
 		t.Fatalf("confirmation tag JSON SHA-256 got %s want %s", got, draft21RistrettoConfirmationTagJSONSHA256)
 	}

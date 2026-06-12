@@ -9,7 +9,7 @@ import (
 )
 
 type initiatorCore struct {
-	scalar *ristretto255.Scalar
+	scalar *ristretto255.Scalar // persistent secret — owned by clear()
 	sid    []byte
 	ya     []byte
 	ada    []byte
@@ -17,8 +17,8 @@ type initiatorCore struct {
 }
 
 type responderCore struct {
-	isk        []byte
-	transcript []byte
+	isk        []byte // persistent secret — owned by clear()
+	transcript []byte // public wire data — zeroed alongside isk as hygiene
 	sid        []byte
 	ya         []byte
 	ada        []byte
@@ -31,6 +31,11 @@ func newInitiatorCore(nc normalizedConfig, random io.Reader) (*initiatorCore, []
 	}
 	g := calculateGenerator(nc.password, nc.ci, nc.sid)
 	defer clearElement(g)
+	// Early-clear the password so its residency is bounded by the generator
+	// derivation, not the full constructor lifetime. nc is a by-value copy:
+	// clearBytes zeroes the shared backing array, and the shell's deferred
+	// nc.wipe() re-covers the field on every exit path, including this
+	// constructor's error returns and panics.
 	clearBytes(nc.password)
 	nc.password = nil
 	y, err := sampleScalar(random)
@@ -55,6 +60,9 @@ func (c *initiatorCore) finish(peerYb, peerAdb, peerTag []byte) ([]byte, *Sessio
 	}
 	tr := transcriptIR(c.ya, c.ada, peerYb, peerAdb)
 	isk := deriveISK(c.sid, k, tr)
+	// Scratch — the initiator's finish-local ISK. The deferred wipe covers
+	// the tag computations below, including panic paths; newSession clones
+	// isk, so the returned Session is unaffected.
 	defer clearBytes(isk)
 	expectedB := confirmationTag(isk, c.sid, peerYb, peerAdb)
 	if !hmac.Equal(expectedB, peerTag) {
@@ -68,11 +76,18 @@ func newResponderCore(nc normalizedConfig, peerYa, peerAda []byte, random io.Rea
 	if random == nil {
 		random = rand.Reader
 	}
+	// Validate Ya FIRST — before generator derivation and scalar sampling;
+	// the ordering is pinned by
+	// TestResponderPrevalidatesInvalidInitiatorShareBeforeRandomness.
+	// scalarMultVFY revalidates the same bytes when computing K, so its
+	// sentinel branch below is defense-in-depth only.
 	if _, err := decodePublicShare(peerYa); err != nil {
 		return nil, nil, nil, wrapPeerShareError(err, "initiator")
 	}
 	g := calculateGenerator(nc.password, nc.ci, nc.sid)
 	defer clearElement(g)
+	// Early-clear the password as in newInitiatorCore; the shell's deferred
+	// nc.wipe() re-covers the field on exit.
 	clearBytes(nc.password)
 	nc.password = nil
 	y, err := sampleScalar(random)
@@ -107,6 +122,8 @@ func (c *responderCore) finish(peerTagC []byte) (*Session, error) {
 	return newSession(c.isk, c.transcript, c.ada, c.peerID), nil
 }
 
+// clear zeroes then nils each persistent-secret field; a second call finds
+// nil and is a safe no-op. Safe on a nil receiver.
 func (c *initiatorCore) clear() {
 	if c == nil {
 		return
@@ -115,6 +132,8 @@ func (c *initiatorCore) clear() {
 	c.scalar = nil
 }
 
+// clear zeroes then nils each persistent-secret field; a second call finds
+// nil and is a safe no-op. Safe on a nil receiver.
 func (c *responderCore) clear() {
 	if c == nil {
 		return

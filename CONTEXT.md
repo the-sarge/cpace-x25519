@@ -17,7 +17,7 @@ exactly once. Reuse is rejected, and the state is spent even when a step fails.
 _Avoid_: handle, context (Go's `context.Context` is unrelated).
 
 **ISK**:
-The Intermediate Session Key — the shared secret CPace derives by hashing the sid, the Diffie-Hellman result, and the transcript. Ownership is role-asymmetric. The responder derives its ISK at construction and holds a working copy in `responderCore` until cleanup by `clear()`. The initiator's ISK exists only as a local inside `Finish`, cleared before `Finish` returns — it is never stored on the initiator or its core. A confirmed **Session** holds its own independent clone. Each owner clears its own copy.
+The Intermediate Session Key — the shared secret CPace derives by hashing the sid, the Diffie-Hellman result, and the transcript. Ownership is role-asymmetric. The responder derives its ISK at construction and holds a working copy in `responderCore` until cleanup by `clear()`. The initiator's ISK exists only as a local inside the core's `finish`, cleared before `Finish` returns — it is never stored on the initiator or its core. A confirmed **Session** holds its own independent clone. Each owner clears its own copy.
 _Avoid_: session key, shared secret, master key.
 
 **Transcript**:

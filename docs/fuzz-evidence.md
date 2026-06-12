@@ -1,6 +1,6 @@
 # Fuzz Evidence
 
-Date: 2026-05-08 through 2026-06-11
+Date: 2026-05-08 through 2026-06-11 (pinned long-fuzz evidence; the ADR-0001 interim non-evidence gate below is dated 2026-06-12)
 
 Target module: `github.com/the-sarge/cpace`
 
