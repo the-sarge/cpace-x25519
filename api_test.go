@@ -1568,8 +1568,8 @@ func TestBuildCIWireStability(t *testing.T) {
 	if got, want := suiteName, "CPACE-RISTR255-SHA512"; got != want {
 		t.Fatalf("suiteName=%q want %q", got, want)
 	}
-	if got, want := byte(SuiteCPaceRistretto255SHA512), byte(0x01); got != want {
-		t.Fatalf("SuiteCPaceRistretto255SHA512=0x%02x want 0x%02x", got, want)
+	if got, want := currentSuite, byte(0x01); got != want {
+		t.Fatalf("currentSuite=0x%02x want 0x%02x", got, want)
 	}
 
 	// Pin the exact byte output of buildCI for fixed inputs. Any change to

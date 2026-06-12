@@ -52,6 +52,9 @@ func TestWireFormatPrefixByte(t *testing.T) {
 	if wireFormatV1 != 0xc1 {
 		t.Fatalf("wireFormatV1=%#x, want 0xc1", wireFormatV1)
 	}
+	if wireSuite != 0x01 {
+		t.Fatalf("wireSuite=%#x, want 0x01", wireSuite)
+	}
 	cases := []struct {
 		name string
 		msg  []byte
