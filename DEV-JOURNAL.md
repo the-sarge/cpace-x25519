@@ -775,3 +775,27 @@ section (the clause anticipated exactly this decision).
 **Next:**
 - ADR-0001 six-step build sequence per `docs/cpace-core-plan.md` (phase group 2), with the merged fuzz baseline as the pre-refactor oracle reference.
 - The consolidated Phase 3 refresh still owes the post-implementation fuzz campaign (ADR-0003 already triggered the refresh rule, as recorded in `docs/fuzz-evidence.md`).
+
+---
+
+## ADR-0001 CPace core extraction implemented - 2026-06-12 01:08 EDT
+
+**Main:** `6f57d63493da`
+**Actor:** Claude (Fable 5)
+
+**Summary:** Implemented ADR-0001's six-step CPace core extraction sequence on `feat/adr-0001-cpace-core`. The public `Initiator` and `Responder` are now thin single-use shells over unexported `initiatorCore` / `responderCore`; persistent-secret cleanup is centralized in nil-safe, idempotent `clear()` methods; scratch secrets remain local and eagerly cleared. The only intentional behavior change is the ADR-recorded zero-value hardening for fabricated `Initiator` / `Responder` values.
+
+**Completed:**
+- Step 1 baseline: `task check` passed on `origin/main`, `FUZZTIME=30s PARALLEL=2 task fuzz` passed all 14 targets, and package-local confirmation-tag goldens were captured at the primitive seam in `testdata/draft21-ristretto255-confirmation-tags.json`.
+- Step 2 extraction: moved initiator then responder cryptographic orchestration into `core.go`, retained `startWithRandom` / `respondWithRandom`, kept normalized-config wipe backstops, installed the `core == nil` zero-value guards, and migrated cleanup white-box tests as fields moved under `.core`.
+- Step 3 ordering pin: extended `TestResponderPrevalidatesInvalidInitiatorShareBeforeRandomness` to call `newResponderCore` directly, pinning invalid `Ya` rejection before randomness at the core seam.
+- Step 4 vectors: added `TestCoreDraft21Vectors`, driving both core constructors and finish methods through deterministic scalar readers with the draft vector PRS/CI/SID/AD and the step-1 tag goldens.
+- Step 5 cleanup consolidation: wrote the clear-contract, failure-path cleanup, Session-ISK isolation, and zero-value hardening tests; observed the expected compile-red for missing `clear()`; replaced shell interim defers with `defer core.clear()`; added the changelog note that explicitly states the prior zero-value responder forged-tag success path.
+- Step 6 interim gate/audit: ran the local `FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=8m PARALLEL=2 task fuzz` gate against commit `7aa79e4a40304a14610df36d0bd906fd6c7e3a24` (all 14 targets passed), appended a clearly marked non-evidence note to `docs/fuzz-evidence.md`, added an ADR-0001 interim addendum to `docs/security-spec-audit.md`, and updated `CONTEXT.md` now that the CPace core is implemented.
+
+**Validation:** Per-step `task check` passed after every committed implementation step. Final branch checks so far: `task check` exit 0; `gosec -tests ./...` 0 issues; baseline fuzz smoke all 14 targets passed; ADR-0001 interim fuzz gate all 14 targets passed from `2026-06-12T04:08:47Z` to `2026-06-12T05:04:52Z`.
+
+**Next:**
+- Open the PR for review; merges remain Josh's action.
+- Offer the same dual review pattern used for PR #78: pr-review-toolkit read-only agents plus `ras review`.
+- Do not complete the OmniFocus ADR-0001 item or update memory outcome until after Josh's merge.
