@@ -401,7 +401,7 @@ func TestFinishCleanupDoesNotAliasReturnedSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	initiatorScalar := initiator.scalar
+	initiatorScalar := initiator.core.scalar
 	responder, msgB, err := respondTestResponder(respCfg, msgA)
 	if err != nil {
 		t.Fatal(err)
@@ -413,7 +413,7 @@ func TestFinishCleanupDoesNotAliasReturnedSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if initiator.scalar != nil {
+	if initiator.core.scalar != nil {
 		t.Fatal("initiator scalar reference retained after Finish")
 	}
 	if initiatorScalar == nil || !allZero(initiatorScalar.Bytes()) {

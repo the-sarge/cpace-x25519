@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-
-	"github.com/gtank/ristretto255"
 )
 
 const (
@@ -58,11 +56,7 @@ type Initiator struct {
 	mu   sync.Mutex
 	used bool
 
-	scalar *ristretto255.Scalar
-	sid    []byte
-	ya     []byte
-	ada    []byte
-	peerID []byte
+	core *initiatorCore
 }
 
 // Responder is a single-use responder state returned by Respond.
@@ -124,37 +118,17 @@ func Start(cfg Config) (*Initiator, []byte, error) {
 }
 
 func startWithRandom(cfg Config, random io.Reader) (*Initiator, []byte, error) {
-	if random == nil {
-		random = rand.Reader
-	}
 	nc, err := normalizeConfig(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer nc.wipe()
 
-	g := calculateGenerator(nc.password, nc.ci, nc.sid)
-	defer clearElement(g)
-	// Early-clear the password so its residency is bounded by the generator
-	// derivation, not the full function lifetime. nc.wipe() will still cover
-	// the (now-nil) field on exit alongside the other normalized fields.
-	clearBytes(nc.password)
-	nc.password = nil
-	y, err := sampleScalar(random)
+	core, ya, err := newInitiatorCore(nc, random)
 	if err != nil {
 		return nil, nil, err
 	}
-	ya := scalarMult(y, g)
-	msg := encodeMessageA(nc.sid, ya, nc.ad)
-
-	st := &Initiator{
-		scalar: y,
-		sid:    clone(nc.sid),
-		ya:     clone(ya),
-		ada:    clone(nc.ad),
-		peerID: clone(nc.responderID),
-	}
-	return st, msg, nil
+	return &Initiator{core: core}, encodeMessageA(nc.sid, ya, nc.ad), nil
 }
 
 // Respond consumes message A, creates responder state, and returns message B.
@@ -227,41 +201,25 @@ func respondWithRandom(cfg Config, messageA []byte, random io.Reader) (*Responde
 // returns message C plus an authenticated session. The initiator state is
 // consumed even when message parsing or confirmation fails.
 func (i *Initiator) Finish(messageB []byte) ([]byte, *Session, error) {
-	if i == nil {
-		return nil, nil, fmt.Errorf("%w: nil initiator", ErrInvalidInput)
+	if i == nil || i.core == nil {
+		return nil, nil, fmt.Errorf("%w: uninitialized initiator", ErrInvalidInput)
 	}
 	if err := i.consume(); err != nil {
 		return nil, nil, err
 	}
-	scalar := i.scalar
 	defer func() {
-		clearScalar(scalar)
-		i.scalar = nil
+		clearScalar(i.core.scalar)
+		i.core.scalar = nil
 	}()
 	b, err := decodeMessageB(messageB)
 	if err != nil {
 		return nil, nil, err
 	}
-	k, err := scalarMultVFY(scalar, b.yb)
-	defer clearBytes(k)
+	tagA, sess, err := i.core.finish(b.yb, b.adb, b.tag)
 	if err != nil {
-		return nil, nil, wrapPeerShareError(err, "responder")
+		return nil, nil, err
 	}
-	tr := transcriptIR(i.ya, i.ada, b.yb, b.adb)
-	isk := deriveISK(i.sid, k, tr)
-	// Defer ISK wipe so every exit path — including future early returns and
-	// panics between here and the success branch — clears the secret. Mirrors
-	// the deferred wipe in Responder.Finish. newSession clones isk into the
-	// returned Session, so this wipe does not affect the caller's Session.
-	defer clearBytes(isk)
-	expectedB := confirmationTag(isk, i.sid, b.yb, b.adb)
-	if !hmac.Equal(expectedB, b.tag) {
-		return nil, nil, ErrConfirmationFailed
-	}
-	tagA := confirmationTag(isk, i.sid, i.ya, i.ada)
-	msgC := encodeMessageC(tagA)
-	sess := newSession(isk, tr, b.adb, i.peerID)
-	return msgC, sess, nil
+	return encodeMessageC(tagA), sess, nil
 }
 
 // Finish consumes message C, verifies the initiator confirmation tag, and
