@@ -2,15 +2,12 @@ package cpace
 
 import (
 	"bytes"
-	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha512"
 	"errors"
 	"fmt"
 	"io"
 	"sync"
-
-	"github.com/gtank/ristretto255"
 )
 
 const (
@@ -58,11 +55,11 @@ type Initiator struct {
 	mu   sync.Mutex
 	used bool
 
-	scalar *ristretto255.Scalar
-	sid    []byte
-	ya     []byte
-	ada    []byte
-	peerID []byte
+	// core is never reassigned or nil'd after construction: clear() zeroes
+	// and nils the core's fields, not this pointer. The unsynchronized
+	// core == nil check in Finish and the ErrStateUsed-after-use semantics
+	// both rely on this.
+	core *initiatorCore
 }
 
 // Responder is a single-use responder state returned by Respond.
@@ -70,14 +67,9 @@ type Responder struct {
 	mu   sync.Mutex
 	used bool
 
-	sid        []byte
-	ya         []byte
-	ada        []byte
-	yb         []byte
-	adb        []byte
-	isk        []byte
-	transcript []byte
-	peerID     []byte
+	// core is never reassigned or nil'd after construction — same invariant
+	// as Initiator.core.
+	core *responderCore
 }
 
 // Session is an explicitly confirmed CPace session. Copies of a Session share
@@ -105,10 +97,11 @@ type normalizedConfig struct {
 }
 
 // wipe performs best-effort zeroization of every byte slice owned by the
-// normalized config. Called via defer at the top of Start/Respond so that all
-// cloned input bytes are cleared on every exit path, including failure paths
-// and panics. Idempotent against fields that have already been cleared and
-// set to nil earlier in the function.
+// normalized config. Called via defer in startWithRandom and respondWithRandom
+// so that all cloned input bytes are cleared on every exit path — including
+// core-constructor error returns and panics. Idempotent against fields whose
+// backing arrays were already zeroed behind the core seam (the password is
+// eagerly cleared inside the core constructors).
 func (nc *normalizedConfig) wipe() {
 	clearBytes(nc.password)
 	clearBytes(nc.initiatorID)
@@ -124,37 +117,17 @@ func Start(cfg Config) (*Initiator, []byte, error) {
 }
 
 func startWithRandom(cfg Config, random io.Reader) (*Initiator, []byte, error) {
-	if random == nil {
-		random = rand.Reader
-	}
 	nc, err := normalizeConfig(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer nc.wipe()
 
-	g := calculateGenerator(nc.password, nc.ci, nc.sid)
-	defer clearElement(g)
-	// Early-clear the password so its residency is bounded by the generator
-	// derivation, not the full function lifetime. nc.wipe() will still cover
-	// the (now-nil) field on exit alongside the other normalized fields.
-	clearBytes(nc.password)
-	nc.password = nil
-	y, err := sampleScalar(random)
+	core, ya, err := newInitiatorCore(nc, random)
 	if err != nil {
 		return nil, nil, err
 	}
-	ya := scalarMult(y, g)
-	msg := encodeMessageA(nc.sid, ya, nc.ad)
-
-	st := &Initiator{
-		scalar: y,
-		sid:    clone(nc.sid),
-		ya:     clone(ya),
-		ada:    clone(nc.ad),
-		peerID: clone(nc.responderID),
-	}
-	return st, msg, nil
+	return &Initiator{core: core}, encodeMessageA(nc.sid, ya, nc.ad), nil
 }
 
 // Respond consumes message A, creates responder state, and returns message B.
@@ -166,9 +139,6 @@ func Respond(cfg Config, messageA []byte) (*Responder, []byte, error) {
 }
 
 func respondWithRandom(cfg Config, messageA []byte, random io.Reader) (*Responder, []byte, error) {
-	if random == nil {
-		random = rand.Reader
-	}
 	nc, err := normalizeConfig(cfg)
 	if err != nil {
 		return nil, nil, err
@@ -181,115 +151,51 @@ func respondWithRandom(cfg Config, messageA []byte, random io.Reader) (*Responde
 	if !bytes.Equal(a.sid, nc.sid) {
 		return nil, nil, fmt.Errorf("%w: session id mismatch", ErrMessage)
 	}
-	// Prevalidate the initiator share before sampling the responder scalar;
-	// scalarMultVFY revalidates the same bytes when computing K, so its
-	// sentinel branches below are defense-in-depth only.
-	if _, err := decodePublicShare(a.ya); err != nil {
-		return nil, nil, wrapPeerShareError(err, "initiator")
-	}
-
-	g := calculateGenerator(nc.password, nc.ci, nc.sid)
-	defer clearElement(g)
-	// Early-clear the password as in startWithRandom; nc.wipe() handles the
-	// remaining normalized fields on exit.
-	clearBytes(nc.password)
-	nc.password = nil
-	y, err := sampleScalar(random)
+	core, yb, tagB, err := newResponderCore(nc, a.ya, a.ada, random)
 	if err != nil {
 		return nil, nil, err
 	}
-	defer clearScalar(y)
-	yb := scalarMult(y, g)
-	k, err := scalarMultVFY(y, a.ya)
-	defer clearBytes(k)
-	if err != nil {
-		return nil, nil, wrapPeerShareError(err, "initiator")
-	}
-	tr := transcriptIR(a.ya, a.ada, yb, nc.ad)
-	isk := deriveISK(nc.sid, k, tr)
-	tagB := confirmationTag(isk, nc.sid, yb, nc.ad)
-	msg := encodeMessageB(yb, nc.ad, tagB)
-
-	st := &Responder{
-		sid:        clone(nc.sid),
-		ya:         clone(a.ya),
-		ada:        clone(a.ada),
-		yb:         clone(yb),
-		adb:        clone(nc.ad),
-		isk:        isk,
-		transcript: tr,
-		peerID:     clone(nc.initiatorID),
-	}
-	return st, msg, nil
+	return &Responder{core: core}, encodeMessageB(yb, nc.ad, tagB), nil
 }
 
 // Finish consumes message B, verifies the responder confirmation tag, and
 // returns message C plus an authenticated session. The initiator state is
 // consumed even when message parsing or confirmation fails.
 func (i *Initiator) Finish(messageB []byte) ([]byte, *Session, error) {
-	if i == nil {
-		return nil, nil, fmt.Errorf("%w: nil initiator", ErrInvalidInput)
+	if i == nil || i.core == nil {
+		return nil, nil, fmt.Errorf("%w: uninitialized initiator", ErrInvalidInput)
 	}
 	if err := i.consume(); err != nil {
 		return nil, nil, err
 	}
-	scalar := i.scalar
-	defer func() {
-		clearScalar(scalar)
-		i.scalar = nil
-	}()
+	defer i.core.clear()
 	b, err := decodeMessageB(messageB)
 	if err != nil {
 		return nil, nil, err
 	}
-	k, err := scalarMultVFY(scalar, b.yb)
-	defer clearBytes(k)
+	tagA, sess, err := i.core.finish(b.yb, b.adb, b.tag)
 	if err != nil {
-		return nil, nil, wrapPeerShareError(err, "responder")
+		return nil, nil, err
 	}
-	tr := transcriptIR(i.ya, i.ada, b.yb, b.adb)
-	isk := deriveISK(i.sid, k, tr)
-	// Defer ISK wipe so every exit path — including future early returns and
-	// panics between here and the success branch — clears the secret. Mirrors
-	// the deferred wipe in Responder.Finish. newSession clones isk into the
-	// returned Session, so this wipe does not affect the caller's Session.
-	defer clearBytes(isk)
-	expectedB := confirmationTag(isk, i.sid, b.yb, b.adb)
-	if !hmac.Equal(expectedB, b.tag) {
-		return nil, nil, ErrConfirmationFailed
-	}
-	tagA := confirmationTag(isk, i.sid, i.ya, i.ada)
-	msgC := encodeMessageC(tagA)
-	sess := newSession(isk, tr, b.adb, i.peerID)
-	return msgC, sess, nil
+	return encodeMessageC(tagA), sess, nil
 }
 
 // Finish consumes message C, verifies the initiator confirmation tag, and
 // returns an authenticated session. The responder state is consumed even when
 // message parsing or confirmation fails.
 func (r *Responder) Finish(messageC []byte) (*Session, error) {
-	if r == nil {
-		return nil, fmt.Errorf("%w: nil responder", ErrInvalidInput)
+	if r == nil || r.core == nil {
+		return nil, fmt.Errorf("%w: uninitialized responder", ErrInvalidInput)
 	}
 	if err := r.consume(); err != nil {
 		return nil, err
 	}
-	defer func() {
-		clearBytes(r.isk)
-		clearBytes(r.transcript)
-		r.isk = nil
-		r.transcript = nil
-	}()
+	defer r.core.clear()
 	c, err := decodeMessageC(messageC)
 	if err != nil {
 		return nil, err
 	}
-	expectedA := confirmationTag(r.isk, r.sid, r.ya, r.ada)
-	if !hmac.Equal(expectedA, c.tag) {
-		return nil, ErrConfirmationFailed
-	}
-	sess := newSession(r.isk, r.transcript, r.ada, r.peerID)
-	return sess, nil
+	return r.core.finish(c.tag)
 }
 
 func (i *Initiator) consume() error {

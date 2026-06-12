@@ -14,10 +14,14 @@ import (
 //go:embed testdata/draft21-ristretto255-generator.json
 var draft21RistrettoGeneratorJSON []byte
 
+//go:embed testdata/draft21-ristretto255-confirmation-tags.json
+var draft21RistrettoConfirmationTagJSON []byte
+
 const (
-	draft21RistrettoGeneratorJSONSHA256 = "05c8a34bd623fbdefd7fbffcd261d2420bd34363efa301d0b0dd9817f7f47c94"
-	draft21RistrettoVectorJSONSHA256    = "dc74177668cc2374beaf57fcb6e4c08a908238bab6b74d8edf8c86e04bc663ae"
-	draft21RistrettoInvalidJSONSHA256   = "6288f7ff96dfb8c2d6c4d743927c5fe6ac4aecbc56da2d1f00f27104000b6dfd"
+	draft21RistrettoGeneratorJSONSHA256       = "05c8a34bd623fbdefd7fbffcd261d2420bd34363efa301d0b0dd9817f7f47c94"
+	draft21RistrettoVectorJSONSHA256          = "dc74177668cc2374beaf57fcb6e4c08a908238bab6b74d8edf8c86e04bc663ae"
+	draft21RistrettoInvalidJSONSHA256         = "6288f7ff96dfb8c2d6c4d743927c5fe6ac4aecbc56da2d1f00f27104000b6dfd"
+	draft21RistrettoConfirmationTagJSONSHA256 = "1d0b59b3b7486dee3569ad4e8d6908e2f575dfcd9f26804c34584cb29515e0d4"
 )
 
 type draftGeneratorVector struct {
@@ -170,6 +174,23 @@ func TestEmbeddedDraftGeneratorJSON(t *testing.T) {
 	}
 }
 
+func TestEmbeddedDraftConfirmationTagGoldens(t *testing.T) {
+	// Hash pins package-local confirmation-tag goldens captured at the
+	// primitive seam from the draft-21 Appendix B.3.9 vector.
+	if got := pinnedJSONHash(draft21RistrettoConfirmationTagJSON); got != draft21RistrettoConfirmationTagJSONSHA256 {
+		t.Fatalf("confirmation tag JSON SHA-256 got %s want %s", got, draft21RistrettoConfirmationTagJSONSHA256)
+	}
+	tags, err := loadDraftVectorJSON(draft21RistrettoConfirmationTagJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"tagA", "tagB"} {
+		if len(tags[key]) != tagSize {
+			t.Fatalf("%s length=%d want %d", key, len(tags[key]), tagSize)
+		}
+	}
+}
+
 func TestEmbeddedDraftInvalidVectorJSON(t *testing.T) {
 	if got := pinnedJSONHash(draft21RistrettoInvalidJSON); got != draft21RistrettoInvalidJSONSHA256 {
 		t.Fatalf("invalid vector JSON SHA-256 got %s want %s", got, draft21RistrettoInvalidJSONSHA256)
@@ -289,6 +310,16 @@ func TestRistrettoDraft21Vectors(t *testing.T) {
 	if !bytes.Equal(iskIR, wantISKIR) {
 		t.Fatalf("ISK_IR got %x want %x", iskIR, wantISKIR)
 	}
+	tags, err := loadDraftVectorJSON(draft21RistrettoConfirmationTagJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := confirmationTag(iskIR, sid, Yb, adb); !bytes.Equal(got, tags["tagB"]) {
+		t.Fatalf("tagB got %x want %x", got, tags["tagB"])
+	}
+	if got := confirmationTag(iskIR, sid, Ya, ada); !bytes.Equal(got, tags["tagA"]) {
+		t.Fatalf("tagA got %x want %x", got, tags["tagA"])
+	}
 
 	trOC := transcriptOC(Ya, ada, Yb, adb)
 	iskOC := deriveISK(sid, wantK, trOC)
@@ -306,6 +337,79 @@ func TestRistrettoDraft21Vectors(t *testing.T) {
 	wantSidOutOC := v["sid_output_oc"]
 	if !bytes.Equal(sidOutOC[:], wantSidOutOC) {
 		t.Fatalf("sid_output_oc got %x want %x", sidOutOC, wantSidOutOC)
+	}
+}
+
+func TestCoreDraft21Vectors(t *testing.T) {
+	v, err := loadDraftVectorJSON(draft21RistrettoVectorJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tags, err := loadDraftVectorJSON(draft21RistrettoConfirmationTagJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"ya", "yb"} {
+		if v[key][31]&0xf0 != 0 {
+			t.Fatalf("%s top nibble is not sampler-injectable: %x", key, v[key][31])
+		}
+	}
+
+	initNC := draftVectorConfig(v, v["ADa"])
+	defer initNC.wipe()
+	initCore, gotYa, err := newInitiatorCore(initNC, &repeatingReader{buf: v["ya"]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearScalar(initCore.scalar)
+	if !bytes.Equal(gotYa, v["Ya"]) {
+		t.Fatalf("newInitiatorCore Ya got %x want %x", gotYa, v["Ya"])
+	}
+	gotTagA, initSession, err := initCore.finish(v["Yb"], v["ADb"], tags["tagB"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(gotTagA, tags["tagA"]) {
+		t.Fatalf("initiator core tagA got %x want %x", gotTagA, tags["tagA"])
+	}
+	if !bytes.Equal(initSession.state.isk, v["ISK_IR"]) {
+		t.Fatalf("initiator core session ISK got %x want %x", initSession.state.isk, v["ISK_IR"])
+	}
+
+	respNC := draftVectorConfig(v, v["ADb"])
+	defer respNC.wipe()
+	respCore, gotYb, gotTagB, err := newResponderCore(respNC, v["Ya"], v["ADa"], &repeatingReader{buf: v["yb"]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clearBytes(respCore.isk)
+	defer clearBytes(respCore.transcript)
+	if !bytes.Equal(gotYb, v["Yb"]) {
+		t.Fatalf("newResponderCore Yb got %x want %x", gotYb, v["Yb"])
+	}
+	if !bytes.Equal(respCore.isk, v["ISK_IR"]) {
+		t.Fatalf("responder core ISK got %x want %x", respCore.isk, v["ISK_IR"])
+	}
+	if !bytes.Equal(gotTagB, tags["tagB"]) {
+		t.Fatalf("responder core tagB got %x want %x", gotTagB, tags["tagB"])
+	}
+	respSession, err := respCore.finish(tags["tagA"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(respSession.state.isk, v["ISK_IR"]) {
+		t.Fatalf("responder core session ISK got %x want %x", respSession.state.isk, v["ISK_IR"])
+	}
+}
+
+func draftVectorConfig(v draftVector, ad []byte) normalizedConfig {
+	return normalizedConfig{
+		password:    clone(v["PRS"]),
+		initiatorID: []byte("A_initiator"),
+		responderID: []byte("B_responder"),
+		ci:          clone(v["CI"]),
+		sid:         clone(v["sid"]),
+		ad:          clone(ad),
 	}
 }
 

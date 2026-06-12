@@ -189,6 +189,48 @@ func TestSessionValueCopiesShareCloseState(t *testing.T) {
 	}
 }
 
+func TestClearNilSafe(t *testing.T) {
+	var initiator *initiatorCore
+	initiator.clear()
+
+	var responder *responderCore
+	responder.clear()
+}
+
+func TestClearIdempotent(t *testing.T) {
+	scalar, err := sampleScalar(repeatingRand(0x11))
+	if err != nil {
+		t.Fatal(err)
+	}
+	initiator := &initiatorCore{scalar: scalar}
+	initiator.clear()
+	initiator.clear()
+	if initiator.scalar != nil {
+		t.Fatal("initiator core retained scalar reference after clear")
+	}
+	if !allZero(scalar.Bytes()) {
+		t.Fatal("initiator scalar was not zeroed by clear")
+	}
+
+	isk := bytes.Repeat([]byte{0x42}, 64)
+	transcript := bytes.Repeat([]byte{0x24}, 32)
+	responder := &responderCore{
+		isk:        isk,
+		transcript: transcript,
+	}
+	responder.clear()
+	responder.clear()
+	if responder.isk != nil || responder.transcript != nil {
+		t.Fatal("responder core retained cleared state references")
+	}
+	if !allZero(isk) {
+		t.Fatal("responder ISK was not zeroed by clear")
+	}
+	if !allZero(transcript) {
+		t.Fatal("responder transcript was not zeroed by clear")
+	}
+}
+
 func TestNilSessionClose(t *testing.T) {
 	var s *Session
 	if err := s.Close(); !errors.Is(err, ErrInvalidInput) {
@@ -401,19 +443,19 @@ func TestFinishCleanupDoesNotAliasReturnedSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	initiatorScalar := initiator.scalar
+	initiatorScalar := initiator.core.scalar
 	responder, msgB, err := respondTestResponder(respCfg, msgA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	responderISK := responder.isk
-	responderTranscript := responder.transcript
+	responderISK := responder.core.isk
+	responderTranscript := responder.core.transcript
 
 	msgC, sI, err := initiator.Finish(msgB)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if initiator.scalar != nil {
+	if initiator.core.scalar != nil {
 		t.Fatal("initiator scalar reference retained after Finish")
 	}
 	if initiatorScalar == nil || !allZero(initiatorScalar.Bytes()) {
@@ -424,7 +466,7 @@ func TestFinishCleanupDoesNotAliasReturnedSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if responder.isk != nil || responder.transcript != nil {
+	if responder.core.isk != nil || responder.core.transcript != nil {
 		t.Fatal("responder retained cleared state references after Finish")
 	}
 	if !allZero(responderISK) {
@@ -446,6 +488,195 @@ func TestFinishCleanupDoesNotAliasReturnedSessions(t *testing.T) {
 	}
 	if !bytes.Equal(kI, kR) {
 		t.Fatal("exports differ after cleanup")
+	}
+}
+
+func TestClearOnFinishFailurePaths(t *testing.T) {
+	t.Run("initiator parse failure", func(t *testing.T) {
+		initiator, _, err := startTestInitiator(testConfig())
+		if err != nil {
+			t.Fatal(err)
+		}
+		initiatorScalar := initiator.core.scalar
+		if _, _, err := initiator.Finish([]byte("garbage")); !errors.Is(err, ErrMessage) {
+			t.Fatalf("initiator Finish garbage err=%v", err)
+		}
+		if initiator.core.scalar != nil {
+			t.Fatal("initiator retained scalar reference after parse failure")
+		}
+		if initiatorScalar == nil || !allZero(initiatorScalar.Bytes()) {
+			t.Fatal("initiator scalar was not cleared after parse failure")
+		}
+	})
+
+	t.Run("initiator confirmation failure", func(t *testing.T) {
+		initCfg := testConfig()
+		initCfg.Password = []byte("password-a")
+		respCfg := testConfig()
+		respCfg.Password = []byte("password-b")
+		initiator, msgA, err := startTestInitiator(initCfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, msgB, err := respondTestResponder(respCfg, msgA)
+		if err != nil {
+			t.Fatal(err)
+		}
+		initiatorScalar := initiator.core.scalar
+		if _, _, err := initiator.Finish(msgB); !errors.Is(err, ErrConfirmationFailed) {
+			t.Fatalf("initiator Finish wrong-password err=%v", err)
+		}
+		if initiator.core.scalar != nil {
+			t.Fatal("initiator retained scalar reference after confirmation failure")
+		}
+		if initiatorScalar == nil || !allZero(initiatorScalar.Bytes()) {
+			t.Fatal("initiator scalar was not cleared after confirmation failure")
+		}
+	})
+
+	t.Run("responder parse failure", func(t *testing.T) {
+		_, msgA, err := startTestInitiator(testConfig())
+		if err != nil {
+			t.Fatal(err)
+		}
+		responder, _, err := respondTestResponder(testConfig(), msgA)
+		if err != nil {
+			t.Fatal(err)
+		}
+		responderISK := responder.core.isk
+		responderTranscript := responder.core.transcript
+		if _, err := responder.Finish([]byte("garbage")); !errors.Is(err, ErrMessage) {
+			t.Fatalf("responder Finish garbage err=%v", err)
+		}
+		if responder.core.isk != nil || responder.core.transcript != nil {
+			t.Fatal("responder retained cleared state references after parse failure")
+		}
+		if !allZero(responderISK) {
+			t.Fatal("responder ISK was not cleared after parse failure")
+		}
+		if !allZero(responderTranscript) {
+			t.Fatal("responder transcript was not cleared after parse failure")
+		}
+	})
+
+	t.Run("responder confirmation failure", func(t *testing.T) {
+		initiator, msgA, err := startTestInitiator(testConfig())
+		if err != nil {
+			t.Fatal(err)
+		}
+		responder, msgB, err := respondTestResponder(testConfig(), msgA)
+		if err != nil {
+			t.Fatal(err)
+		}
+		msgC, _, err := initiator.Finish(msgB)
+		if err != nil {
+			t.Fatal(err)
+		}
+		msgC[len(msgC)-1] ^= 0xff
+		responderISK := responder.core.isk
+		responderTranscript := responder.core.transcript
+		if _, err := responder.Finish(msgC); !errors.Is(err, ErrConfirmationFailed) {
+			t.Fatalf("responder Finish tampered tagA err=%v", err)
+		}
+		if responder.core.isk != nil || responder.core.transcript != nil {
+			t.Fatal("responder retained cleared state references after confirmation failure")
+		}
+		if !allZero(responderISK) {
+			t.Fatal("responder ISK was not cleared after confirmation failure")
+		}
+		if !allZero(responderTranscript) {
+			t.Fatal("responder transcript was not cleared after confirmation failure")
+		}
+	})
+}
+
+func TestSessionISKSurvivesCoreClear(t *testing.T) {
+	initCfg := testConfig()
+	initCfg.AssociatedData = []byte("ADa")
+	respCfg := testConfig()
+	respCfg.AssociatedData = []byte("ADb")
+
+	initiator, msgA, err := startTestInitiator(initCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responder, msgB, err := respondTestResponder(respCfg, msgA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msgC, sI, err := initiator.Finish(msgB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responderISK := responder.core.isk
+	sR, err := responder.Finish(msgC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if responder.core.isk != nil {
+		t.Fatal("responder retained ISK reference after Finish")
+	}
+	if !allZero(responderISK) {
+		t.Fatal("responder-owned ISK backing array was not cleared")
+	}
+	kI, err := sI.Export([]byte("label"), []byte("ctx"), 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kR, err := sR.Export([]byte("label"), []byte("ctx"), 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if allZero(kR) {
+		t.Fatal("responder session export unexpectedly all-zero after core cleanup")
+	}
+	if !bytes.Equal(kI, kR) {
+		t.Fatal("exports differ after responder core cleanup")
+	}
+}
+
+func TestFinishZeroValueHardening(t *testing.T) {
+	var initiator Initiator
+	if _, _, err := initiator.Finish([]byte("garbage")); !errors.Is(err, ErrInvalidInput) ||
+		!strings.Contains(err.Error(), "uninitialized initiator") {
+		t.Fatalf("zero-value Initiator.Finish malformed err=%v", err)
+	}
+	if initiator.used {
+		t.Fatal("zero-value Initiator.Finish consumed state on malformed message")
+	}
+
+	v, err := loadDraftVectorJSON(draft21RistrettoVectorJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msgB := encodeMessageB(v["Yb"], v["ADb"], bytes.Repeat([]byte{0x99}, tagSize))
+	if _, _, err := initiator.Finish(msgB); !errors.Is(err, ErrInvalidInput) ||
+		!strings.Contains(err.Error(), "uninitialized initiator") {
+		t.Fatalf("zero-value Initiator.Finish shaped msgB err=%v", err)
+	}
+	if initiator.used {
+		t.Fatal("zero-value Initiator.Finish consumed state on shaped message B")
+	}
+
+	var responder Responder
+	if _, err := responder.Finish([]byte("garbage")); !errors.Is(err, ErrInvalidInput) ||
+		!strings.Contains(err.Error(), "uninitialized responder") {
+		t.Fatalf("zero-value Responder.Finish malformed err=%v", err)
+	}
+	if responder.used {
+		t.Fatal("zero-value Responder.Finish consumed state on malformed message")
+	}
+
+	forgedC := encodeMessageC(confirmationTag(nil, nil, nil, nil))
+	sess, err := responder.Finish(forgedC)
+	if sess != nil {
+		t.Fatal("zero-value Responder.Finish returned a Session for forged message C")
+	}
+	if !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "uninitialized responder") {
+		t.Fatalf("zero-value Responder.Finish forged msgC err=%v", err)
+	}
+	if responder.used {
+		t.Fatal("zero-value Responder.Finish consumed state on forged message C")
 	}
 }
 
@@ -990,6 +1221,23 @@ func TestResponderPrevalidatesInvalidInitiatorShareBeforeRandomness(t *testing.T
 			}
 			if random.reads != 0 {
 				t.Fatalf("Respond read randomness %d times before rejecting share", random.reads)
+			}
+
+			nc, err := normalizeConfig(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer nc.wipe()
+			random = &countingFailingReader{err: io.ErrUnexpectedEOF}
+			core, yb, tagB, err := newResponderCore(nc, tc.ya, nil, random)
+			if core != nil || yb != nil || tagB != nil {
+				t.Fatalf("newResponderCore returned core=%v yb=%x tagB=%x on invalid share", core, yb, tagB)
+			}
+			if !errors.Is(err, ErrAbort) || errors.Is(err, ErrRandomness) {
+				t.Fatalf("newResponderCore err=%v", err)
+			}
+			if random.reads != 0 {
+				t.Fatalf("newResponderCore read randomness %d times before rejecting share", random.reads)
 			}
 		})
 	}
