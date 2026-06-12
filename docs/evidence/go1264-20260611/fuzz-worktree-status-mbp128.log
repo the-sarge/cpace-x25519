@@ -1,0 +1,14 @@
+# Fuzz worktree status — mbp128.local (ARM leg)
+$ date -u
+2026-06-11T07:13:34Z
+$ git rev-parse HEAD
+933ece246e6170b11e838395bf36f852cba0cd02
+$ git status --short
+?? fuzz-worktree-status-mbp128.log
+$ go version
+go version go1.26.4 darwin/arm64
+$ task --version
+3.51.1
+$ go env GOOS GOARCH
+darwin
+arm64
