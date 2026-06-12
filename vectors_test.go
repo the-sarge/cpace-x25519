@@ -14,10 +14,14 @@ import (
 //go:embed testdata/draft21-ristretto255-generator.json
 var draft21RistrettoGeneratorJSON []byte
 
+//go:embed testdata/draft21-ristretto255-confirmation-tags.json
+var draft21RistrettoConfirmationTagJSON []byte
+
 const (
-	draft21RistrettoGeneratorJSONSHA256 = "05c8a34bd623fbdefd7fbffcd261d2420bd34363efa301d0b0dd9817f7f47c94"
-	draft21RistrettoVectorJSONSHA256    = "dc74177668cc2374beaf57fcb6e4c08a908238bab6b74d8edf8c86e04bc663ae"
-	draft21RistrettoInvalidJSONSHA256   = "6288f7ff96dfb8c2d6c4d743927c5fe6ac4aecbc56da2d1f00f27104000b6dfd"
+	draft21RistrettoGeneratorJSONSHA256       = "05c8a34bd623fbdefd7fbffcd261d2420bd34363efa301d0b0dd9817f7f47c94"
+	draft21RistrettoVectorJSONSHA256          = "dc74177668cc2374beaf57fcb6e4c08a908238bab6b74d8edf8c86e04bc663ae"
+	draft21RistrettoInvalidJSONSHA256         = "6288f7ff96dfb8c2d6c4d743927c5fe6ac4aecbc56da2d1f00f27104000b6dfd"
+	draft21RistrettoConfirmationTagJSONSHA256 = "1d0b59b3b7486dee3569ad4e8d6908e2f575dfcd9f26804c34584cb29515e0d4"
 )
 
 type draftGeneratorVector struct {
@@ -170,6 +174,23 @@ func TestEmbeddedDraftGeneratorJSON(t *testing.T) {
 	}
 }
 
+func TestEmbeddedDraftConfirmationTagGoldens(t *testing.T) {
+	// Hash pins package-local confirmation-tag goldens captured at the
+	// primitive seam from the draft-21 Appendix B.3.11.1 vector.
+	if got := pinnedJSONHash(draft21RistrettoConfirmationTagJSON); got != draft21RistrettoConfirmationTagJSONSHA256 {
+		t.Fatalf("confirmation tag JSON SHA-256 got %s want %s", got, draft21RistrettoConfirmationTagJSONSHA256)
+	}
+	tags, err := loadDraftVectorJSON(draft21RistrettoConfirmationTagJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"tagA", "tagB"} {
+		if len(tags[key]) != tagSize {
+			t.Fatalf("%s length=%d want %d", key, len(tags[key]), tagSize)
+		}
+	}
+}
+
 func TestEmbeddedDraftInvalidVectorJSON(t *testing.T) {
 	if got := pinnedJSONHash(draft21RistrettoInvalidJSON); got != draft21RistrettoInvalidJSONSHA256 {
 		t.Fatalf("invalid vector JSON SHA-256 got %s want %s", got, draft21RistrettoInvalidJSONSHA256)
@@ -288,6 +309,16 @@ func TestRistrettoDraft21Vectors(t *testing.T) {
 	wantISKIR := v["ISK_IR"]
 	if !bytes.Equal(iskIR, wantISKIR) {
 		t.Fatalf("ISK_IR got %x want %x", iskIR, wantISKIR)
+	}
+	tags, err := loadDraftVectorJSON(draft21RistrettoConfirmationTagJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := confirmationTag(iskIR, sid, Yb, adb); !bytes.Equal(got, tags["tagB"]) {
+		t.Fatalf("tagB got %x want %x", got, tags["tagB"])
+	}
+	if got := confirmationTag(iskIR, sid, Ya, ada); !bytes.Equal(got, tags["tagA"]) {
+		t.Fatalf("tagA got %x want %x", got, tags["tagA"])
 	}
 
 	trOC := transcriptOC(Ya, ada, Yb, adb)
