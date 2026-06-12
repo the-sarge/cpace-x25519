@@ -161,10 +161,7 @@ func (i *Initiator) Finish(messageB []byte) ([]byte, *Session, error) {
 	if err := i.consume(); err != nil {
 		return nil, nil, err
 	}
-	defer func() {
-		clearScalar(i.core.scalar)
-		i.core.scalar = nil
-	}()
+	defer i.core.clear()
 	b, err := decodeMessageB(messageB)
 	if err != nil {
 		return nil, nil, err
@@ -186,12 +183,7 @@ func (r *Responder) Finish(messageC []byte) (*Session, error) {
 	if err := r.consume(); err != nil {
 		return nil, err
 	}
-	defer func() {
-		clearBytes(r.core.isk)
-		clearBytes(r.core.transcript)
-		r.core.isk = nil
-		r.core.transcript = nil
-	}()
+	defer r.core.clear()
 	c, err := decodeMessageC(messageC)
 	if err != nil {
 		return nil, err

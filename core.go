@@ -106,3 +106,21 @@ func (c *responderCore) finish(peerTagC []byte) (*Session, error) {
 	}
 	return newSession(c.isk, c.transcript, c.ada, c.peerID), nil
 }
+
+func (c *initiatorCore) clear() {
+	if c == nil {
+		return
+	}
+	clearScalar(c.scalar)
+	c.scalar = nil
+}
+
+func (c *responderCore) clear() {
+	if c == nil {
+		return
+	}
+	clearBytes(c.isk)
+	clearBytes(c.transcript)
+	c.isk = nil
+	c.transcript = nil
+}
