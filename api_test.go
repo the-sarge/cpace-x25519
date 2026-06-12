@@ -268,16 +268,34 @@ func TestClearIdempotent(t *testing.T) {
 	}
 }
 
-func TestNilSessionClose(t *testing.T) {
+func TestNilReceiverMethods(t *testing.T) {
 	var s *Session
-	if err := s.Close(); !errors.Is(err, ErrInvalidInput) {
-		t.Fatalf("Close nil err=%v", err)
+	if err := s.Close(); err != nil {
+		t.Fatalf("nil Close err=%v want nil", err)
+	}
+	if _, err := s.Export([]byte("label"), nil, 32); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("nil Export err=%v want ErrInvalidInput", err)
+	}
+	if got := s.TranscriptID(); got != nil {
+		t.Fatalf("nil TranscriptID=%q want nil", got)
 	}
 	if got := s.PeerAssociatedData(); got != nil {
 		t.Fatalf("nil PeerAssociatedData=%q want nil", got)
 	}
 	if got := s.PeerID(); got != nil {
 		t.Fatalf("nil PeerID=%q want nil", got)
+	}
+
+	zero := &Session{}
+	if err := zero.Close(); !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "nil session") {
+		t.Fatalf("zero-value Close err=%v want ErrInvalidInput", err)
+	}
+	if _, err := zero.Export([]byte("label"), nil, 32); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("zero-value Export err=%v want ErrInvalidInput", err)
+	}
+
+	if err := new(Session).Close(); !errors.Is(err, ErrInvalidInput) || !strings.Contains(err.Error(), "nil session") {
+		t.Fatalf("new Session Close err=%v want ErrInvalidInput", err)
 	}
 }
 

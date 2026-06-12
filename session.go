@@ -41,12 +41,16 @@ func (s *Session) PeerID() []byte {
 }
 
 // Close releases the secret key material held by the Session. Close is
-// idempotent. It performs best-effort in-memory key cleanup, but Go does not
-// provide guaranteed secure memory erasure and the runtime or compiler may make
+// idempotent and nil-safe; calling Close on a nil *Session returns nil. It
+// performs best-effort in-memory key cleanup, but Go does not provide
+// guaranteed secure memory erasure and the runtime or compiler may make
 // additional copies. Non-secret metadata such as TranscriptID,
 // PeerAssociatedData, and PeerID remains available after Close.
 func (s *Session) Close() error {
-	if s == nil || s.state == nil {
+	if s == nil {
+		return nil
+	}
+	if s.state == nil {
 		return fmt.Errorf("%w: nil session", ErrInvalidInput)
 	}
 	st := s.state

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Pre-v1 contract/behavior change: `(*Session)(nil).Close()` now returns `nil` as a nil-safe no-op; zero-value `Session` values and nil/zero-value `Export` remain strict `ErrInvalidInput` cases. This is breaking for callers that used `errors.Is(err, ErrInvalidInput)` on `Close` to detect nil receivers.
 - Pin Export length contract: documented as `[0, 16320]`, zero-length returns length 0.
 - Pre-v1 API cleanup (breaking relative to `v0.1.2`): remove exported `Suite` and `SuiteCPaceRistretto255SHA512`; callers should drop those references and treat the package as single-suite with opaque framing. No wire/protocol behavior change.
 - Internal hardening: `Initiator.Finish` and `Responder.Finish` now reject caller-fabricated zero-value protocol states with `ErrInvalidInput` before consuming state; this closes the pre-v1 zero-value responder forged-tag path where `Responder.Finish` could accept `encodeMessageC(confirmationTag(nil, nil, nil, nil))` and return a Session keyed from nil ISK. Nil-receiver error text now says "uninitialized initiator/responder"; error identity remains `ErrInvalidInput`.
