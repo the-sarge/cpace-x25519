@@ -96,6 +96,43 @@ func TestConfirmedExchangeAndExport(t *testing.T) {
 	}
 }
 
+func TestExportLengthBoundaries(t *testing.T) {
+	sI, _ := completeExchange(t, testConfig(), testConfig())
+
+	cases := []struct {
+		name    string
+		length  int
+		wantErr bool
+	}{
+		{"negative", -1, true},
+		{"zero", 0, false},
+		{"one", 1, false},
+		{"max minus one", maxHKDFOutput - 1, false},
+		{"max", maxHKDFOutput, false},
+		{"over max", maxHKDFOutput + 1, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := sI.Export([]byte("label"), []byte("ctx"), tc.length)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("Export succeeded, want error")
+				}
+				if !errors.Is(err, ErrInvalidInput) {
+					t.Fatalf("Export err=%v want ErrInvalidInput", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Export err=%v", err)
+			}
+			if len(out) != tc.length {
+				t.Fatalf("Export len=%d want %d", len(out), tc.length)
+			}
+		})
+	}
+}
+
 func TestSessionPeerMetadata(t *testing.T) {
 	initCfg := testConfig()
 	initCfg.AssociatedData = []byte("ADa")

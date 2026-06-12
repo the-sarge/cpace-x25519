@@ -65,6 +65,10 @@ func (s *Session) Close() error {
 // using HKDF-SHA512. The label and context are prefix-free encoded into HKDF
 // info. Export output is not fresh randomness or a randomness pool; use
 // separate, domain-specific labels and contexts for each application purpose.
+// length must be in the range [0, 16320] (255 * 64, the HKDF-SHA512 maximum).
+// A length of zero returns a result with length 0; callers must not distinguish
+// nil from empty output for this case. Negative values and values exceeding the
+// maximum are rejected with a wrapped ErrInvalidInput.
 func (s *Session) Export(label, context []byte, length int) ([]byte, error) {
 	if s == nil || s.state == nil {
 		return nil, fmt.Errorf("%w: nil session", ErrInvalidInput)
@@ -75,6 +79,9 @@ func (s *Session) Export(label, context []byte, length int) ([]byte, error) {
 	if st.closed {
 		return nil, ErrSessionClosed
 	}
+	// Negative lengths must be rejected here: crypto/hkdf.Key panics on
+	// negative length, so do not delegate this validation to the standard
+	// library. See ADR-0005.
 	if length < 0 || length > maxHKDFOutput {
 		return nil, fmt.Errorf("%w: invalid export length", ErrInvalidInput)
 	}
