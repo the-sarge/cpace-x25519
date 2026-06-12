@@ -4,7 +4,7 @@ import "fmt"
 
 const (
 	wireFormatV1 byte = 0xc1
-	wireSuite    byte = byte(SuiteCPaceRistretto255SHA512)
+	wireSuite    byte = currentSuite
 	roleA        byte = 0x01
 	roleB        byte = 0x02
 	roleC        byte = 0x03

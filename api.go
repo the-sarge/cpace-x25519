@@ -15,15 +15,12 @@ const (
 	// this package.
 	DraftVersion = "draft-irtf-cfrg-cpace-21"
 
-	// SuiteCPaceRistretto255SHA512 is the only suite implemented by v1 of this
+	// currentSuite is the only suite implemented by v1 of this
 	// package.
-	SuiteCPaceRistretto255SHA512 Suite = 0x01
+	currentSuite byte = 0x01
 )
 
 const suiteName = "CPACE-RISTR255-SHA512"
-
-// Suite identifies a CPace ciphersuite in this package's wire framing.
-type Suite byte
 
 // Config contains the local inputs for one CPace role.
 //
