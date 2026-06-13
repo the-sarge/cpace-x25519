@@ -67,6 +67,35 @@ fi
 "$repo_root/scripts/extract-release-notes.sh" "$prerelease_changelog" v1.2.3-rc.1 >"$tmpdir/prerelease-notes.txt"
 grep -q 'Release candidate note' "$tmpdir/prerelease-notes.txt"
 
+assert_tag_metadata() {
+  tag=$1
+  expected_prerelease=$2
+  expected_latest=$3
+  expected_flags=$4
+  metadata="$tmpdir/tag-$tag.env"
+
+  "$repo_root/scripts/release-tag-metadata.sh" "$tag" >"$metadata"
+  grep -Fxq "release-tag=$tag" "$metadata"
+  grep -Fxq "sbom-file=cpace-$tag.cdx.json" "$metadata"
+  grep -Fxq "prerelease=$expected_prerelease" "$metadata"
+  grep -Fxq "latest=$expected_latest" "$metadata"
+  grep -Fxq "release-flags=$expected_flags" "$metadata"
+}
+
+assert_tag_metadata v1.0.0 false true ''
+assert_tag_metadata v1.0.0-rc.1 true false '--prerelease --latest=false'
+assert_tag_metadata v0.1.3 true false '--prerelease --latest=false'
+
+if "$repo_root/scripts/release-tag-metadata.sh" 'v1#foo' >"$tmpdir/tag-hash.out" 2>"$tmpdir/tag-hash.err"; then
+  echo "unsafe hash tag unexpectedly succeeded" >&2
+  exit 1
+fi
+
+if "$repo_root/scripts/release-tag-metadata.sh" 'v1/foo' >"$tmpdir/tag-slash.out" 2>"$tmpdir/tag-slash.err"; then
+  echo "unsafe slash tag unexpectedly succeeded" >&2
+  exit 1
+fi
+
 sbom="$tmpdir/cpace-v1.2.3.cdx.json"
 cat >"$sbom" <<'EOF'
 {
