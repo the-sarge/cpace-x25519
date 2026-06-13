@@ -880,3 +880,33 @@ ADR-0006 is implemented and merged. PR #88 makes `(*Session)(nil).Close()` retur
 
 - Complete the ADR-0006 OmniFocus task `fg42mN_gyWG` after this journal update lands.
 - Continue with ADR-0007, then run the Phase 3 consolidated evidence refresh; stronger release claims still require refreshing pinned dependency-review, fuzz, and security-audit evidence against the exact candidate commit.
+
+---
+
+## ADR-0007 release artifacts merged - 2026-06-13 00:19 EDT
+
+**Main:** `cccb0dcf8d2e`
+**Actor:** Codex
+
+**Summary**
+
+ADR-0007 is implemented and merged. PR #90 adds the release supply-chain artifact path without reopening the frozen public API or package-profile policy: signed annotated `v*` tags gate the release workflow, CycloneDX SBOM JSON is generated and validated, SBOM provenance is attested, and v0.x or SemVer prerelease tags publish as GitHub prereleases with `latest=false`.
+
+**Completed**
+
+- Merged PR #90 as `cccb0dcf8d2e61abab5754f5e12a214460ce4658`; implementation head was `71ad345db318687c064438cbd5ae90c3aff4e295`.
+- Added `.github/allowed_signers` and hardened `.github/workflows/release.yml` with `unsupported-ref`, `verify-tag`, signed annotated tag verification, release-note extraction, fail-closed existing-release checks, pinned artifact upload/download actions, SHA-pinned `anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610`, SHA-pinned `actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26`, and SBOM plus Sigstore bundle release assets.
+- Added `scripts/extract-release-notes.sh`, `scripts/release-tag-metadata.sh`, `scripts/test-release-helpers.sh`, and `scripts/validate-cyclonedx-sbom.sh`, with `task release:helpers` wired into CI and local documentation checks.
+- Updated `README.md`, `CHANGELOG.md`, `docs/ci-policy.md`, `docs/release-checklist.md`, `docs/release-verification.md`, and `docs/security-gates.md` so release operators have the signed-tag, SBOM, attestation, prerelease, and fail-closed publishing contracts in one place.
+- Drove the change with `ras implement` run `20260613T023632-3e88228b19f588529d5338e7`; resolved review runs `20260613T024713-7576a5e6e200a2c349683abd`, `20260613T030515-e69a3bcac3fb2be870d47ba5`, `20260613T033032-68701975a207636f683a1d4a`, and fresh review `20260613T035338-7fa650bf8acdc0067dc23765`.
+
+**Validation**
+
+- GitHub checks on PR #90 were green at `71ad345`: Actionlint, Check, DCO, Dependency Gate, and SAST Gate; the gosec child check was neutral/skipped as expected.
+- RAS verification passed cleanly for review `20260613T033032-68701975a207636f683a1d4a` at `b2386ae254fb791d55273b778c4320ee80b93b16` and for fresh review `20260613T035338-7fa650bf8acdc0067dc23765` at `71ad345db318687c064438cbd5ae90c3aff4e295`, with no still-open findings and no new concerns.
+- Local gates passed at `71ad345`: `PATH=/tmp/cpace-bin:$PATH task release:helpers`, real Syft `v1.45.1` CycloneDX SBOM generation plus `scripts/validate-cyclonedx-sbom.sh`, prerelease/latest metadata checks for `v0.1.3` and `v1.0.0`, unsafe-tag rejection checks, no-`jq` failure smoke, `task docs:check`, `task quick`, `task check`, `go test -race ./...`, `go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12`, `go run github.com/securego/gosec/v2/cmd/gosec@v2.26.1 -tests ./...`, and `git diff --check`.
+
+**Next**
+
+- Complete the ADR-0007 OmniFocus task `h0GnwLCRQYj` after this journal update lands.
+- The v1.0.0 candidate still needs the consolidated Phase 3 evidence refresh before stronger release claims: signed `v*` workflow-dispatch rehearsal, branch/non-`v*` fail-closed checks, lightweight/unsigned/wrong-signer tag negative tests, missing changelog-section failure, `gh attestation verify`, and Scorecard before/after evidence for SBOM, Packaging, and Signed-Releases.
