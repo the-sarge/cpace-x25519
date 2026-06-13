@@ -21,10 +21,13 @@ Review the key fingerprints:
 ssh-keygen -lf ~/.config/git/cpace-allowed-signers
 ```
 
-If you have a checkout of the release source, compare the checked-in signer snapshot with a freshly generated file:
+If you have a checkout of the release source, verify that every checked-in signer key blob still appears in the freshly fetched maintainer keys. Extra fetched GitHub account keys are not trusted automatically; investigate them before adding them to an allowed signers file:
 
 ```sh
-diff -u .github/allowed_signers ~/.config/git/cpace-allowed-signers
+awk '{ print $2 " " $3 }' .github/allowed_signers | sort -u > /tmp/cpace-checked-in-keys
+awk '{ print $2 " " $3 }' ~/.config/git/cpace-allowed-signers | sort -u > /tmp/cpace-github-keys
+missing="$(comm -23 /tmp/cpace-checked-in-keys /tmp/cpace-github-keys)"
+test -z "$missing" || { printf 'checked-in signer keys missing from GitHub keys:\n%s\n' "$missing" >&2; exit 1; }
 ```
 
 Then either verify with that file for this command:
