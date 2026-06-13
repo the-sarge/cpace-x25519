@@ -1,6 +1,9 @@
 package cpace
 
-import "bytes"
+import (
+	"bytes"
+	"fmt"
+)
 
 type messageFramingTarget struct {
 	name   string
@@ -105,6 +108,8 @@ func messageFramingMaxFieldCases() []messageFramingCase {
 func messageFramingFieldLimitCases() []messageFramingCase {
 	point := bytes.Repeat([]byte{0x42}, pointSize)
 	tag := bytes.Repeat([]byte{0x99}, tagSize)
+	overDeclaredBAd := append(messageHeader(roleB), prependLen(point)...)
+	overDeclaredBAd = append(overDeclaredBAd, encodeLEB128(uint64(maxAssociatedDataLength+1))...)
 	return []messageFramingCase{
 		{"A session id oversized", encodeMessageA(bytes.Repeat([]byte{0x11}, maxSessionIDLength+1), point, nil), "message A session id field too large"},
 		{"A point short", encodeMessageA([]byte("sid"), bytes.Repeat([]byte{0x42}, pointSize-1), nil), "message A point length"},
@@ -113,6 +118,7 @@ func messageFramingFieldLimitCases() []messageFramingCase {
 		{"B point short", encodeMessageB(bytes.Repeat([]byte{0x42}, pointSize-1), nil, tag), "message B point length"},
 		{"B point long", encodeMessageB(bytes.Repeat([]byte{0x42}, pointSize+1), nil, tag), "message B point length"},
 		{"B associated data oversized", encodeMessageB(point, bytes.Repeat([]byte{0x33}, maxAssociatedDataLength+1), tag), "message B associated data field too large"},
+		{"B associated data over-declared absent bytes", overDeclaredBAd, "message B associated data field too large"},
 		{"B tag short", encodeMessageB(point, nil, bytes.Repeat([]byte{0x99}, tagSize-1)), "message B tag length"},
 		{"B tag long", encodeMessageB(point, nil, bytes.Repeat([]byte{0x99}, tagSize+1)), "message B tag length"},
 		{"C tag short", encodeMessageC(bytes.Repeat([]byte{0x99}, tagSize-1)), "message C tag length"},
@@ -169,8 +175,7 @@ func messageHeader(role byte) []byte {
 
 func decodeMessageFromCatalogue(msg []byte) error {
 	if len(msg) < messageHeaderSize {
-		_, err := decodeMessageA(msg)
-		return err
+		return fmt.Errorf("cpace test: message framing catalogue case has short header")
 	}
 	switch msg[2] {
 	case roleA:
@@ -183,8 +188,7 @@ func decodeMessageFromCatalogue(msg []byte) error {
 		_, err := decodeMessageC(msg)
 		return err
 	default:
-		_, err := decodeMessageA(msg)
-		return err
+		return fmt.Errorf("cpace test: message framing catalogue case has unexpected role %#x", msg[2])
 	}
 }
 
