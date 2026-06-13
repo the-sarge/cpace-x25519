@@ -165,7 +165,7 @@ Confirm Code Scanning has no unexpected open alerts after SARIF ingestion. For r
 
 ## 12. Publish Release
 
-The Release Validation workflow creates or edits the GitHub release on publishing-eligible tag pushes. Verify the published notes state:
+The Release Validation workflow creates the GitHub release on publishing-eligible tag pushes and fails closed if a release for that tag already exists, so manual repair can happen without in-place asset replacement. Verify the published notes state:
 
 - whether the release is production-ready;
 - the supported CPace draft, suite, and mode;

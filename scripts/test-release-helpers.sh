@@ -71,7 +71,6 @@ assert_tag_metadata() {
   tag=$1
   expected_prerelease=$2
   expected_latest=$3
-  expected_flags=$4
   metadata="$tmpdir/tag-$tag.env"
 
   "$repo_root/scripts/release-tag-metadata.sh" "$tag" >"$metadata"
@@ -79,12 +78,11 @@ assert_tag_metadata() {
   grep -Fxq "sbom-file=cpace-$tag.cdx.json" "$metadata"
   grep -Fxq "prerelease=$expected_prerelease" "$metadata"
   grep -Fxq "latest=$expected_latest" "$metadata"
-  grep -Fxq "release-flags=$expected_flags" "$metadata"
 }
 
-assert_tag_metadata v1.0.0 false true ''
-assert_tag_metadata v1.0.0-rc.1 true false '--prerelease --latest=false'
-assert_tag_metadata v0.1.3 true false '--prerelease --latest=false'
+assert_tag_metadata v1.0.0 false true
+assert_tag_metadata v1.0.0-rc.1 true false
+assert_tag_metadata v0.1.3 true false
 
 if "$repo_root/scripts/release-tag-metadata.sh" 'v1#foo' >"$tmpdir/tag-hash.out" 2>"$tmpdir/tag-hash.err"; then
   echo "unsafe hash tag unexpectedly succeeded" >&2
@@ -122,6 +120,14 @@ cat >"$sbom" <<'EOF'
 EOF
 
 "$repo_root/scripts/validate-cyclonedx-sbom.sh" "$sbom"
+
+if command -v syft >/dev/null 2>&1; then
+  real_sbom="$tmpdir/cpace-syft.cdx.json"
+  (cd "$repo_root" && syft dir:. -o "cyclonedx-json@1.5=$real_sbom" >/dev/null)
+  "$repo_root/scripts/validate-cyclonedx-sbom.sh" "$real_sbom"
+else
+  echo "syft not found; skipping optional real Syft SBOM validation"
+fi
 
 bad_sbom="$tmpdir/bad.cdx.json"
 cat >"$bad_sbom" <<'EOF'

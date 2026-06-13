@@ -366,12 +366,17 @@ jobs:
           fi
 
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "$tag" --notes-file release-body.md "${release_args[@]}"
-          else
-            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --title "$tag" --notes-file release-body.md --verify-tag "${release_args[@]}"
+            echo "GitHub Release already exists for $tag; refusing automated in-place asset replacement." >&2
+            echo "Delete the draft/release or repair it manually before rerunning Release Validation." >&2
+            exit 1
           fi
 
-          gh release upload "$tag" --repo "$GITHUB_REPOSITORY" "$sbom_path" "$bundle_path" --clobber
+          gh release create "$tag" "$sbom_path" "$bundle_path" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$tag" \
+            --notes-file release-body.md \
+            --verify-tag \
+            "${release_args[@]}"
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.verify-tag.outputs.release-tag }}

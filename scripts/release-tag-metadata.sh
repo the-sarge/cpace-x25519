@@ -23,7 +23,6 @@ version=${tag#v}
 major=${version%%.*}
 prerelease=false
 latest=true
-release_flags=
 
 case "$version" in
   *-*)
@@ -37,12 +36,7 @@ if [ "$major" = "0" ]; then
   latest=false
 fi
 
-if [ "$prerelease" = "true" ]; then
-  release_flags="--prerelease --latest=false"
-fi
-
 printf 'release-tag=%s\n' "$tag"
 printf 'sbom-file=cpace-%s.cdx.json\n' "$tag"
 printf 'prerelease=%s\n' "$prerelease"
 printf 'latest=%s\n' "$latest"
-printf 'release-flags=%s\n' "$release_flags"
