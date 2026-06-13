@@ -28,6 +28,26 @@ const (
 
 const _ = uint((1 << (7 * maxLEB128BytesForField)) - 1 - maxAssociatedDataLength)
 
+const (
+	messageHeaderSize      = 3
+	maxValidMessageALength = messageHeaderSize +
+		maxLEB128BytesForField + maxSessionIDLength +
+		maxLEB128BytesForField + pointSize +
+		maxLEB128BytesForField + maxAssociatedDataLength
+	maxValidMessageBLength = messageHeaderSize +
+		maxLEB128BytesForField + pointSize +
+		maxLEB128BytesForField + maxAssociatedDataLength +
+		maxLEB128BytesForField + tagSize
+	maxValidMessageCLength = messageHeaderSize +
+		maxLEB128BytesForField + tagSize
+)
+
+const (
+	_ = uint(maxMessageLength - maxValidMessageALength - 1)
+	_ = uint(maxMessageLength - maxValidMessageBLength - 1)
+	_ = uint(maxMessageLength - maxValidMessageCLength - 1)
+)
+
 type messageA struct {
 	sid []byte
 	ya  []byte
