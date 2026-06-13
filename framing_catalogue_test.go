@@ -109,31 +109,34 @@ func messageFramingAggregateCases(target messageFramingTarget) []messageFramingC
 }
 
 func messageFramingMaxFieldCases() []messageFramingCase {
-	point := bytes.Repeat([]byte{0x42}, messageAPointCap.length)
-	tag := bytes.Repeat([]byte{0x99}, messageBTagCap.length)
+	aPoint := bytes.Repeat([]byte{0x42}, messageAPointCap.length)
+	bPoint := bytes.Repeat([]byte{0x42}, messageBPointCap.length)
+	bTag := bytes.Repeat([]byte{0x99}, messageBTagCap.length)
+	cTag := bytes.Repeat([]byte{0x99}, messageCTagCap.length)
 	return []messageFramingCase{
-		{"A max fields", encodeMessageA(bytes.Repeat([]byte{0x11}, messageASessionIDCap.length), point, bytes.Repeat([]byte{0x22}, messageAAssociatedDataCap.length)), ""},
-		{"B max fields", encodeMessageB(point, bytes.Repeat([]byte{0x33}, messageBAssociatedDataCap.length), tag), ""},
-		{"C exact tag", encodeMessageC(tag), ""},
+		{"A max fields", encodeMessageA(bytes.Repeat([]byte{0x11}, messageASessionIDCap.length), aPoint, bytes.Repeat([]byte{0x22}, messageAAssociatedDataCap.length)), ""},
+		{"B max fields", encodeMessageB(bPoint, bytes.Repeat([]byte{0x33}, messageBAssociatedDataCap.length), bTag), ""},
+		{"C exact tag", encodeMessageC(cTag), ""},
 	}
 }
 
 func messageFramingFieldLimitCases() []messageFramingCase {
-	point := bytes.Repeat([]byte{0x42}, messageAPointCap.length)
-	tag := bytes.Repeat([]byte{0x99}, messageBTagCap.length)
-	overDeclaredBAd := append(messageHeader(roleB), prependLen(point)...)
+	aPoint := bytes.Repeat([]byte{0x42}, messageAPointCap.length)
+	bPoint := bytes.Repeat([]byte{0x42}, messageBPointCap.length)
+	bTag := bytes.Repeat([]byte{0x99}, messageBTagCap.length)
+	overDeclaredBAd := append(messageHeader(roleB), prependLen(bPoint)...)
 	overDeclaredBAd = append(overDeclaredBAd, encodeLEB128(uint64(messageBAssociatedDataCap.length+1))...)
 	return []messageFramingCase{
-		{"A session id oversized", encodeMessageA(bytes.Repeat([]byte{0x11}, messageASessionIDCap.length+1), point, nil), "message A session id field too large"},
+		{"A session id oversized", encodeMessageA(bytes.Repeat([]byte{0x11}, messageASessionIDCap.length+1), aPoint, nil), "message A session id field too large"},
 		{"A point short", encodeMessageA([]byte("sid"), bytes.Repeat([]byte{0x42}, messageAPointCap.length-1), nil), "message A point length"},
 		{"A point long", encodeMessageA([]byte("sid"), bytes.Repeat([]byte{0x42}, messageAPointCap.length+1), nil), "message A point length"},
-		{"A associated data oversized", encodeMessageA([]byte("sid"), point, bytes.Repeat([]byte{0x22}, messageAAssociatedDataCap.length+1)), "message A associated data field too large"},
-		{"B point short", encodeMessageB(bytes.Repeat([]byte{0x42}, messageBPointCap.length-1), nil, tag), "message B point length"},
-		{"B point long", encodeMessageB(bytes.Repeat([]byte{0x42}, messageBPointCap.length+1), nil, tag), "message B point length"},
-		{"B associated data oversized", encodeMessageB(point, bytes.Repeat([]byte{0x33}, messageBAssociatedDataCap.length+1), tag), "message B associated data field too large"},
+		{"A associated data oversized", encodeMessageA([]byte("sid"), aPoint, bytes.Repeat([]byte{0x22}, messageAAssociatedDataCap.length+1)), "message A associated data field too large"},
+		{"B point short", encodeMessageB(bytes.Repeat([]byte{0x42}, messageBPointCap.length-1), nil, bTag), "message B point length"},
+		{"B point long", encodeMessageB(bytes.Repeat([]byte{0x42}, messageBPointCap.length+1), nil, bTag), "message B point length"},
+		{"B associated data oversized", encodeMessageB(bPoint, bytes.Repeat([]byte{0x33}, messageBAssociatedDataCap.length+1), bTag), "message B associated data field too large"},
 		{"B associated data over-declared absent bytes", overDeclaredBAd, "message B associated data field too large"},
-		{"B tag short", encodeMessageB(point, nil, bytes.Repeat([]byte{0x99}, messageBTagCap.length-1)), "message B tag length"},
-		{"B tag long", encodeMessageB(point, nil, bytes.Repeat([]byte{0x99}, messageBTagCap.length+1)), "message B tag length"},
+		{"B tag short", encodeMessageB(bPoint, nil, bytes.Repeat([]byte{0x99}, messageBTagCap.length-1)), "message B tag length"},
+		{"B tag long", encodeMessageB(bPoint, nil, bytes.Repeat([]byte{0x99}, messageBTagCap.length+1)), "message B tag length"},
 		{"C tag short", encodeMessageC(bytes.Repeat([]byte{0x99}, messageCTagCap.length-1)), "message C tag length"},
 		{"C tag long", encodeMessageC(bytes.Repeat([]byte{0x99}, messageCTagCap.length+1)), "message C tag length"},
 	}
