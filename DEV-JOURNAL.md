@@ -968,3 +968,34 @@ PR #94 deepens the ADR-0007 release policy checker into an executable guard for 
 - Merge PR #94 after the journal commit's checks are green.
 - Update OmniFocus with the merged PR and evidence notes.
 - Keep the release evidence caveat intact: stronger release claims still require refreshing pinned dependency-review, fuzz, and security-audit evidence against the exact candidate commit.
+
+---
+
+## Message framing catalogue landed - 2026-06-13 17:05 EDT
+
+**Main:** `5df3e7ea516d`
+**Actor:** Codex
+
+**Summary**
+
+PR #96 landed the Message framing test catalogue suggested by the architecture review. The change is test-only: malformed, aggregate-size, field-limit, LEB128, and fuzz-seed cases for Message A/B/C now live behind one intent-named catalogue, with no production behavior or public API change.
+
+**Completed**
+
+- Merged PR #96 as `5df3e7ea516dee1dce974294fd47b057cd62e556`; final implementation head was `1edfb7641912bc269915786bdab64d047131ffa8`.
+- Added `framing_catalogue_test.go` as the shared Message framing catalogue for parser tests and fuzz seed construction.
+- Reworked `api_test.go` parser coverage to consume catalogue cases for malformed headers, role/suite errors, aggregate-size precedence, max-field acceptance, field caps, and LEB128 decoding errors.
+- Reworked `fuzz_test.go` so Message A/B/C decoder and protocol fuzzers share the catalogue seed builders.
+- Moved malformed LEB128 coverage out of `strings_test.go` and into Message framing tests across roles A, B, and C.
+- Addressed RAS follow-ups before merge with `554dea5e0a8a14c77b5af660a3e2551d95be83f7` and `1edfb7641912bc269915786bdab64d047131ffa8`: sparse over-declared Message B associated-data coverage, explicit catalogue dispatch failures, and exact truncated-field diagnostics.
+
+**Validation**
+
+- Local gates passed on the PR branch: `task check`; after RAS follow-ups, `go test -run TestMessageFramingCatalogueRejectsMalformed -v ./...`, `go test ./...`, `task check`, and `git diff --check`.
+- GitHub checks on final head `1edfb7641912bc269915786bdab64d047131ffa8` were green: CI Check, DCO, Dependency Gate, SAST Gate, CodeQL Analyze/CodeQL, Staticcheck, macOS/Windows smoke; the gosec child check was neutral as expected.
+- RAS review-fix runs `20260613T203023-1da9e38f205b48430ec784fe`, `20260613T204452-218b22c25c13844f27dad5ed`, and `20260613T205302-e830df4d0d7e4a10e7809c39` completed. The final run reported no merge-blocking findings for PR #96 at `1edfb7641912bc269915786bdab64d047131ffa8`.
+
+**Next**
+
+- Optional non-blocking follow-up from the final RAS pass: add aggregate-size boundary catalogue cases for exactly `maxMessageLength` and `maxMessageLength+1` if the maintainer wants to exhaust the remaining low-severity test-hardening suggestion.
+- Keep the release evidence caveat intact: stronger release claims still require refreshing pinned dependency-review, fuzz, and security-audit evidence against the exact candidate commit.
