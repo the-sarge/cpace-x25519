@@ -999,3 +999,38 @@ PR #96 landed the Message framing test catalogue suggested by the architecture r
 
 - Optional non-blocking follow-up from the final RAS pass: add aggregate-size boundary catalogue cases for exactly `maxMessageLength` and `maxMessageLength+1` if the maintainer wants to exhaust the remaining low-severity test-hardening suggestion.
 - Keep the release evidence caveat intact: stronger release claims still require refreshing pinned dependency-review, fuzz, and security-audit evidence against the exact candidate commit.
+
+---
+
+## Package-owned cap policy ready - 2026-06-13 18:15 EDT
+
+**Branch:** `codex/package-owned-cap-policy`
+**PR:** #98
+**Actor:** Codex
+
+**Summary**
+
+PR #98 concentrates the internal Package-owned cap policy behind `caps.go` without changing public API, wire format, cap values, error identity, or error text. `normalizeConfig`, Message framing specs, catalogue tests, and message fuzz guards now read the same cap facts, while the aggregate `maxMessageLength` parser backstop remains in Message framing.
+
+**Completed**
+
+- Added `caps.go` with package-owned cap facts for caller-provided `Config` fields and package-owned Message A/B/C fields.
+- Updated `api.go` so `normalizeConfig` reads local input cap names and lengths from the cap policy while preserving validation order and diagnostic text.
+- Updated `framing.go` so `messageASpec`, `messageBSpec`, and `messageCSpec` read their field specs from the cap policy; LEB128 parsing, role checks, and `maxMessageLength` stayed in Message framing.
+- Added `caps_test.go` to pin shipped cap names, lengths, exact-vs-capped semantics, and Message framing spec usage.
+- Updated `api_test.go`, `framing_catalogue_test.go`, and `fuzz_test.go` so size-limit tests, catalogue cases, and message round-trip fuzz guards use cap-policy fields where they are testing package-owned field caps.
+- Added the Package-owned cap policy term to `CONTEXT.md`.
+- Addressed RAS review finding C-001 with signed-off commit `9e07b452f7f0c4fc2727a06ef54f57b276349492`, changing catalogue fixtures to use message-matched `aPoint`, `bPoint`, `bTag`, and `cTag` cap fields.
+- Addressed the GitHub SAST/gosec `-tests` G115 finding with signed-off commit `f76d7d683ec6ab201decb4ec718853a0651531c2`, keeping the over-declared Message B AD test on the cap-policy constant so gosec sees a compile-time-safe LEB128 length.
+
+**Validation**
+
+- Local gates passed after the signed-off rewrite and SAST fix: `go test ./...`, `go test -race ./...`, `task check`, `gosec -tests -fmt sarif -out /tmp/cpace-gosec.sarif . ./tools/releasepolicy`, and `git diff --check`.
+- `task check` included `scripts/test-release-helpers.sh`, `(cd tools/releasepolicy && go test ./...)`, release policy checker validation, `go vet ./...`, `staticcheck ./...`, `ast-grep scan --error`, and `govulncheck -test ./...`; Syft was not installed, so the helper script skipped only its optional real Syft SBOM validation path.
+- RAS review `20260613T220234-2d89640ea92a616f9cb7b8a6` on PR #98 found one non-blocking test clarity nit and no behavior-preservation, security, wire-format, cap-value, or error-text blocker.
+- RAS verify `20260613T220234-2d89640ea92a616f9cb7b8a6-verify-20260613T221245-cad99e71ff3e0e6351a3addf`, rerun against the later PR head `2193af0c72358df16f5a3a8edb4d2e913d7a01a7` before the signed-off rewrite, reported C-001 resolved, no still-open findings, and no new concerns; the subsequent signed-off rewrite preserves the reviewed diff content.
+
+**Next**
+
+- Merge PR #98 only with explicit maintainer authorization.
+- Keep the release evidence caveat intact: this is internal but security-relevant because it moves allocation and parsing-limit facts, so stronger release-readiness claims still require refreshing pinned dependency-review, fuzz, and security/spec-audit evidence against the exact candidate commit.
