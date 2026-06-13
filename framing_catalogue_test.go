@@ -65,7 +65,7 @@ func validMessageCForCatalogue() []byte {
 func messageFramingMalformedCases(target messageFramingTarget) []messageFramingCase {
 	valid := target.valid()
 	cases := []messageFramingCase{
-		{"truncated field", truncatedMessage(valid), "truncated"},
+		{"truncated field", truncatedMessage(valid), messageFramingFinalFieldTruncation(target.role)},
 		{"trailing data", append(clone(valid), 0), "trailing data"},
 		{"wrong format", withMessageHeader(valid, 0, wireSuite, target.role), "wrong wire format version"},
 		{"wrong suite", withMessageHeader(valid, wireFormatV1, 0, target.role), "wrong suite"},
@@ -83,6 +83,19 @@ func messageFramingLEB128Cases(role byte) []messageFramingCase {
 		{"non-canonical zero LEB128", append(messageHeader(role), 0x80, 0x00), "non-canonical LEB128"},
 		{"non-canonical value LEB128", append(append(messageHeader(role), 0xc0, 0x00), bytes.Repeat([]byte{0x99}, tagSize)...), "non-canonical LEB128"},
 		{"malformed LEB128", append(messageHeader(role), 0x80, 0x80, 0x80, 0x80, 0x00), "malformed LEB128"},
+	}
+}
+
+func messageFramingFinalFieldTruncation(role byte) string {
+	switch role {
+	case roleA:
+		return "truncated message A associated data field"
+	case roleB:
+		return "truncated message B tag field"
+	case roleC:
+		return "truncated message C tag field"
+	default:
+		return "truncated"
 	}
 }
 
