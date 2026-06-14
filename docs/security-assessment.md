@@ -87,11 +87,11 @@ Internally `scalarMultVFY` returns nil with a typed error on failure instead of 
 - `github.com/gtank/ristretto255 v0.2.0`
 - `filippo.io/edwards25519 v1.2.0` as an indirect dependency
 
-Dependency evidence freshness is indexed in `docs/evidence-baseline.md`. The current pinned package-code dependency/SAST baseline is Go 1.26.4 at `933ece246e6170b11e838395bf36f852cba0cd02`; see `docs/dependency-review.md`. It predates later security-relevant changes and must be refreshed against the exact candidate before any stronger release claim.
+Dependency evidence freshness is indexed in `docs/evidence-baseline.md`. The lane-specific dependency, vulnerability, and SAST/gosec summary lives in `docs/dependency-review.md`. Refresh those through the baseline module before any stronger release claim.
 
 ## Fuzzing
 
-Fuzz evidence freshness is indexed in `docs/evidence-baseline.md`. The current pinned paired long-fuzz baseline covers all 14 targets registered in `.github/fuzz-targets.json` under Go 1.26.4 at `933ece246e6170b11e838395bf36f852cba0cd02`; see `docs/fuzz-evidence.md`. Supplemental `v0.1.2` tag soak evidence remains historical prerelease evidence and is not current exact-candidate evidence for newer commits.
+Fuzz evidence freshness is indexed in `docs/evidence-baseline.md`. The lane-specific long-fuzz summary, target count, raw-log links, and historical prerelease soak notes live in `docs/fuzz-evidence.md`. Refresh those through the baseline module before any stronger release claim.
 
 ## Release Bar
 
