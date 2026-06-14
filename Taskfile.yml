@@ -138,6 +138,13 @@ tasks:
     cmds:
       - scripts/check-evidence-baseline.sh
 
+  evidence:lint:
+    desc: Run lint checks for the evidence baseline checker module
+    dir: tools/evidencebaseline
+    cmds:
+      - go vet ./...
+      - "{{.STATICCHECK}} ./..."
+
   quick:
     desc: Lightweight local iteration lane
     cmds:
@@ -169,13 +176,18 @@ tasks:
         fi
 
         docs_only=true
+        evidence_changed=false
         while IFS= read -r path; do
           [ -z "$path" ] && continue
+          case "$path" in
+            docs/evidence-baseline.md|docs/evidence/*)
+              evidence_changed=true
+              ;;
+          esac
           case "$path" in
             *.md|docs/*) ;;
             *)
               docs_only=false
-              break
               ;;
           esac
         done <<< "$changed_files"
@@ -187,6 +199,10 @@ tasks:
           echo "Code or workflow changes detected; running quick validation."
           task quick
         fi
+        if [ "$evidence_changed" = "true" ]; then
+          echo "Evidence baseline changes detected; running evidence baseline validation."
+          task evidence:baseline
+        fi
 
   check:
     desc: Full local validation gate, including release helper smoke tests
@@ -194,6 +210,7 @@ tasks:
       - task: docs:check
       - task: release:helpers
       - task: evidence:baseline
+      - task: evidence:lint
       - task: test
       - task: test:race
       - task: lint

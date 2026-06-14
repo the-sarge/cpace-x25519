@@ -10,15 +10,13 @@ Local validation uses `Taskfile.yml` as the command facade:
 
 - `task docs:check` validates tracked Markdown and whitespace.
 - `task quick` runs Go formatting checks, docs validation, and `go test ./...`.
-- `task check` runs docs validation, release-helper smoke tests, tests, race tests, formatting/import checks, `go vet`, Staticcheck, ast-grep rules, and `govulncheck`; it requires `jq` for CycloneDX SBOM JSON validation.
+- `task check` runs docs validation, release-helper smoke tests, evidence baseline validation, nested evidence-checker linting, tests, race tests, formatting/import checks, `go vet`, Staticcheck, ast-grep rules, and `govulncheck`; it requires `jq` for CycloneDX SBOM JSON validation.
 - `task fuzz` runs every fuzz target in `.github/fuzz-targets.json` with the
   caller-provided `FUZZTIME`, `PARALLEL`, and `FUZZ_RACE` settings.
 
 Repository CI runs on these events:
 
-- Pull requests to `main`: required `Check` runs for every PR. Code changes run
-  `go test ./...`; docs-only PRs run whitespace and Markdown validation. The
-  DCO workflow checks every PR commit for a `Signed-off-by` trailer.
+- Pull requests to `main`: required `Check` runs for every PR. The job sets up Go for every PR so docs-only and code-change PRs both run the evidence baseline validator; code changes also run `go test ./...`, while docs-only PRs otherwise run whitespace and Markdown validation. The DCO workflow checks every PR commit for a `Signed-off-by` trailer.
   `Dependency Gate` runs blocking SCA tooling, and `SAST Gate` runs blocking
   `gosec`.
 - Pull requests that touch Go code or Go module files: CodeQL and Staticcheck
@@ -41,10 +39,7 @@ docs.
 
 The intended required PR gates are:
 
-- `Check` in `.github/workflows/ci.yml`. It runs on GitHub-hosted Ubuntu
-  runners with read-only repository permissions. Code changes run
-  `go test ./...`; docs-only PRs run whitespace and Markdown validation without
-  setting up Go.
+- `Check` in `.github/workflows/ci.yml`. It runs on GitHub-hosted Ubuntu runners with read-only repository permissions. Every PR sets up Go and runs the evidence baseline validator; code changes also run `go test ./...`, while docs-only PRs otherwise run whitespace and Markdown validation.
 - `DCO` in `.github/workflows/dco.yml`. It checks every PR commit for a
   `Signed-off-by` trailer.
 - `Dependency Gate` in `.github/workflows/dependency-gate.yml`. It runs GitHub
