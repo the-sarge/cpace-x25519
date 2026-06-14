@@ -1,0 +1,11 @@
+# Generated from docs/evidence-baseline.md by tools/evidencebaseline --write-summary-docs.
+docs/capslock-report.md
+docs/ci-policy.md
+docs/dependency-review.md
+docs/external-review-handoff.md
+docs/fuzz-evidence.md
+docs/project-plan.md
+docs/release-checklist.md
+docs/security-assessment.md
+docs/security-spec-audit.md
+docs/spec-matrix.md

@@ -33,9 +33,43 @@ var (
 	sha256Hex   = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
 
+const summaryDocsManifestRef = "docs/evidence-baseline-summary-docs.txt"
+
 func main() {
 	repoRoot := flag.String("repo-root", "../..", "repository root")
+	listSummaryDocs := flag.Bool("list-summary-docs", false, "list summary docs parsed from the evidence baseline")
+	writeSummaryDocs := flag.Bool("write-summary-docs", false, "rewrite the summary-doc manifest from the evidence baseline")
 	flag.Parse()
+
+	if *listSummaryDocs && *writeSummaryDocs {
+		fmt.Fprintln(os.Stderr, "evidence baseline checker failed: --list-summary-docs and --write-summary-docs are mutually exclusive")
+		os.Exit(2)
+	}
+	if *listSummaryDocs || *writeSummaryDocs {
+		refs, findings, err := summaryDocsFromBaseline(*repoRoot)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "evidence baseline checker failed: %v\n", err)
+			os.Exit(2)
+		}
+		if len(findings) > 0 {
+			sortFindings(findings)
+			for _, f := range findings {
+				fmt.Fprintf(os.Stderr, "%s: %s\n", f.path, f.msg)
+			}
+			os.Exit(1)
+		}
+		if *writeSummaryDocs {
+			if err := writeSummaryDocsManifest(*repoRoot, refs); err != nil {
+				fmt.Fprintf(os.Stderr, "evidence baseline checker failed: %v\n", err)
+				os.Exit(2)
+			}
+			return
+		}
+		for _, ref := range refs {
+			fmt.Println(ref)
+		}
+		return
+	}
 
 	findings, err := checkRepo(*repoRoot)
 	if err != nil {
@@ -70,6 +104,7 @@ func checkRepo(repoRoot string) ([]finding, error) {
 	}
 
 	referencedBundles := map[string]bool{}
+	summaryDocSet := map[string]bool{}
 	for _, row := range rows {
 		rawRefs, rawFindings := evidenceRefs(row.rawCell, baselinePath+":"+row.lane)
 		findings = append(findings, rawFindings...)
@@ -97,6 +132,7 @@ func checkRepo(repoRoot string) ([]finding, error) {
 		docRefs, docFindings := summaryRefs(row.summaryCell, baselinePath+":"+row.lane)
 		findings = append(findings, docFindings...)
 		for _, ref := range docRefs {
+			summaryDocSet[ref] = true
 			_, info, pathFindings, err := lstatRepoRelative(repoRoot, ref, baselinePath+":"+row.lane)
 			if len(pathFindings) > 0 {
 				findings = append(findings, pathFindings...)
@@ -114,6 +150,7 @@ func checkRepo(repoRoot string) ([]finding, error) {
 			}
 		}
 	}
+	findings = append(findings, checkSummaryDocsManifest(repoRoot, sortedKeys(summaryDocSet))...)
 
 	allBundles, bundleFindings, err := discoverEvidenceBundles(repoRoot)
 	if err != nil {
@@ -129,6 +166,145 @@ func checkRepo(repoRoot string) ([]finding, error) {
 	}
 	sortFindings(findings)
 	return findings, nil
+}
+
+func summaryDocsFromBaseline(repoRoot string) ([]string, []finding, error) {
+	baselinePath := filepath.Join(repoRoot, "docs", "evidence-baseline.md")
+	rows, findings, err := parseBaselineIndex(baselinePath)
+	if err != nil {
+		return nil, nil, err
+	}
+	summaryDocSet := map[string]bool{}
+	for _, row := range rows {
+		refs, refFindings := summaryRefs(row.summaryCell, baselinePath+":"+row.lane)
+		findings = append(findings, refFindings...)
+		for _, ref := range refs {
+			summaryDocSet[ref] = true
+		}
+	}
+	return sortedKeys(summaryDocSet), findings, nil
+}
+
+func checkSummaryDocsManifest(repoRoot string, want []string) []finding {
+	got, findings, err := readSummaryDocsManifest(repoRoot)
+	if len(findings) > 0 {
+		return findings
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		return []finding{{path: summaryDocsManifestRef, msg: "summary-doc manifest is missing; run (cd tools/evidencebaseline && go run . --repo-root ../.. --write-summary-docs)"}}
+	}
+	if err != nil {
+		return []finding{{path: summaryDocsManifestRef, msg: err.Error()}}
+	}
+	if !sameStringSlice(got, want) {
+		return []finding{{path: summaryDocsManifestRef, msg: fmt.Sprintf("summary-doc manifest got %q, want %q; run (cd tools/evidencebaseline && go run . --repo-root ../.. --write-summary-docs)", got, want)}}
+	}
+	return nil
+}
+
+func readSummaryDocsManifest(repoRoot string) ([]string, []finding, error) {
+	full, info, pathFindings, err := lstatRepoRelative(repoRoot, summaryDocsManifestRef, summaryDocsManifestRef)
+	if len(pathFindings) > 0 {
+		return nil, pathFindings, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if info.Mode()&fs.ModeSymlink != 0 {
+		return nil, []finding{{path: summaryDocsManifestRef, msg: "summary-doc manifest must not be a symlink"}}, nil
+	}
+	if !info.Mode().IsRegular() {
+		return nil, []finding{{path: summaryDocsManifestRef, msg: "summary-doc manifest must be a regular file"}}, nil
+	}
+	in, err := os.ReadFile(full)
+	if err != nil {
+		return nil, nil, err
+	}
+	return parseSummaryDocsManifest(string(in))
+}
+
+func parseSummaryDocsManifest(content string) ([]string, []finding, error) {
+	var refs []string
+	var findings []finding
+	scanner := bufio.NewScanner(strings.NewReader(content))
+	lineNo := 0
+	for scanner.Scan() {
+		lineNo++
+		ref := scanner.Text()
+		if ref == "" || strings.HasPrefix(ref, "#") {
+			continue
+		}
+		if strings.TrimSpace(ref) != ref {
+			findings = append(findings, finding{path: fmt.Sprintf("%s:%d", summaryDocsManifestRef, lineNo), msg: "summary-doc manifest entries must not have leading or trailing whitespace"})
+			continue
+		}
+		refs = append(refs, ref)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, nil, err
+	}
+	return refs, findings, nil
+}
+
+func writeSummaryDocsManifest(repoRoot string, refs []string) error {
+	content := "# Generated from docs/evidence-baseline.md by tools/evidencebaseline --write-summary-docs.\n"
+	for _, ref := range refs {
+		content += ref + "\n"
+	}
+
+	path, err := summaryDocsManifestWritePath(repoRoot)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".evidence-baseline-summary-docs-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	removeTmp := true
+	defer func() {
+		if removeTmp {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmp.WriteString(content); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(0o644); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	removeTmp = false
+	return nil
+}
+
+func summaryDocsManifestWritePath(repoRoot string) (string, error) {
+	full, info, pathFindings, err := lstatRepoRelative(repoRoot, summaryDocsManifestRef, summaryDocsManifestRef)
+	if len(pathFindings) > 0 {
+		return "", errors.New(pathFindings[0].msg)
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		return full, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if info.Mode()&fs.ModeSymlink != 0 {
+		return "", fmt.Errorf("summary-doc manifest must not be a symlink")
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("summary-doc manifest must be a regular file")
+	}
+	return full, nil
 }
 
 func parseBaselineIndex(path string) ([]baselineRow, []finding, error) {
@@ -677,6 +853,15 @@ func sameStringSlice(got, want []string) bool {
 		}
 	}
 	return true
+}
+
+func sortedKeys(set map[string]bool) []string {
+	out := make([]string, 0, len(set))
+	for key := range set {
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func sortFindings(findings []finding) {

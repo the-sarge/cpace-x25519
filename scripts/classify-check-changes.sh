@@ -2,37 +2,19 @@
 set -eu
 
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-baseline="$repo_root/docs/evidence-baseline.md"
+summary_docs_manifest="$repo_root/docs/evidence-baseline-summary-docs.txt"
 
 summary_doc_refs() {
-  [ -f "$baseline" ] || return 0
-  refs=$(
-    awk -F '|' '
-    /^## / {
-      if (in_section) {
-        exit
-      }
-      in_section = ($0 == "## Baseline Index")
-      next
-    }
-    in_section && /^[[:space:]]*\|/ {
-      table_row++
-      if (table_row <= 2) {
-        next
-      }
-      cell = $5
-      while (match(cell, /`[^`]+`/)) {
-        ref = substr(cell, RSTART + 1, RLENGTH - 2)
-        while (sub(/^\.\//, "", ref)) {}
-        if (ref ~ /^docs\/.*\.md$/) {
-          print ref
-        }
-        cell = substr(cell, RSTART + RLENGTH)
-      }
-    }
-  ' "$baseline"
-  ) || return $?
-  [ -z "$refs" ] || printf '%s\n' "$refs" | sort -u
+  [ -f "$summary_docs_manifest" ] || {
+    echo "missing summary-doc manifest: docs/evidence-baseline-summary-docs.txt" >&2
+    return 2
+  }
+  while IFS= read -r ref || [ -n "$ref" ]; do
+    case "$ref" in
+      ""|\#*) continue ;;
+    esac
+    printf '%s\n' "$ref"
+  done <"$summary_docs_manifest" | sort -u
 }
 
 case "${1:-}" in
@@ -71,7 +53,7 @@ while IFS= read -r path; do
   changed=true
 
   case "$path" in
-    docs/evidence-baseline.md|docs/evidence/*)
+    docs/evidence-baseline.md|docs/evidence-baseline-summary-docs.txt|docs/evidence/*)
       evidence_changed=true
       ;;
     scripts/check-evidence-baseline.sh|tools/evidencebaseline/*)
