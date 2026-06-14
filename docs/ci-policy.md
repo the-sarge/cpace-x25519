@@ -16,7 +16,7 @@ Local validation uses `Taskfile.yml` as the command facade:
 
 Repository CI runs on these events:
 
-- Pull requests to `main`: required `Check` runs for every PR. The job sets up Go for every PR so docs-only and code-change PRs both run the evidence baseline validator; code changes also run `go test ./...`, while docs-only PRs otherwise run whitespace and Markdown validation. The DCO workflow checks every PR commit for a `Signed-off-by` trailer.
+- Pull requests to `main`: required `Check` runs for every PR. Code changes set up Go, run `go test ./...`, and run the evidence baseline validator. Docs-only PRs run whitespace and Markdown validation without Go unless they touch `docs/evidence-baseline.md` or `docs/evidence/**`, in which case the job also sets up Go and runs the evidence baseline validator. The DCO workflow checks every PR commit for a `Signed-off-by` trailer.
   `Dependency Gate` runs blocking SCA tooling, and `SAST Gate` runs blocking
   `gosec`.
 - Pull requests that touch Go code or Go module files: CodeQL and Staticcheck
@@ -39,7 +39,7 @@ docs.
 
 The intended required PR gates are:
 
-- `Check` in `.github/workflows/ci.yml`. It runs on GitHub-hosted Ubuntu runners with read-only repository permissions. Every PR sets up Go and runs the evidence baseline validator; code changes also run `go test ./...`, while docs-only PRs otherwise run whitespace and Markdown validation.
+- `Check` in `.github/workflows/ci.yml`. It runs on GitHub-hosted Ubuntu runners with read-only repository permissions. Code changes set up Go, run `go test ./...`, and run the evidence baseline validator. Docs-only PRs run whitespace and Markdown validation without Go unless they touch `docs/evidence-baseline.md` or `docs/evidence/**`, in which case the job also sets up Go and runs the evidence baseline validator.
 - `DCO` in `.github/workflows/dco.yml`. It checks every PR commit for a
   `Signed-off-by` trailer.
 - `Dependency Gate` in `.github/workflows/dependency-gate.yml`. It runs GitHub
