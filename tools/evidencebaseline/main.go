@@ -54,6 +54,16 @@ func main() {
 
 func checkRepo(repoRoot string) ([]finding, error) {
 	baselinePath := filepath.Join(repoRoot, "docs", "evidence-baseline.md")
+	if _, info, pathFindings, err := lstatRepoRelative(repoRoot, "docs/evidence-baseline.md", "docs/evidence-baseline.md"); err != nil {
+		return nil, err
+	} else if len(pathFindings) > 0 {
+		return pathFindings, nil
+	} else if info.Mode()&fs.ModeSymlink != 0 {
+		return []finding{{path: "docs/evidence-baseline.md", msg: "evidence baseline file must not be a symlink"}}, nil
+	} else if !info.Mode().IsRegular() {
+		return []finding{{path: "docs/evidence-baseline.md", msg: "evidence baseline file must be a regular file"}}, nil
+	}
+
 	rows, findings, err := parseBaselineIndex(baselinePath)
 	if err != nil {
 		return nil, err
@@ -64,8 +74,11 @@ func checkRepo(repoRoot string) ([]finding, error) {
 		rawRefs, rawFindings := evidenceRefs(row.rawCell, baselinePath+":"+row.lane)
 		findings = append(findings, rawFindings...)
 		for _, ref := range rawRefs {
-			full := filepath.Join(repoRoot, filepath.FromSlash(ref))
-			info, err := os.Lstat(full)
+			_, info, pathFindings, err := lstatRepoRelative(repoRoot, ref, baselinePath+":"+row.lane)
+			if len(pathFindings) > 0 {
+				findings = append(findings, pathFindings...)
+				continue
+			}
 			switch {
 			case errors.Is(err, fs.ErrNotExist):
 				findings = append(findings, finding{path: baselinePath + ":" + row.lane, msg: "referenced raw artifact does not exist: " + ref})
@@ -84,8 +97,11 @@ func checkRepo(repoRoot string) ([]finding, error) {
 		docRefs, docFindings := summaryRefs(row.summaryCell, baselinePath+":"+row.lane)
 		findings = append(findings, docFindings...)
 		for _, ref := range docRefs {
-			full := filepath.Join(repoRoot, filepath.FromSlash(ref))
-			info, err := os.Lstat(full)
+			_, info, pathFindings, err := lstatRepoRelative(repoRoot, ref, baselinePath+":"+row.lane)
+			if len(pathFindings) > 0 {
+				findings = append(findings, pathFindings...)
+				continue
+			}
 			switch {
 			case errors.Is(err, fs.ErrNotExist):
 				findings = append(findings, finding{path: baselinePath + ":" + row.lane, msg: "referenced summary doc does not exist: " + ref})
@@ -99,10 +115,11 @@ func checkRepo(repoRoot string) ([]finding, error) {
 		}
 	}
 
-	allBundles, err := discoverEvidenceBundles(repoRoot)
+	allBundles, bundleFindings, err := discoverEvidenceBundles(repoRoot)
 	if err != nil {
 		return nil, err
 	}
+	findings = append(findings, bundleFindings...)
 	for _, bundle := range allBundles {
 		referencedBundles[bundle] = true
 	}
@@ -246,7 +263,7 @@ func filteredBacktickRefs(cell, findingPath string, keep func(string) bool) ([]s
 
 		ref := trimLeadingDotSlash(raw)
 		if !keep(ref) {
-			if looksLikeUnsafeKeptRef(ref, keep) {
+			if looksLikeUnsafeRepoRef(ref) {
 				findings = append(findings, finding{path: findingPath, msg: "unsafe baseline ref: " + raw})
 			}
 			continue
@@ -269,15 +286,12 @@ func trimLeadingDotSlash(ref string) string {
 	return ref
 }
 
-func looksLikeUnsafeKeptRef(ref string, keep func(string) bool) bool {
+func looksLikeUnsafeRepoRef(ref string) bool {
 	if safeRepoRelativeRef(ref) {
 		return false
 	}
-	if strings.HasPrefix(ref, "/") && keep(strings.TrimLeft(ref, "/")) {
-		return true
-	}
 	candidate := strings.TrimLeft(ref, "/")
-	return strings.Contains(candidate, "docs/")
+	return strings.HasPrefix(candidate, "docs/")
 }
 
 func safeRepoRelativeRef(ref string) bool {
@@ -323,11 +337,59 @@ func evidenceBundleForRef(ref string, info os.FileInfo) string {
 	return ""
 }
 
-func discoverEvidenceBundles(repoRoot string) ([]string, error) {
-	root := filepath.Join(repoRoot, "docs", "evidence")
+func lstatRepoRelative(repoRoot, ref, findingPath string) (string, fs.FileInfo, []finding, error) {
+	if !safeRepoRelativeRef(ref) {
+		return "", nil, []finding{{path: findingPath, msg: "unsafe repository path: " + ref}}, nil
+	}
+
+	clean := strings.TrimSuffix(ref, "/")
+	parts := strings.Split(clean, "/")
+	full := repoRoot
+	for i, part := range parts {
+		full = filepath.Join(full, part)
+		info, err := os.Lstat(full)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) && i < len(parts)-1 {
+				parent := strings.Join(parts[:i+1], "/")
+				return "", nil, []finding{{path: findingPath, msg: "repository path parent does not exist: " + parent}}, nil
+			}
+			return full, nil, nil, err
+		}
+		if i < len(parts)-1 {
+			parent := strings.Join(parts[:i+1], "/")
+			if info.Mode()&fs.ModeSymlink != 0 {
+				return "", nil, []finding{{path: findingPath, msg: "repository path contains symlinked parent: " + parent}}, nil
+			}
+			if !info.IsDir() {
+				return "", nil, []finding{{path: findingPath, msg: "repository path parent is not a directory: " + parent}}, nil
+			}
+		}
+		if i == len(parts)-1 {
+			return full, info, nil, nil
+		}
+	}
+	return "", nil, []finding{{path: findingPath, msg: "repository path is empty: " + ref}}, nil
+}
+
+func discoverEvidenceBundles(repoRoot string) ([]string, []finding, error) {
+	const rootRef = "docs/evidence"
+	root, info, pathFindings, err := lstatRepoRelative(repoRoot, rootRef, rootRef)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(pathFindings) > 0 {
+		return nil, pathFindings, nil
+	}
+	if info.Mode()&fs.ModeSymlink != 0 {
+		return nil, []finding{{path: rootRef, msg: "evidence directory must not be a symlink"}}, nil
+	}
+	if !info.IsDir() {
+		return nil, []finding{{path: rootRef, msg: "evidence directory is not a directory"}}, nil
+	}
+
 	entries, err := os.ReadDir(root)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var bundles []string
 	for _, entry := range entries {
@@ -340,14 +402,16 @@ func discoverEvidenceBundles(repoRoot string) ([]string, error) {
 		bundles = append(bundles, "docs/evidence/"+entry.Name())
 	}
 	sort.Strings(bundles)
-	return bundles, nil
+	return bundles, nil, nil
 }
 
 func checkBundle(repoRoot, bundle string) []finding {
-	bundlePath := filepath.Join(repoRoot, filepath.FromSlash(bundle))
 	var findings []finding
 
-	info, err := os.Lstat(bundlePath)
+	bundlePath, info, pathFindings, err := lstatRepoRelative(repoRoot, bundle, bundle)
+	if len(pathFindings) > 0 {
+		return pathFindings
+	}
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return []finding{{path: bundle, msg: "evidence bundle root does not exist"}}

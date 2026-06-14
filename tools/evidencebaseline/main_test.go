@@ -251,6 +251,28 @@ func TestEvidenceBaselineRejectsSymlinkedBundleRoot(t *testing.T) {
 	requireFinding(t, findings, "evidence bundle root must not be a symlink")
 }
 
+func TestEvidenceBaselineRejectsSymlinkedEvidenceDirectory(t *testing.T) {
+	repoRoot := validFixtureRepo(t)
+	outside := filepath.Join(repoRoot, "outside-evidence", "candidate")
+	writeFile(t, filepath.Join(outside, "README.md"), "# Outside Evidence\n")
+	writeFile(t, filepath.Join(outside, "analysis.log"), "analysis\n")
+	writeFile(t, filepath.Join(outside, "fuzz.log"), "fuzz\n")
+	writeSHA256SUMS(t, outside, "analysis.log", "fuzz.log")
+
+	evidenceDir := filepath.Join(repoRoot, "docs", "evidence")
+	removeAll(t, evidenceDir)
+	if err := os.Symlink(filepath.Join(repoRoot, "outside-evidence"), evidenceDir); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireFinding(t, findings, "docs/evidence")
+	requireFinding(t, findings, "symlink")
+}
+
 func TestEvidenceBaselineRejectsSymlinkedControlFiles(t *testing.T) {
 	tests := []struct {
 		name string
@@ -312,6 +334,20 @@ func TestEvidenceBaselineRejectsUnsafeBaselineRef(t *testing.T) {
 		t.Fatal(err)
 	}
 	requireFinding(t, findings, "unsafe baseline ref")
+}
+
+func TestEvidenceBaselineAllowsNonRepoBacktickURLContainingDocsPath(t *testing.T) {
+	repoRoot := validFixtureRepo(t)
+	baseline := filepath.Join(repoRoot, "docs", "evidence-baseline.md")
+	replaceInFile(t, baseline, "`docs/evidence/candidate/analysis.log`", "`docs/evidence/candidate/analysis.log`, `https://example.invalid/archive/docs/run`")
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) > 0 {
+		t.Fatalf("expected URL token to be ignored, got %#v", findings)
+	}
 }
 
 func TestEvidenceBaselineParserRejectsMalformedBaselineHeader(t *testing.T) {
