@@ -251,11 +251,60 @@ func writeSummaryDocsManifest(repoRoot string, refs []string) error {
 	for _, ref := range refs {
 		content += ref + "\n"
 	}
-	path := filepath.Join(repoRoot, summaryDocsManifestRef)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+
+	path, err := summaryDocsManifestWritePath(repoRoot)
+	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(content), 0o644)
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".evidence-baseline-summary-docs-*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	removeTmp := true
+	defer func() {
+		if removeTmp {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmp.WriteString(content); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(0o644); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	removeTmp = false
+	return nil
+}
+
+func summaryDocsManifestWritePath(repoRoot string) (string, error) {
+	full, info, pathFindings, err := lstatRepoRelative(repoRoot, summaryDocsManifestRef, summaryDocsManifestRef)
+	if len(pathFindings) > 0 {
+		return "", errors.New(pathFindings[0].msg)
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		return full, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if info.Mode()&fs.ModeSymlink != 0 {
+		return "", fmt.Errorf("summary-doc manifest must not be a symlink")
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("summary-doc manifest must be a regular file")
+	}
+	return full, nil
 }
 
 func parseBaselineIndex(path string) ([]baselineRow, []finding, error) {

@@ -161,6 +161,73 @@ func TestEvidenceBaselineWriteSummaryDocsFlagRoundTrip(t *testing.T) {
 	}
 }
 
+func TestEvidenceBaselineWriteSummaryDocsRejectsManifestSymlink(t *testing.T) {
+	repoRoot := validFixtureRepo(t)
+	outside := filepath.Join(repoRoot, "outside-summary-docs.txt")
+	outsideContent := "outside target\n"
+	writeFile(t, outside, outsideContent)
+	manifest := filepath.Join(repoRoot, summaryDocsManifestRef)
+	remove(t, manifest)
+	if err := os.Symlink(outside, manifest); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	cmd := exec.Command("go", "run", ".", "--repo-root", repoRoot, "--write-summary-docs")
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected symlinked manifest write to fail, got success:\n%s", out)
+	}
+	if !strings.Contains(string(out), "summary-doc manifest must not be a symlink") {
+		t.Fatalf("expected symlink error, got:\n%s", out)
+	}
+	got, err := os.ReadFile(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != outsideContent {
+		t.Fatalf("outside target changed:\ngot:\n%s\nwant:\n%s", got, outsideContent)
+	}
+}
+
+func TestEvidenceBaselineWriteSummaryDocsRejectsUnsafeManifestPaths(t *testing.T) {
+	t.Run("symlinked parent", func(t *testing.T) {
+		repoRoot := validFixtureRepo(t)
+		docs := filepath.Join(repoRoot, "docs")
+		realDocs := filepath.Join(repoRoot, "real-docs")
+		if err := os.Rename(docs, realDocs); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(realDocs, docs); err != nil {
+			t.Skipf("symlink unavailable: %v", err)
+		}
+
+		err := writeSummaryDocsManifest(repoRoot, []string{"docs/dependency-review.md"})
+		if err == nil {
+			t.Fatal("expected symlinked parent to fail")
+		}
+		if !strings.Contains(err.Error(), "symlinked parent") {
+			t.Fatalf("expected symlinked parent error, got %v", err)
+		}
+	})
+
+	t.Run("non-regular manifest", func(t *testing.T) {
+		repoRoot := validFixtureRepo(t)
+		manifest := filepath.Join(repoRoot, summaryDocsManifestRef)
+		remove(t, manifest)
+		if err := os.Mkdir(manifest, 0o755); err != nil {
+			t.Fatal(err)
+		}
+
+		err := writeSummaryDocsManifest(repoRoot, []string{"docs/dependency-review.md"})
+		if err == nil {
+			t.Fatal("expected non-regular manifest to fail")
+		}
+		if !strings.Contains(err.Error(), "regular file") {
+			t.Fatalf("expected regular-file error, got %v", err)
+		}
+	})
+}
+
 func TestEvidenceBaselineRejectsMutuallyExclusiveSummaryDocFlags(t *testing.T) {
 	cmd := exec.Command("go", "run", ".", "--list-summary-docs", "--write-summary-docs")
 	out, err := cmd.CombinedOutput()
