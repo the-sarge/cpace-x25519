@@ -89,24 +89,11 @@ Internally `scalarMultVFY` returns nil with a typed error on failure instead of 
 - `github.com/gtank/ristretto255 v0.2.0`
 - `filippo.io/edwards25519 v1.2.0` as an indirect dependency
 
-Dependency review was refreshed on 2026-05-08 at commit
-`2e09774f171dde8c62763d6e35a258b0fef88801` under Go 1.26.3; see
-`docs/dependency-review.md`. `govulncheck -test -show verbose ./...` found no
-vulnerabilities, and the pinned `gosec@v2.26.1` command reported zero issues.
-Repeat the review against the exact release tag if any dependency, toolchain, or
-parser/security-relevant code changes before release.
+Dependency evidence freshness is indexed in `docs/evidence-baseline.md`. The current pinned package-code dependency/SAST baseline is Go 1.26.4 at `933ece246e6170b11e838395bf36f852cba0cd02`; see `docs/dependency-review.md`. It predates later security-relevant changes and must be refreshed against the exact candidate before any stronger release claim.
 
 ## Fuzzing
 
-Fuzz target evidence is recorded in `docs/fuzz-evidence.md`. The current paired
-release-readiness run covers all 14 targets registered in
-`.github/fuzz-targets.json` at commit
-`2e09774f171dde8c62763d6e35a258b0fef88801`, with paired one-hour Go 1.26.3
-long runs on ARM and Intel maintainer machines. Supplemental `v0.1.2` tag soak
-evidence at commit `4e661bc1f925ebedf1f270668129d85bab73e468` ran
-`FUZZTIME=4h` across all 14 targets on ARM and Intel hosts; ARM passed all
-targets, while the Intel all-target run ended with a `FuzzProtocolConsistency`
-deadline failure followed by a clean same-host 4-hour targeted rerun.
+Fuzz evidence freshness is indexed in `docs/evidence-baseline.md`. The current pinned paired long-fuzz baseline covers all 14 targets registered in `.github/fuzz-targets.json` under Go 1.26.4 at `933ece246e6170b11e838395bf36f852cba0cd02`; see `docs/fuzz-evidence.md`. Supplemental `v0.1.2` tag soak evidence remains historical prerelease evidence and is not current exact-candidate evidence for newer commits.
 
 ## Release Bar
 

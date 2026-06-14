@@ -13,6 +13,8 @@ Supplemental tag commit: `4e661bc1f925ebedf1f270668129d85bab73e468`
 
 Registered fuzz targets: 14 from `.github/fuzz-targets.json`
 
+Baseline status: `docs/evidence-baseline.md` is the current source of truth for whether these pinned fuzz runs are fresh for the latest release candidate.
+
 ## Command
 
 - `FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=1h PARALLEL=1 task fuzz` (current Go 1.26.4 baseline runs)

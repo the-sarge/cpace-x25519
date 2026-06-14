@@ -113,6 +113,8 @@ instructions live in `docs/release-verification.md`. Project governance,
 security-gate, and VEX policies live in `docs/governance.md`,
 `docs/security-gates.md`, and `docs/vex.md`.
 
+Current pinned evidence baselines and freshness caveats are indexed in `docs/evidence-baseline.md`.
+
 ```go
 initiator, msgA, err := cpace.Start(initCfg)
 responder, msgB, err := cpace.Respond(respCfg, msgA)

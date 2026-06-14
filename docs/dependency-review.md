@@ -12,6 +12,8 @@ Toolchain: Go 1.26.4 (`darwin/arm64`)
 
 Transcript: `docs/evidence/go1264-20260611/local-analysis.log`
 
+Baseline status: `docs/evidence-baseline.md` is the current source of truth for whether this pinned review is fresh for the latest release candidate.
+
 Dependencies:
 
 | Module | Version | Role | Notes |

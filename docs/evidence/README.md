@@ -5,6 +5,8 @@ refreshes, and other review packets that need more than a handwritten summary.
 Evidence summaries in `docs/*.md` should point to these artifacts or to
 immutable GitHub workflow runs.
 
+The current pinned evidence baseline index lives in `../evidence-baseline.md`; this directory remains the raw-artifact store.
+
 ## Evidence Modes
 
 Use one or both of these modes for exact-candidate evidence:
