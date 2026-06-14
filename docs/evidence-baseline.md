@@ -36,5 +36,6 @@ When refreshing evidence for a candidate:
 1. Identify the exact candidate commit and update this module first.
 2. Preserve raw logs or immutable workflow links according to `docs/evidence/README.md`.
 3. Update the lane-specific summary docs named in the Baseline Index.
-4. Update `docs/project-plan.md` and `docs/external-review-handoff.md` only when the release-readiness posture or external-review packet changes.
-5. Keep superseded baselines visible until the new evidence has its own raw artifacts, checksums or immutable workflow links, and residual-risk wording.
+4. Regenerate `docs/evidence-baseline-summary-docs.txt` with `(cd tools/evidencebaseline && go run . --repo-root ../.. --write-summary-docs)`; the CI change classifier reads this generated adapter before Go is set up, while this module remains the source of truth.
+5. Update `docs/project-plan.md` and `docs/external-review-handoff.md` only when the release-readiness posture or external-review packet changes.
+6. Keep superseded baselines visible until the new evidence has its own raw artifacts, checksums or immutable workflow links, and residual-risk wording.

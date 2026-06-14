@@ -37,6 +37,7 @@ assert_classification() {
 
 assert_classification ordinary-doc "docs/governance.md" true false false
 assert_classification evidence-baseline "docs/evidence-baseline.md" true true false
+assert_classification evidence-summary-doc-manifest "docs/evidence-baseline-summary-docs.txt" true true false
 assert_classification evidence-bundle "docs/evidence/go1264-20260611/local-analysis.log" true true false
 assert_classification summary-doc "docs/dependency-review.md" true true false
 assert_classification evidence-checker "tools/evidencebaseline/main.go" false true true
@@ -63,17 +64,8 @@ fakebin="$tmpdir/fakebin"
 mkdir "$fakebin"
 printf '#!/bin/sh\nexit 42\n' >"$fakebin/awk"
 chmod +x "$fakebin/awk"
-if PATH="$fakebin:$PATH" "$repo_root/scripts/classify-check-changes.sh" --list-summary-docs >"$tmpdir/awk-failure.out" 2>"$tmpdir/awk-failure.err"; then
-  echo "expected classifier to fail when awk fails" >&2
-  exit 1
-else
-  status=$?
-fi
-[ "$status" -eq 42 ] || {
-  echo "expected awk failure status 42, got $status" >&2
-  cat "$tmpdir/awk-failure.out" >&2
-  cat "$tmpdir/awk-failure.err" >&2
-  exit 1
-}
+PATH="$fakebin:$PATH" "$repo_root/scripts/classify-check-changes.sh" --list-summary-docs >"$tmpdir/no-awk.out"
+grep -Fxq "docs/dependency-review.md" "$tmpdir/no-awk.out"
+grep -Fxq "docs/fuzz-evidence.md" "$tmpdir/no-awk.out"
 
 echo "CI change classifier tests passed"

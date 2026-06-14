@@ -98,6 +98,29 @@ func TestEvidenceBaselineRejectsMissingSummaryDoc(t *testing.T) {
 	requireFinding(t, findings, "referenced summary doc does not exist")
 }
 
+func TestEvidenceBaselineRejectsMissingSummaryDocsManifest(t *testing.T) {
+	repoRoot := validFixtureRepo(t)
+	remove(t, filepath.Join(repoRoot, summaryDocsManifestRef))
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireFinding(t, findings, "summary-doc manifest is missing")
+}
+
+func TestEvidenceBaselineRejectsStaleSummaryDocsManifest(t *testing.T) {
+	repoRoot := validFixtureRepo(t)
+	writeFile(t, filepath.Join(repoRoot, summaryDocsManifestRef), "docs/dependency-review.md\n")
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireFinding(t, findings, "summary-doc manifest got")
+	requireFinding(t, findings, "docs/fuzz-evidence.md")
+}
+
 func TestEvidenceBaselineRejectsSymlinkedSummaryDoc(t *testing.T) {
 	repoRoot := validFixtureRepo(t)
 	outside := filepath.Join(repoRoot, "outside-summary.md")
@@ -520,6 +543,12 @@ func validFixtureRepo(t *testing.T) string {
 		"Keep this short in fixtures.",
 		"",
 	}, "\n"))
+	writeFile(t, filepath.Join(repoRoot, summaryDocsManifestRef), strings.Join([]string{
+		"# Generated from docs/evidence-baseline.md by tools/evidencebaseline --write-summary-docs.",
+		"docs/dependency-review.md",
+		"docs/fuzz-evidence.md",
+		"",
+	}, "\n"))
 	return repoRoot
 }
 
@@ -560,15 +589,6 @@ func rejectFinding(t *testing.T, findings []finding, unwanted string) {
 			t.Fatalf("unexpected finding containing %q; got %#v", unwanted, findings)
 		}
 	}
-}
-
-func sortedKeys(set map[string]bool) []string {
-	out := make([]string, 0, len(set))
-	for key := range set {
-		out = append(out, key)
-	}
-	sort.Strings(out)
-	return out
 }
 
 func writeFile(t *testing.T, path, content string) {
