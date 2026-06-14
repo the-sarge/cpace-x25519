@@ -37,32 +37,18 @@ jobs:
           evidence_changed=false
 
           if [ "${{ github.event_name }}" = "pull_request" ] && git rev-parse --verify HEAD^1 >/dev/null 2>&1; then
-            changed_files="$(git diff --name-only HEAD^1 HEAD)"
-            docs_only=true
-
-            if [ -z "$changed_files" ]; then
-              docs_only=false
-            else
-              while IFS= read -r path; do
-                [ -z "$path" ] && continue
-                case "$path" in
-                  docs/evidence-baseline.md|docs/evidence/*)
-                    evidence_changed=true
-                    ;;
-                esac
-                case "$path" in
-                  *.md|docs/*) ;;
-                  *)
-                    docs_only=false
-                    break
-                    ;;
-                esac
-              done <<< "$changed_files"
-            fi
+            changed_files="$(git diff --name-only --no-renames HEAD^1 HEAD)"
+            classification="$(printf '%s\n' "$changed_files" | scripts/classify-check-changes.sh)"
+            printf '%s\n' "$classification"
+            printf '%s\n' "$classification" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
-          echo "evidence_changed=$evidence_changed" >> "$GITHUB_OUTPUT"
+          {
+            echo "docs_only=$docs_only"
+            echo "evidence_changed=$evidence_changed"
+            echo "evidence_checker_changed=false"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up Go
         if: steps.changes.outputs.docs_only != 'true' || steps.changes.outputs.evidence_changed == 'true'
@@ -82,12 +68,13 @@ jobs:
           import subprocess
 
           changed = subprocess.check_output(
-              ["git", "diff", "--name-only", "HEAD^1", "HEAD"],
+              ["git", "diff", "--name-only", "--no-renames", "HEAD^1", "HEAD"],
               text=True,
           ).splitlines()
           for path in changed:
-              if path.endswith(".md"):
-                  pathlib.Path(path).read_text(encoding="utf-8")
+              candidate = pathlib.Path(path)
+              if path.endswith(".md") and candidate.exists():
+                  candidate.read_text(encoding="utf-8")
           PY
 
       - name: Report Go environment
@@ -100,9 +87,11 @@ jobs:
         if: steps.changes.outputs.docs_only != 'true'
         run: go test ./...
 
-      - name: Run release helper smoke tests
+      - name: Run shell helper smoke tests
         if: steps.changes.outputs.docs_only != 'true'
-        run: scripts/test-release-helpers.sh
+        run: |
+          scripts/test-release-helpers.sh
+          scripts/test-ci-classifier.sh
 
       - name: Run evidence baseline checker
         if: steps.changes.outputs.docs_only != 'true' || steps.changes.outputs.evidence_changed == 'true'

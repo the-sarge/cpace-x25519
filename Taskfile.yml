@@ -133,6 +133,11 @@ tasks:
     cmds:
       - scripts/test-release-helpers.sh
 
+  ci:classifier:
+    desc: Run CI change classifier tests
+    cmds:
+      - scripts/test-ci-classifier.sh
+
   evidence:baseline:
     desc: Validate the pinned evidence baseline index and committed evidence bundles
     cmds:
@@ -150,6 +155,7 @@ tasks:
     cmds:
       - task: lint:gofmt
       - task: docs:check
+      - task: ci:classifier
       - task: quick-test
 
   check:changed:
@@ -161,41 +167,16 @@ tasks:
         changed_files="$(
           {
             if git rev-parse --verify "$base" >/dev/null 2>&1; then
-              git diff --name-only "$base"...HEAD
+              git diff --name-only --no-renames "$base"...HEAD
             fi
-            git diff --name-only
-            git diff --cached --name-only
+            git diff --name-only --no-renames
+            git diff --cached --name-only --no-renames
             git ls-files --others --exclude-standard
           } | sort -u
         )"
 
-        if [ -z "$changed_files" ]; then
-          echo "No changed files detected; running quick validation."
-          task quick
-          exit 0
-        fi
-
-        docs_only=true
-        evidence_changed=false
-        evidence_checker_changed=false
-        while IFS= read -r path; do
-          [ -z "$path" ] && continue
-          case "$path" in
-            docs/evidence-baseline.md|docs/evidence/*)
-              evidence_changed=true
-              ;;
-            scripts/check-evidence-baseline.sh|tools/evidencebaseline/*)
-              evidence_changed=true
-              evidence_checker_changed=true
-              ;;
-          esac
-          case "$path" in
-            *.md|docs/*) ;;
-            *)
-              docs_only=false
-              ;;
-          esac
-        done <<< "$changed_files"
+        classification="$(printf '%s\n' "$changed_files" | scripts/classify-check-changes.sh)"
+        eval "$classification"
 
         if [ "$docs_only" = "true" ]; then
           echo "Docs-only changes detected; running docs validation."
@@ -218,6 +199,7 @@ tasks:
     cmds:
       - task: docs:check
       - task: release:helpers
+      - task: ci:classifier
       - task: evidence:baseline
       - task: evidence:lint
       - task: test
