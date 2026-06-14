@@ -139,7 +139,7 @@ func parseBaselineIndex(path string) ([]baselineRow, []finding, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, nil, err
 	}
-	if len(tableLines) < 3 {
+	if len(tableLines) == 0 {
 		return nil, []finding{{path: path, msg: "Baseline Index table is missing or empty"}}, nil
 	}
 
@@ -152,7 +152,18 @@ func parseBaselineIndex(path string) ([]baselineRow, []finding, error) {
 	var rows []baselineRow
 	var findings []finding
 	seenLane := map[string]bool{}
-	for _, line := range tableLines[2:] {
+	dataStart := 2
+	if len(tableLines) < 2 {
+		findings = append(findings, finding{path: path, msg: "Baseline Index separator is missing"})
+		dataStart = 1
+	} else {
+		separator := splitTableRow(tableLines[1])
+		if !validTableSeparator(separator, len(wantHeader)) {
+			findings = append(findings, finding{path: path, msg: fmt.Sprintf("Baseline Index separator got %q, want %d Markdown separator columns", separator, len(wantHeader))})
+			dataStart = 1
+		}
+	}
+	for _, line := range tableLines[dataStart:] {
 		cells := splitTableRow(line)
 		if len(cells) != len(wantHeader) {
 			findings = append(findings, finding{path: path, msg: "Baseline Index row has wrong column count: " + line})
@@ -177,6 +188,26 @@ func parseBaselineIndex(path string) ([]baselineRow, []finding, error) {
 		findings = append(findings, finding{path: path, msg: "Baseline Index contains no evidence rows"})
 	}
 	return rows, findings, nil
+}
+
+func validTableSeparator(cells []string, wantCols int) bool {
+	if len(cells) != wantCols {
+		return false
+	}
+	for _, cell := range cells {
+		cell = strings.TrimSpace(cell)
+		cell = strings.TrimPrefix(cell, ":")
+		cell = strings.TrimSuffix(cell, ":")
+		if len(cell) < 3 {
+			return false
+		}
+		for _, r := range cell {
+			if r != '-' {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func splitTableRow(line string) []string {
@@ -331,6 +362,9 @@ func checkBundle(repoRoot, bundle string) []finding {
 	readmeFindings, _ := validateBundleControlFile(bundlePath, bundle, "README.md")
 	findings = append(findings, readmeFindings...)
 
+	sigFindings := validateOptionalBundleControlFile(bundlePath, bundle, "SHA256SUMS.sig")
+	findings = append(findings, sigFindings...)
+
 	sumPath := filepath.Join(bundlePath, "SHA256SUMS")
 	sumFileFindings, ok := validateBundleControlFile(bundlePath, bundle, "SHA256SUMS")
 	findings = append(findings, sumFileFindings...)
@@ -381,6 +415,23 @@ func validateBundleControlFile(bundlePath, bundle, name string) ([]finding, bool
 		return []finding{{path: bundle + "/" + name, msg: "evidence bundle control file must be a regular file"}}, false
 	default:
 		return nil, true
+	}
+}
+
+func validateOptionalBundleControlFile(bundlePath, bundle, name string) []finding {
+	path := filepath.Join(bundlePath, name)
+	info, err := os.Lstat(path)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return nil
+	case err != nil:
+		return []finding{{path: bundle + "/" + name, msg: err.Error()}}
+	case info.Mode()&fs.ModeSymlink != 0:
+		return []finding{{path: bundle + "/" + name, msg: "evidence bundle control file must not be a symlink"}}
+	case !info.Mode().IsRegular():
+		return []finding{{path: bundle + "/" + name, msg: "evidence bundle control file must be a regular file"}}
+	default:
+		return nil
 	}
 }
 

@@ -32,6 +32,19 @@ summary_doc_refs() {
   ' "$baseline" | sort -u
 }
 
+case "${1:-}" in
+  "")
+    ;;
+  --list-summary-docs)
+    summary_doc_refs
+    exit 0
+    ;;
+  *)
+    echo "usage: $0 [--list-summary-docs]" >&2
+    exit 2
+    ;;
+esac
+
 summary_docs="
 $(summary_doc_refs)
 "

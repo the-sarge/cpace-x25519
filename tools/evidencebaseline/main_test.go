@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -36,6 +38,52 @@ func TestEvidenceBaselineAcceptsValidFixture(t *testing.T) {
 	}
 	if len(findings) > 0 {
 		t.Fatalf("expected clean fixture, got %#v", findings)
+	}
+}
+
+func TestSummaryDocClassifierRefsMatchBaselineParser(t *testing.T) {
+	repoRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	baselinePath := filepath.Join(repoRoot, "docs", "evidence-baseline.md")
+	if _, err := os.Stat(baselinePath); err != nil {
+		if os.IsNotExist(err) {
+			t.Skip("repository evidence baseline is not present")
+		}
+		t.Fatal(err)
+	}
+
+	rows, findings, err := parseBaselineIndex(baselinePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) > 0 {
+		t.Fatalf("repository Baseline Index parser findings: %#v", findings)
+	}
+
+	wantSet := map[string]bool{}
+	for _, row := range rows {
+		refs, refFindings := summaryRefs(row.summaryCell, baselinePath+":"+row.lane)
+		if len(refFindings) > 0 {
+			t.Fatalf("repository summary ref findings: %#v", refFindings)
+		}
+		for _, ref := range refs {
+			wantSet[ref] = true
+		}
+	}
+	want := sortedKeys(wantSet)
+
+	cmd := exec.Command(filepath.Join(repoRoot, "scripts", "classify-check-changes.sh"), "--list-summary-docs")
+	cmd.Dir = repoRoot
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Fields(string(out))
+	sort.Strings(got)
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("summary doc parser drift:\ngot:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }
 
@@ -232,6 +280,23 @@ func TestEvidenceBaselineRejectsSymlinkedControlFiles(t *testing.T) {
 	}
 }
 
+func TestEvidenceBaselineRejectsSymlinkedChecksumSignature(t *testing.T) {
+	repoRoot := validFixtureRepo(t)
+	outside := filepath.Join(repoRoot, "outside-SHA256SUMS.sig")
+	writeFile(t, outside, "outside\n")
+	link := filepath.Join(repoRoot, "docs", "evidence", "candidate", "SHA256SUMS.sig")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireFinding(t, findings, "SHA256SUMS.sig")
+	requireFinding(t, findings, "control file must not be a symlink")
+}
+
 func TestEvidenceBaselineRejectsUnsafeBaselineRef(t *testing.T) {
 	repoRoot := validFixtureRepo(t)
 	baseline := filepath.Join(repoRoot, "docs", "evidence-baseline.md")
@@ -259,6 +324,20 @@ func TestEvidenceBaselineParserRejectsMalformedBaselineHeader(t *testing.T) {
 		t.Fatal(err)
 	}
 	requireFinding(t, findings, "Baseline Index header got")
+}
+
+func TestEvidenceBaselineParserRejectsMissingSeparatorWithoutSkippingFirstRow(t *testing.T) {
+	repoRoot := validFixtureRepo(t)
+	baseline := filepath.Join(repoRoot, "docs", "evidence-baseline.md")
+	remove(t, filepath.Join(repoRoot, "docs", "dependency-review.md"))
+	replaceInFile(t, baseline, "| --- | --- | --- | --- | --- |\n", "")
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireFinding(t, findings, "Baseline Index separator")
+	requireFinding(t, findings, "referenced summary doc does not exist")
 }
 
 func TestEvidenceBaselineParserRejectsDuplicateLane(t *testing.T) {
@@ -445,6 +524,15 @@ func rejectFinding(t *testing.T, findings []finding, unwanted string) {
 			t.Fatalf("unexpected finding containing %q; got %#v", unwanted, findings)
 		}
 	}
+}
+
+func sortedKeys(set map[string]bool) []string {
+	out := make([]string, 0, len(set))
+	for key := range set {
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func writeFile(t *testing.T, path, content string) {
