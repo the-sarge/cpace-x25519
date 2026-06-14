@@ -61,7 +61,9 @@ func checkRepo(repoRoot string) ([]finding, error) {
 
 	referencedBundles := map[string]bool{}
 	for _, row := range rows {
-		for _, ref := range evidenceRefs(row.rawCell) {
+		rawRefs, rawFindings := evidenceRefs(row.rawCell, baselinePath+":"+row.lane)
+		findings = append(findings, rawFindings...)
+		for _, ref := range rawRefs {
 			full := filepath.Join(repoRoot, filepath.FromSlash(ref))
 			info, err := os.Stat(full)
 			switch {
@@ -77,7 +79,9 @@ func checkRepo(repoRoot string) ([]finding, error) {
 			}
 		}
 
-		for _, ref := range summaryRefs(row.summaryCell) {
+		docRefs, docFindings := summaryRefs(row.summaryCell, baselinePath+":"+row.lane)
+		findings = append(findings, docFindings...)
+		for _, ref := range docRefs {
 			full := filepath.Join(repoRoot, filepath.FromSlash(ref))
 			info, err := os.Stat(full)
 			switch {
@@ -183,40 +187,96 @@ func splitTableRow(line string) []string {
 	return out
 }
 
-func evidenceRefs(cell string) []string {
-	return filteredBacktickRefs(cell, func(ref string) bool {
+func evidenceRefs(cell, findingPath string) ([]string, []finding) {
+	return filteredBacktickRefs(cell, findingPath, func(ref string) bool {
 		return strings.HasPrefix(ref, "docs/evidence/")
 	})
 }
 
-func summaryRefs(cell string) []string {
-	return filteredBacktickRefs(cell, func(ref string) bool {
+func summaryRefs(cell, findingPath string) ([]string, []finding) {
+	return filteredBacktickRefs(cell, findingPath, func(ref string) bool {
 		return strings.HasPrefix(ref, "docs/") && strings.HasSuffix(ref, ".md")
 	})
 }
 
-func filteredBacktickRefs(cell string, keep func(string) bool) []string {
+func filteredBacktickRefs(cell, findingPath string, keep func(string) bool) ([]string, []finding) {
 	matches := backtickRef.FindAllStringSubmatch(cell, -1)
 	var out []string
+	var findings []finding
 	for _, match := range matches {
-		ref := strings.TrimSpace(match[1])
-		if ref == "" || strings.Contains(ref, "\\") || strings.Contains(ref, "\x00") {
+		raw := strings.TrimSpace(match[1])
+		if raw == "" {
 			continue
 		}
-		ref = strings.TrimPrefix(ref, "./")
-		if keep(ref) && !slices.Contains(out, ref) {
+
+		ref := trimLeadingDotSlash(raw)
+		if !keep(ref) {
+			if looksLikeUnsafeKeptRef(ref, keep) {
+				findings = append(findings, finding{path: findingPath, msg: "unsafe baseline ref: " + raw})
+			}
+			continue
+		}
+		if !safeRepoRelativeRef(ref) {
+			findings = append(findings, finding{path: findingPath, msg: "unsafe baseline ref: " + raw})
+			continue
+		}
+		if !slices.Contains(out, ref) {
 			out = append(out, ref)
 		}
 	}
-	return out
+	return out, findings
+}
+
+func trimLeadingDotSlash(ref string) string {
+	for strings.HasPrefix(ref, "./") {
+		ref = strings.TrimPrefix(ref, "./")
+	}
+	return ref
+}
+
+func looksLikeUnsafeKeptRef(ref string, keep func(string) bool) bool {
+	if safeRepoRelativeRef(ref) {
+		return false
+	}
+	if strings.HasPrefix(ref, "/") && keep(strings.TrimLeft(ref, "/")) {
+		return true
+	}
+	candidate := strings.TrimLeft(ref, "/")
+	return strings.Contains(candidate, "docs/")
+}
+
+func safeRepoRelativeRef(ref string) bool {
+	return safeSlashPath(ref, true)
+}
+
+func safeBundleRelativePath(ref string) bool {
+	return safeSlashPath(ref, false)
+}
+
+func safeSlashPath(ref string, allowTrailingSlash bool) bool {
+	if ref == "" || strings.Contains(ref, "\\") || strings.Contains(ref, "\x00") || strings.Contains(ref, ":") || strings.HasPrefix(ref, "/") {
+		return false
+	}
+	if strings.HasSuffix(ref, "/") {
+		if !allowTrailingSlash {
+			return false
+		}
+		ref = strings.TrimSuffix(ref, "/")
+		if ref == "" {
+			return false
+		}
+	}
+	for _, part := range strings.Split(ref, "/") {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
+	}
+	return true
 }
 
 func evidenceBundleForRef(ref string, info os.FileInfo) string {
 	parts := strings.Split(strings.Trim(ref, "/"), "/")
 	if len(parts) < 3 || parts[0] != "docs" || parts[1] != "evidence" {
-		return ""
-	}
-	if len(parts) == 2 {
 		return ""
 	}
 	if info.IsDir() {
@@ -281,7 +341,8 @@ func checkBundle(repoRoot, bundle string) []finding {
 		findings = append(findings, verifySHA256Entry(bundlePath, bundle, entry)...)
 	}
 
-	rawFiles, err := bundleRawFiles(bundlePath)
+	rawFiles, rawFindings, err := bundleRawFiles(bundlePath, bundle)
+	findings = append(findings, rawFindings...)
 	if err != nil {
 		findings = append(findings, finding{path: bundle, msg: err.Error()})
 		return findings
@@ -326,7 +387,7 @@ func parseSHA256SUMS(path string) ([]checksumEntry, []finding, error) {
 		if !sha256Hex.MatchString(hash) {
 			findings = append(findings, finding{path: fmt.Sprintf("%s:%d", path, lineNo), msg: "checksum hash must be 64 lowercase hex characters"})
 		}
-		if rel == "" || filepath.IsAbs(rel) || strings.Contains(rel, "\\") || strings.Contains(rel, "\x00") || strings.HasPrefix(rel, "../") || strings.Contains(rel, "/../") {
+		if !safeBundleRelativePath(rel) {
 			findings = append(findings, finding{path: fmt.Sprintf("%s:%d", path, lineNo), msg: "checksum path must be a safe bundle-relative path"})
 			continue
 		}
@@ -344,11 +405,22 @@ func parseSHA256SUMS(path string) ([]checksumEntry, []finding, error) {
 
 func verifySHA256Entry(bundlePath, bundle string, entry checksumEntry) []finding {
 	full := filepath.Join(bundlePath, filepath.FromSlash(entry.path))
-	file, err := os.Open(full)
+	info, err := os.Lstat(full)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return []finding{{path: bundle + "/" + entry.path, msg: "checksum references missing file"}}
 		}
+		return []finding{{path: bundle + "/" + entry.path, msg: err.Error()}}
+	}
+	if info.Mode()&fs.ModeSymlink != 0 {
+		return []finding{{path: bundle + "/" + entry.path, msg: "checksum references symlink"}}
+	}
+	if !info.Mode().IsRegular() {
+		return []finding{{path: bundle + "/" + entry.path, msg: "checksum references non-regular file"}}
+	}
+
+	file, err := os.Open(full)
+	if err != nil {
 		return []finding{{path: bundle + "/" + entry.path, msg: err.Error()}}
 	}
 	defer file.Close()
@@ -364,25 +436,57 @@ func verifySHA256Entry(bundlePath, bundle string, entry checksumEntry) []finding
 	return nil
 }
 
-func bundleRawFiles(bundlePath string) ([]string, error) {
-	entries, err := os.ReadDir(bundlePath)
-	if err != nil {
-		return nil, err
-	}
+func bundleRawFiles(bundlePath, bundle string) ([]string, []finding, error) {
 	var out []string
-	for _, entry := range entries {
+	var findings []finding
+	err := filepath.WalkDir(bundlePath, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if path == bundlePath {
+			return nil
+		}
+
+		relOS, err := filepath.Rel(bundlePath, path)
+		if err != nil {
+			return err
+		}
+		rel := filepath.ToSlash(relOS)
+		if ignoredBundleEntry(rel) {
+			return nil
+		}
+		if entry.Type()&fs.ModeSymlink != 0 {
+			findings = append(findings, finding{path: bundle + "/" + rel, msg: "raw evidence entry must not be a symlink"})
+			return nil
+		}
 		if entry.IsDir() {
-			continue
+			return nil
 		}
-		name := entry.Name()
-		switch name {
-		case "README.md", "SHA256SUMS", "SHA256SUMS.sig":
-			continue
+		info, err := entry.Info()
+		if err != nil {
+			findings = append(findings, finding{path: bundle + "/" + rel, msg: err.Error()})
+			return nil
 		}
-		out = append(out, name)
+		if !info.Mode().IsRegular() {
+			findings = append(findings, finding{path: bundle + "/" + rel, msg: "raw evidence entry must be a regular file"})
+			return nil
+		}
+		out = append(out, rel)
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
 	}
 	sort.Strings(out)
-	return out, nil
+	return out, findings, nil
+}
+
+func ignoredBundleEntry(rel string) bool {
+	switch rel {
+	case "README.md", "SHA256SUMS", "SHA256SUMS.sig":
+		return true
+	}
+	return filepath.Base(rel) == ".DS_Store"
 }
 
 func sameStringSlice(got, want []string) bool {

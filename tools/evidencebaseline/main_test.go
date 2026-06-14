@@ -11,6 +11,12 @@ import (
 
 func TestCurrentRepositoryEvidenceBaseline(t *testing.T) {
 	repoRoot := filepath.Join("..", "..")
+	if _, err := os.Stat(filepath.Join(repoRoot, "docs", "evidence-baseline.md")); err != nil {
+		if os.IsNotExist(err) {
+			t.Skip("repository evidence baseline is not present")
+		}
+		t.Fatal(err)
+	}
 	findings, err := checkRepo(repoRoot)
 	if err != nil {
 		t.Fatal(err)
@@ -112,6 +118,77 @@ func TestEvidenceBaselineRejectsUncoveredRawFile(t *testing.T) {
 	requireFinding(t, findings, "not covered by SHA256SUMS")
 }
 
+func TestEvidenceBaselineRejectsNestedUncoveredRawFile(t *testing.T) {
+	repoRoot := validFixtureRepo(t)
+	writeFile(t, filepath.Join(repoRoot, "docs", "evidence", "candidate", "nested", "uncovered.log"), "not covered\n")
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireFinding(t, findings, "nested/uncovered.log")
+	requireFinding(t, findings, "not covered by SHA256SUMS")
+}
+
+func TestEvidenceBaselineRejectsSymlinkedChecksumEntry(t *testing.T) {
+	repoRoot := validFixtureRepo(t)
+	outside := filepath.Join(repoRoot, "outside.log")
+	writeFile(t, outside, "outside\n")
+	link := filepath.Join(repoRoot, "docs", "evidence", "candidate", "linked.log")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	appendSHA256SUMS(t, filepath.Join(repoRoot, "docs", "evidence", "candidate"), "linked.log", "outside\n")
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireFinding(t, findings, "checksum references symlink")
+}
+
+func TestEvidenceBaselineRejectsUnsafeBaselineRef(t *testing.T) {
+	repoRoot := validFixtureRepo(t)
+	baseline := filepath.Join(repoRoot, "docs", "evidence-baseline.md")
+	content, err := os.ReadFile(baseline)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := strings.Replace(string(content), "docs/evidence/candidate/analysis.log", "docs/evidence/candidate/../outside.log", 1)
+	writeFile(t, baseline, updated)
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireFinding(t, findings, "unsafe baseline ref")
+}
+
+func TestEvidenceBaselineIgnoresLocalDSStore(t *testing.T) {
+	repoRoot := validFixtureRepo(t)
+	writeFile(t, filepath.Join(repoRoot, "docs", "evidence", "candidate", ".DS_Store"), "local metadata\n")
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) > 0 {
+		t.Fatalf("expected .DS_Store to be ignored, got %#v", findings)
+	}
+}
+
+func TestEvidenceBaselineRejectsHiddenRawFile(t *testing.T) {
+	repoRoot := validFixtureRepo(t)
+	writeFile(t, filepath.Join(repoRoot, "docs", "evidence", "candidate", ".hidden.log"), "hidden evidence\n")
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireFinding(t, findings, ".hidden.log")
+	requireFinding(t, findings, "not covered by SHA256SUMS")
+}
+
 func TestEvidenceBaselineRejectsUnsafeChecksumPath(t *testing.T) {
 	repoRoot := validFixtureRepo(t)
 	appendFile(t, filepath.Join(repoRoot, "docs", "evidence", "candidate", "SHA256SUMS"), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  ../outside.log\n")
@@ -162,6 +239,12 @@ func writeSHA256SUMS(t *testing.T, dir string, files ...string) {
 		lines = append(lines, fmt.Sprintf("%x  %s", sum, name))
 	}
 	writeFile(t, filepath.Join(dir, "SHA256SUMS"), strings.Join(lines, "\n")+"\n")
+}
+
+func appendSHA256SUMS(t *testing.T, dir, name, content string) {
+	t.Helper()
+	sum := sha256.Sum256([]byte(content))
+	appendFile(t, filepath.Join(dir, "SHA256SUMS"), fmt.Sprintf("%x  %s\n", sum, name))
 }
 
 func requireFinding(t *testing.T, findings []finding, want string) {
