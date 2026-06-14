@@ -18,6 +18,8 @@ capability-surface change from either trigger.
 
 Transcript: `docs/evidence/go1264-20260611/local-analysis.log`
 
+Baseline status: `docs/evidence-baseline.md` is the current source of truth for whether this pinned Capslock report is fresh for the latest release candidate.
+
 ## Tool
 
 ```sh

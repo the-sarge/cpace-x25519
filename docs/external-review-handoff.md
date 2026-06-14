@@ -8,8 +8,7 @@ Last released tag: `v0.1.2`
 
 Last released commit: `4e661bc1f925ebedf1f270668129d85bab73e468`
 
-Current package-code evidence baseline:
-`2e09774f171dde8c62763d6e35a258b0fef88801`
+Current evidence baseline: see `docs/evidence-baseline.md`. The original `v0.1.2` external-review packet remains historical prerelease evidence; later Go 1.26.4 and post-baseline freshness caveats are centralized in the baseline index.
 
 Evidence status: refreshed for the v0.1.2 package-code candidate and packaged
 in the signed `v0.1.2` prerelease. This is still an unaudited prerelease
@@ -39,6 +38,7 @@ cryptographic review before any production-ready claim.
 - `docs/dependency-review.md` for dependency and vulnerability scan evidence.
 - `docs/fuzz-evidence.md` for local smoke and long-fuzz campaign evidence.
 - `docs/capslock-report.md` for static capability-analysis evidence.
+- `docs/evidence-baseline.md` for the current pinned evidence baseline and stale-trigger index.
 - `docs/evidence/v012-candidate-20260508/` for raw v0.1.2 candidate transcript
   files and SHA-256 digests.
 - `docs/evidence/v012-soak-20260509/` for raw v0.1.2 supplemental fuzz soak
@@ -98,22 +98,9 @@ The `v0.1.2` prerelease contains the external-review packet, Go 1.26
 modernization, and refreshed evidence. It has no intended Go API,
 wire/protocol, dependency, or vector behavior change.
 
-Go 1.26.3 dependency, gosec, long-fuzz, Capslock, and security/spec evidence is
-recorded for v0.1.2 package-code candidate
-`2e09774f171dde8c62763d6e35a258b0fef88801`. The paired long-fuzz refresh ran
-all 14 registered targets for `FUZZTIME=1h` on local ARM and Intel maintainer
-machines after the Go 1.26 `go fix` modernization. Supplemental `v0.1.2` tag
-soak evidence ran all 14 targets with `FUZZTIME=4h` on ARM and Intel; ARM
-passed, while Intel had an all-target `FuzzProtocolConsistency` deadline
-failure followed by a clean same-host 4-hour targeted rerun. Repeat dependency
-review, long fuzzing, Capslock, and security/spec audit against the exact
-release candidate before any production-readiness claim, or sooner if protocol,
-parser/framing, fuzz harness, dependency, toolchain, or package-profile docs
-change.
+The current pinned package-code evidence baseline and freshness caveats are indexed in `docs/evidence-baseline.md`. Repeat dependency review, long fuzzing, Capslock, and security/spec audit against the exact release candidate before any production-readiness claim, or sooner if protocol, parser/framing, fuzz harness, dependency, toolchain, or package-profile docs change.
 
-Capslock capability-analysis evidence is recorded in
-`docs/capslock-report.md` for
-`2e09774f171dde8c62763d6e35a258b0fef88801`.
+Capslock capability-analysis evidence is recorded in `docs/capslock-report.md`; its pinned baseline and freshness caveat are indexed in `docs/evidence-baseline.md`.
 
 OSS-Fuzz onboarding is open upstream in `google/oss-fuzz#15480`. The upstream
 PR helper build, header check, and Google CLA check passed; merge is waiting on

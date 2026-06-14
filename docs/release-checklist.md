@@ -83,6 +83,7 @@ command exit code.
 
 Refresh the evidence docs when the candidate changes security-relevant state:
 
+- `docs/evidence-baseline.md` for the current pinned baseline, candidate target, and stale-trigger index.
 - `docs/dependency-review.md` for dependency, vulnerability, and gosec results.
 - `docs/fuzz-evidence.md` for fuzz campaign evidence.
 - `docs/security-spec-audit.md` for review of `docs/security-assessment.md` and

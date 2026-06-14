@@ -14,6 +14,8 @@ Toolchain: Go 1.26.4
 
 Evidence transcript: `docs/evidence/go1264-20260611/local-analysis.log`
 
+Baseline status: `docs/evidence-baseline.md` is the current source of truth for whether this pinned audit is fresh for the latest release candidate.
+
 Draft source: `draft-irtf-cfrg-cpace-21`
 (`https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-cpace-21`)
 
@@ -62,9 +64,7 @@ implementation:
 - package-owned CI construction, binary framing, non-configurable field caps,
   `Session.Export`, `Session.Close`, `PeerAssociatedData`, and `PeerID` are
   correctly documented as package-profile behavior;
-- dependency and Capslock evidence references point to the refreshed Go 1.26.4
-  evidence documents; the long-fuzz evidence refresh under 1.26.4 is pending
-  the paired maintainer-machine campaigns and is tracked separately.
+- dependency, Capslock, and long-fuzz evidence references point to the refreshed Go 1.26.4 pinned evidence baseline indexed in `docs/evidence-baseline.md`; post-baseline security-relevant changes are out of scope for this audit and require the consolidated exact-candidate refresh.
 
 The go1.26.4 release (2026-06-02) is a security release: fixes to
 `crypto/x509`, `mime`, and `net/textproto`, plus bug fixes to
