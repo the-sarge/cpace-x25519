@@ -46,6 +46,8 @@ Each committed bundle should include:
 - `SHA256SUMS`, covering every raw transcript in the bundle.
 - `SHA256SUMS.sig`, when detached signing is practical.
 
+`SHA256SUMS` entries must use lowercase 64-character SHA-256 hex, the GNU text-mode two-space separator, and safe bundle-relative paths with no spaces or `sha256sum -b` `*` path prefix.
+
 When detached signatures are used, prefer the signer identity documented in
 `docs/release-verification.md`. Name the signing tool, signer identity, and key
 fingerprint in the bundle README, or document the exception.

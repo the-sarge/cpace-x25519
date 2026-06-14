@@ -85,12 +85,14 @@ func checkRepo(repoRoot string) ([]finding, error) {
 		findings = append(findings, docFindings...)
 		for _, ref := range docRefs {
 			full := filepath.Join(repoRoot, filepath.FromSlash(ref))
-			info, err := os.Stat(full)
+			info, err := os.Lstat(full)
 			switch {
 			case errors.Is(err, fs.ErrNotExist):
 				findings = append(findings, finding{path: baselinePath + ":" + row.lane, msg: "referenced summary doc does not exist: " + ref})
 			case err != nil:
 				return nil, err
+			case info.Mode()&fs.ModeSymlink != 0:
+				findings = append(findings, finding{path: baselinePath + ":" + row.lane, msg: "referenced summary doc is a symlink: " + ref})
 			case info.IsDir():
 				findings = append(findings, finding{path: baselinePath + ":" + row.lane, msg: "referenced summary doc is a directory: " + ref})
 			}
@@ -401,18 +403,29 @@ func parseSHA256SUMS(path string) ([]checksumEntry, []finding, error) {
 	lineNo := 0
 	for scanner.Scan() {
 		lineNo++
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
+		line := scanner.Text()
+		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		fields := strings.Fields(line)
-		if len(fields) != 2 {
-			findings = append(findings, finding{path: fmt.Sprintf("%s:%d", path, lineNo), msg: "checksum line must contain hash and relative path"})
+		if len(line) >= 66 && line[64] == ' ' && line[65] == '*' {
+			findings = append(findings, finding{path: fmt.Sprintf("%s:%d", path, lineNo), msg: "checksum line must use text-mode SHA256SUMS format without a binary '*' path prefix"})
 			continue
 		}
-		hash, rel := fields[0], fields[1]
+		if len(line) < 67 || line[64:66] != "  " {
+			findings = append(findings, finding{path: fmt.Sprintf("%s:%d", path, lineNo), msg: "checksum line must use '<64 lowercase hex><two spaces><bundle-relative path>' format"})
+			continue
+		}
+		hash, rel := line[:64], line[66:]
 		if !sha256Hex.MatchString(hash) {
 			findings = append(findings, finding{path: fmt.Sprintf("%s:%d", path, lineNo), msg: "checksum hash must be 64 lowercase hex characters"})
+		}
+		if strings.ContainsAny(rel, " \t\r\n") {
+			findings = append(findings, finding{path: fmt.Sprintf("%s:%d", path, lineNo), msg: "checksum path must not contain whitespace"})
+			continue
+		}
+		if strings.HasPrefix(rel, "*") {
+			findings = append(findings, finding{path: fmt.Sprintf("%s:%d", path, lineNo), msg: "checksum path must not start with a binary '*' path prefix"})
+			continue
 		}
 		if !safeBundleRelativePath(rel) {
 			findings = append(findings, finding{path: fmt.Sprintf("%s:%d", path, lineNo), msg: "checksum path must be a safe bundle-relative path"})
@@ -431,16 +444,9 @@ func parseSHA256SUMS(path string) ([]checksumEntry, []finding, error) {
 }
 
 func verifySHA256Entry(bundlePath, bundle string, entry checksumEntry) []finding {
-	full := filepath.Join(bundlePath, filepath.FromSlash(entry.path))
-	info, err := os.Lstat(full)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return []finding{{path: bundle + "/" + entry.path, msg: "checksum references missing file"}}
-		}
-		return []finding{{path: bundle + "/" + entry.path, msg: err.Error()}}
-	}
-	if info.Mode()&fs.ModeSymlink != 0 {
-		return []finding{{path: bundle + "/" + entry.path, msg: "checksum references symlink"}}
+	full, info, findings := lstatChecksumEntry(bundlePath, bundle, entry.path)
+	if len(findings) > 0 {
+		return findings
 	}
 	if !info.Mode().IsRegular() {
 		return []finding{{path: bundle + "/" + entry.path, msg: "checksum references non-regular file"}}
@@ -461,6 +467,36 @@ func verifySHA256Entry(bundlePath, bundle string, entry checksumEntry) []finding
 		return []finding{{path: bundle + "/" + entry.path, msg: "SHA256SUMS hash mismatch"}}
 	}
 	return nil
+}
+
+func lstatChecksumEntry(bundlePath, bundle, rel string) (string, fs.FileInfo, []finding) {
+	full := bundlePath
+	parts := strings.Split(rel, "/")
+	for i, part := range parts {
+		full = filepath.Join(full, part)
+		info, err := os.Lstat(full)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return "", nil, []finding{{path: bundle + "/" + rel, msg: "checksum references missing file"}}
+			}
+			return "", nil, []finding{{path: bundle + "/" + rel, msg: err.Error()}}
+		}
+		if info.Mode()&fs.ModeSymlink != 0 {
+			if i < len(parts)-1 {
+				parent := strings.Join(parts[:i+1], "/")
+				return "", nil, []finding{{path: bundle + "/" + rel, msg: "checksum path contains symlinked parent: " + parent}}
+			}
+			return "", nil, []finding{{path: bundle + "/" + rel, msg: "checksum references symlink"}}
+		}
+		if i < len(parts)-1 && !info.IsDir() {
+			parent := strings.Join(parts[:i+1], "/")
+			return "", nil, []finding{{path: bundle + "/" + rel, msg: "checksum path parent is not a directory: " + parent}}
+		}
+		if i == len(parts)-1 {
+			return full, info, nil
+		}
+	}
+	return "", nil, []finding{{path: bundle + "/" + rel, msg: "checksum references missing file"}}
 }
 
 func bundleRawFiles(bundlePath, bundle string) ([]string, []finding, error) {
