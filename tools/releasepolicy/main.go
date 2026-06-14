@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -452,7 +453,7 @@ func requireExactScriptLines(c *checker, nodePath, run string, want []string) {
 
 func scriptLines(run string) []string {
 	var out []string
-	for _, line := range strings.Split(run, "\n") {
+	for line := range strings.SplitSeq(run, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
@@ -588,12 +589,7 @@ func yamlPath(parent, child string) string {
 }
 
 func contains(items []string, want string) bool {
-	for _, item := range items {
-		if item == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(items, want)
 }
 
 func sameStringSet(got, want []string) bool {
