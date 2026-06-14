@@ -40,6 +40,9 @@ assert_classification evidence-baseline "docs/evidence-baseline.md" true true fa
 assert_classification evidence-bundle "docs/evidence/go1264-20260611/local-analysis.log" true true false
 assert_classification summary-doc "docs/dependency-review.md" true true false
 assert_classification evidence-checker "tools/evidencebaseline/main.go" false true true
+assert_classification evidence-checker-wrapper "scripts/check-evidence-baseline.sh" false true true
+assert_classification classifier-script "scripts/classify-check-changes.sh" false true false
+assert_classification classifier-test "scripts/test-ci-classifier.sh" false true false
 
 rename_repo="$tmpdir/rename-repo"
 mkdir "$rename_repo"
