@@ -21,7 +21,7 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -92,6 +92,13 @@ jobs:
         run: |
           scripts/test-release-helpers.sh
           scripts/test-ci-classifier.sh
+
+      - name: Run evidence checker lint
+        if: steps.changes.outputs.docs_only != 'true'
+        working-directory: tools/evidencebaseline
+        run: |
+          go vet ./...
+          go run honnef.co/go/tools/cmd/staticcheck@v0.7.0 ./...
 
       - name: Run evidence baseline checker
         if: steps.changes.outputs.docs_only != 'true' || steps.changes.outputs.evidence_changed == 'true'
