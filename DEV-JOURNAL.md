@@ -1323,3 +1323,16 @@ Accepted and merged ADR-0008, recording a narrow public-lifecycle thaw for expli
 
 - Implement ADR-0008 in a separate code PR.
 - Do not claim refreshed release evidence from ADR-0008 until exact-candidate evidence refresh covers the implementation commit.
+
+---
+
+## Implement ADR-0008 single-use state Close - 2026-06-16 00:52 EDT
+
+**Main:** `977d08476486`
+**Actor:** Codex
+
+- Merged PR #118 (`feat: add single-use state close`) at `977d084764860a2d5957285b3826688f8bcf0179`.
+- Implemented ADR-0008 by adding `Initiator.Close` and `Responder.Close`, moving constructed initiator/responder values onto shared terminal state, and documenting the lifecycle contract in README, package docs, integration guidance, changelog, and CONTEXT.
+- Ran `ras review-fix 118`; review loop `20260616T044602-6333a251248f2384ee160008` reported no fix-first findings and no required code changes.
+- Validation before merge: `task check` passed locally; GitHub checks for PR #118 passed with merge state `CLEAN`.
+- Evidence refresh was intentionally deferred per maintainer direction; exact-candidate evidence refresh remains tracked separately before stronger release claims.
