@@ -30,7 +30,7 @@ func (s *Session) PeerAssociatedData() []byte {
 }
 
 // PeerID returns the caller-configured peer identity that was bound into CI and
-// confirmed by the completed exchange. The value is copied from Config; it is
+// confirmed by the completed exchange. The value is copied from Input; it is
 // not parsed from peer-controlled wire data. The returned slice is a copy and
 // remains available after Close.
 func (s *Session) PeerID() []byte {

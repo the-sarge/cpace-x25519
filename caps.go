@@ -24,68 +24,68 @@ func exactPackageCapField(name string, wantLen int) packageCapField {
 	return packageCapField{name: name, length: wantLen, exact: true}
 }
 
-type acceptedConfig struct {
-	password    []byte
-	initiatorID []byte
-	responderID []byte
-	context     []byte
-	sid         []byte
-	ad          []byte
+type acceptedInput struct {
+	password []byte
+	selfID   []byte
+	peerID   []byte
+	context  []byte
+	sid      []byte
+	localAD  []byte
 }
 
-func acceptConfig(cfg Config) (acceptedConfig, error) {
-	if len(cfg.Password) == 0 {
-		return acceptedConfig{}, fmt.Errorf("%w: empty password", ErrInvalidInput)
+func acceptInput(input Input) (acceptedInput, error) {
+	if len(input.Password) == 0 {
+		return acceptedInput{}, fmt.Errorf("%w: empty password", ErrInvalidInput)
 	}
-	if len(cfg.InitiatorID) == 0 {
-		return acceptedConfig{}, fmt.Errorf("%w: empty initiator id", ErrInvalidInput)
+	if len(input.SelfID) == 0 {
+		return acceptedInput{}, fmt.Errorf("%w: empty self id", ErrInvalidInput)
 	}
-	if len(cfg.ResponderID) == 0 {
-		return acceptedConfig{}, fmt.Errorf("%w: empty responder id", ErrInvalidInput)
+	if len(input.PeerID) == 0 {
+		return acceptedInput{}, fmt.Errorf("%w: empty peer id", ErrInvalidInput)
 	}
-	if len(cfg.SessionID) == 0 && !cfg.AllowEmptySessionID {
-		return acceptedConfig{}, fmt.Errorf("%w: %w", ErrInvalidInput, ErrEmptySessionID)
+	if len(input.SessionID) == 0 && !input.AllowEmptySessionID {
+		return acceptedInput{}, fmt.Errorf("%w: %w", ErrInvalidInput, ErrEmptySessionID)
 	}
 
 	for _, field := range []struct {
 		cap   packageCapField
 		value []byte
 	}{
-		{passwordCap, cfg.Password},
-		{initiatorIDCap, cfg.InitiatorID},
-		{responderIDCap, cfg.ResponderID},
-		{contextCap, cfg.Context},
-		{sessionIDCap, cfg.SessionID},
-		{associatedDataCap, cfg.AssociatedData},
+		{passwordCap, input.Password},
+		{selfIDCap, input.SelfID},
+		{peerIDCap, input.PeerID},
+		{contextCap, input.Context},
+		{sessionIDCap, input.SessionID},
+		{localAssociatedDataCap, input.LocalAssociatedData},
 	} {
-		if err := field.cap.validateConfigLength(len(field.value)); err != nil {
-			return acceptedConfig{}, err
+		if err := field.cap.validateInputLength(len(field.value)); err != nil {
+			return acceptedInput{}, err
 		}
 	}
 
-	return acceptedConfig{
-		password:    clone(cfg.Password),
-		initiatorID: clone(cfg.InitiatorID),
-		responderID: clone(cfg.ResponderID),
-		context:     clone(cfg.Context),
-		sid:         clone(cfg.SessionID),
-		ad:          clone(cfg.AssociatedData),
+	return acceptedInput{
+		password: clone(input.Password),
+		selfID:   clone(input.SelfID),
+		peerID:   clone(input.PeerID),
+		context:  clone(input.Context),
+		sid:      clone(input.SessionID),
+		localAD:  clone(input.LocalAssociatedData),
 	}, nil
 }
 
-func (c *acceptedConfig) wipe() {
+func (c *acceptedInput) wipe() {
 	if c == nil {
 		return
 	}
 	clearBytes(c.password)
-	clearBytes(c.initiatorID)
-	clearBytes(c.responderID)
+	clearBytes(c.selfID)
+	clearBytes(c.peerID)
 	clearBytes(c.context)
 	clearBytes(c.sid)
-	clearBytes(c.ad)
+	clearBytes(c.localAD)
 }
 
-func (f packageCapField) validateConfigLength(n int) error {
+func (f packageCapField) validateInputLength(n int) error {
 	if n > f.length {
 		return fmt.Errorf("%w: %s too large", ErrInvalidInput, f.name)
 	}
@@ -117,11 +117,11 @@ func (f packageCapField) validateMessageLength(n int) error {
 func shippedPackageCapPolicy() []packageCapField {
 	return []packageCapField{
 		passwordCap,
-		initiatorIDCap,
-		responderIDCap,
+		selfIDCap,
+		peerIDCap,
 		contextCap,
 		sessionIDCap,
-		associatedDataCap,
+		localAssociatedDataCap,
 		messageASessionIDCap,
 		messageAPointCap,
 		messageAAssociatedDataCap,
@@ -133,12 +133,12 @@ func shippedPackageCapPolicy() []packageCapField {
 }
 
 var (
-	passwordCap       = cappedPackageCapField("password", maxPasswordLength)
-	initiatorIDCap    = cappedPackageCapField("initiator id", maxIDLength)
-	responderIDCap    = cappedPackageCapField("responder id", maxIDLength)
-	contextCap        = cappedPackageCapField("context", maxContextLength)
-	sessionIDCap      = cappedPackageCapField("session id", maxSessionIDLength)
-	associatedDataCap = cappedPackageCapField("associated data", maxAssociatedDataLength)
+	passwordCap            = cappedPackageCapField("password", maxPasswordLength)
+	selfIDCap              = cappedPackageCapField("self id", maxIDLength)
+	peerIDCap              = cappedPackageCapField("peer id", maxIDLength)
+	contextCap             = cappedPackageCapField("context", maxContextLength)
+	sessionIDCap           = cappedPackageCapField("session id", maxSessionIDLength)
+	localAssociatedDataCap = cappedPackageCapField("local associated data", maxAssociatedDataLength)
 
 	messageASessionIDCap      = cappedPackageCapField("message A session id", maxSessionIDLength)
 	messageAPointCap          = exactPackageCapField("message A point", pointSize)

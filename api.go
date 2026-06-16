@@ -21,28 +21,30 @@ const (
 
 const suiteName = "CPACE-RISTR255-SHA512"
 
-// Config contains the local inputs for one CPace role.
+// Input contains the local inputs for one CPace role.
 //
-// Password, InitiatorID, and ResponderID must be non-empty. Context and
-// AssociatedData may be empty. Both parties must use the same role orientation:
-// InitiatorID is the party that called Start, and ResponderID is the party that
-// called Respond. SessionID must be a fresh, non-secret, parties-agree-on value
-// for every session. Empty SessionID values are rejected by default because they
-// weaken replay and transcript separation properties. Set AllowEmptySessionID
-// only for draft-21 compatibility tests or profiles that have deliberately
-// accepted the weaker empty-sid behavior. Scalar randomness always comes from
-// crypto/rand.Reader. The AssociatedData field is ADa for Start and ADb for
-// Respond. Field lengths are capped at 4 KiB for Password and IDs, 1 KiB for
-// Context and SessionID, and 64 KiB for AssociatedData. Inputs exceeding these
-// caps are rejected before copying; accepted byte slices are copied by Start
-// and Respond before use.
-type Config struct {
+// Password, SelfID, and PeerID must be non-empty. Context and
+// LocalAssociatedData may be empty. Password, Context, and SessionID are shared
+// session values both parties supply identically. SelfID, PeerID, and
+// LocalAssociatedData are role-local values: Start treats SelfID as the
+// initiator identity and PeerID as the responder identity; Respond treats
+// SelfID as the responder identity and PeerID as the initiator identity.
+// SessionID must be a fresh, non-secret, parties-agree-on value for every
+// session. Empty SessionID values are rejected by default because they weaken
+// replay and transcript separation properties. Set AllowEmptySessionID only for
+// draft-21 compatibility tests or profiles that have deliberately accepted the
+// weaker empty-sid behavior. Scalar randomness always comes from
+// crypto/rand.Reader. Field lengths are capped at 4 KiB for Password and IDs,
+// 1 KiB for Context and SessionID, and 64 KiB for LocalAssociatedData. Inputs
+// exceeding these caps are rejected before copying; accepted byte slices are
+// copied by Start and Respond before use.
+type Input struct {
 	Password            []byte
-	InitiatorID         []byte
-	ResponderID         []byte
+	SelfID              []byte
+	PeerID              []byte
 	Context             []byte
 	SessionID           []byte
-	AssociatedData      []byte
+	LocalAssociatedData []byte
 	AllowEmptySessionID bool
 }
 
@@ -116,12 +118,12 @@ func (nc *normalizedConfig) wipe() {
 }
 
 // Start creates initiator state and message A.
-func Start(cfg Config) (*Initiator, []byte, error) {
-	return startWithRandom(cfg, rand.Reader)
+func Start(input Input) (*Initiator, []byte, error) {
+	return startWithRandom(input, rand.Reader)
 }
 
-func startWithRandom(cfg Config, random io.Reader) (*Initiator, []byte, error) {
-	nc, err := normalizeConfig(cfg)
+func startWithRandom(input Input, random io.Reader) (*Initiator, []byte, error) {
+	nc, err := normalizeStartInput(input)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -138,12 +140,12 @@ func startWithRandom(cfg Config, random io.Reader) (*Initiator, []byte, error) {
 // Message B includes the responder's explicit key-confirmation tag. A nil
 // error from Respond does not authenticate the initiator; authentication is
 // established only by successful Finish calls.
-func Respond(cfg Config, messageA []byte) (*Responder, []byte, error) {
-	return respondWithRandom(cfg, messageA, rand.Reader)
+func Respond(input Input, messageA []byte) (*Responder, []byte, error) {
+	return respondWithRandom(input, messageA, rand.Reader)
 }
 
-func respondWithRandom(cfg Config, messageA []byte, random io.Reader) (*Responder, []byte, error) {
-	nc, err := normalizeConfig(cfg)
+func respondWithRandom(input Input, messageA []byte, random io.Reader) (*Responder, []byte, error) {
+	nc, err := normalizeRespondInput(input)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -308,8 +310,16 @@ func (s *responderState) claimClose() (*responderCore, error) {
 	return s.core, nil
 }
 
-func normalizeConfig(cfg Config) (normalizedConfig, error) {
-	accepted, err := acceptConfig(cfg)
+func normalizeStartInput(input Input) (normalizedConfig, error) {
+	return normalizeInput(input, false)
+}
+
+func normalizeRespondInput(input Input) (normalizedConfig, error) {
+	return normalizeInput(input, true)
+}
+
+func normalizeInput(input Input, responder bool) (normalizedConfig, error) {
+	accepted, err := acceptInput(input)
 	if err != nil {
 		return normalizedConfig{}, err
 	}
@@ -319,16 +329,21 @@ func normalizeConfig(cfg Config) (normalizedConfig, error) {
 			accepted.wipe()
 		}
 	}()
-	ci := buildCI(accepted.initiatorID, accepted.responderID, accepted.context)
+	initiatorID := accepted.selfID
+	responderID := accepted.peerID
+	if responder {
+		initiatorID, responderID = accepted.peerID, accepted.selfID
+	}
+	ci := buildCI(initiatorID, responderID, accepted.context)
 	clearBytes(accepted.context)
 	accepted.context = nil
 	nc := normalizedConfig{
 		password:    accepted.password,
-		initiatorID: accepted.initiatorID,
-		responderID: accepted.responderID,
+		initiatorID: initiatorID,
+		responderID: responderID,
 		ci:          ci,
 		sid:         accepted.sid,
-		ad:          accepted.ad,
+		ad:          accepted.localAD,
 	}
 	keep = true
 	return nc, nil

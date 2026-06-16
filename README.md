@@ -24,19 +24,9 @@ key confirmation:
 Treat message B as an unauthenticated protocol message until the finish calls
 complete.
 
-This module is a package-specific `cpace-go` profile over draft-21. It builds
-CI internally from the draft version, suite, roles, initiator ID, responder ID,
-and caller context. It also owns its binary wire framing; applications should
-treat message bytes as opaque and versioned by this module. The current wire
-format prefix byte is `0xc1`.
+This module is a package-specific `cpace-go` profile over draft-21. It builds CI internally from the draft version, suite, protocol roles, caller-provided party identities, and caller context. It also owns its binary wire framing; applications should treat message bytes as opaque and versioned by this module. The current wire format prefix byte is `0xc1`.
 
-Both sides must configure the same role orientation: `InitiatorID` is the party
-that called `Start`, and `ResponderID` is the party that called `Respond`, on
-both machines. A common integration bug is for each side to put its own
-identity first; that makes the CI inputs differ and confirmation fails. Do not
-use only globally hardcoded role labels such as `"client"` and `"server"` for
-all users or deployments. Bind stable, application-meaningful party identities
-into these fields.
+Callers provide role-local `Input`. The initiator calls `Start` with `SelfID` set to the initiator identity and `PeerID` set to the responder identity; the responder calls `Respond` with `SelfID` set to the responder identity and `PeerID` set to the initiator identity. `Password`, `Context`, and `SessionID` are shared session values that both sides supply identically; `LocalAssociatedData` is each side's local associated data and may differ. Do not use only globally hardcoded role labels such as `"client"` and `"server"` for all users or deployments. Bind stable, application-meaningful party identities into `SelfID` and `PeerID`.
 
 Provide a fresh, non-secret `SessionID` agreed by both parties for every
 session. Empty session IDs are rejected by default because they weaken replay
@@ -53,20 +43,12 @@ guidance.
 
 `Session.TranscriptID` is the draft `CPaceSidOutput` for the confirmed CPace
 transcript, not a complete channel binding for outer protocol negotiation.
-`Session.Export` derives deterministic, domain-separated application key
-material from the confirmed ISK. It is not a source of fresh randomness; use
-specific labels and contexts for each exported key purpose. `Session.Close`
-performs best-effort cleanup of the session key material and makes future
-`Export` calls fail with `ErrSessionClosed`; non-secret metadata accessors
-remain available after close. `Session.PeerAssociatedData` returns the exact
-peer AD bound into the confirmed exchange. `Session.PeerID` returns the
-caller-configured peer identity that was bound into CI and confirmed by the
-exchange; it is not parsed from peer-controlled wire data.
+`Session.Export` derives deterministic, domain-separated application key material from the confirmed ISK. It is not a source of fresh randomness; use specific labels and contexts for each exported key purpose. `Session.Close` performs best-effort cleanup of the session key material and makes future `Export` calls fail with `ErrSessionClosed`; non-secret metadata accessors remain available after close. `Session.PeerAssociatedData` returns the exact peer local associated data bound into the confirmed exchange. `Session.PeerID` returns the caller-configured peer identity that was bound into CI and confirmed by the exchange; it is not parsed from peer-controlled wire data.
 
 Scalar randomness is always drawn from Go's `crypto/rand.Reader`. Callers do
 not provide randomness to `Start` or `Respond`.
 
-Input and wire fields have package-owned per-field caps: passwords and party IDs are limited to 4 KiB, context and session IDs to 1 KiB, and associated data to 64 KiB. Valid package-owned message shapes are governed by those per-field caps and exact public-share/tag lengths; malformed framed inputs also hit a 128 KiB aggregate decoder backstop before field parsing proceeds. Associated data should bind protocol context, not carry large payloads; represent large external artifacts with a digest, Merkle root, exporter, or other fixed-size commitment.
+Input and wire fields have package-owned per-field caps: passwords and party IDs are limited to 4 KiB, context and session IDs to 1 KiB, and local associated data to 64 KiB. Valid package-owned message shapes are governed by those per-field caps and exact public-share/tag lengths; malformed framed inputs also hit a 128 KiB aggregate decoder backstop before field parsing proceeds. Local associated data should bind protocol context, not carry large payloads; represent large external artifacts with a digest, Merkle root, exporter, or other fixed-size commitment.
 
 ## Validation
 

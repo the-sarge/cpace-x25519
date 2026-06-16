@@ -61,18 +61,11 @@ explicit key confirmation.
 
 ### Protocol Inputs
 
-The package authenticates only the inputs it is given: password, party
-identities, context, session ID, associated data, and wire messages. Callers are
-responsible for making outer negotiation results part of those inputs or
-protecting negotiation separately.
+The package authenticates only the inputs it is given: password, role-local party identities, context, session ID, local associated data, and wire messages. Callers are responsible for making outer negotiation results part of those inputs or protecting negotiation separately.
 
-### Identity Orientation
+### Role-Local Identities
 
-Both parties must agree that `InitiatorID` names the party running `Start`, and
-`ResponderID` names the party running `Respond`. If each side puts itself first,
-the context info differs and confirmation fails. Global role labels such as
-`client` and `server` are not enough as stable party identities for all users or
-deployments.
+Each party supplies identities from its own point of view: the initiator uses `SelfID=initiator, PeerID=responder`, and the responder uses `SelfID=responder, PeerID=initiator`. If one side swaps those values, the context info differs and confirmation fails. Global role labels such as `client` and `server` are not enough as stable party identities for all users or deployments.
 
 ### Wire Framing
 
@@ -100,16 +93,8 @@ fuzzing remains maintainer-controlled evidence rather than a required PR gate.
 
 Critical code paths and interactions:
 
-- Public API and configuration validation: `Start`, `Respond`,
-  `Initiator.Finish`, `Responder.Finish`, and `Session.Export` are the primary
-  caller entry points. Validation rejects missing passwords, wrong role
-  orientation, empty session IDs unless explicitly allowed, oversized fields,
-  closed sessions, and malformed protocol messages.
-- Context and identity binding: package-owned context-info construction binds
-  the draft version, suite, role orientation, party identities, caller context,
-  and session ID. Integration mistakes here can produce authentication failure
-  or weak outer-channel binding, so docs require stable application identities
-  and outer downgrade protection.
+- Public API and input validation: `Start`, `Respond`, `Initiator.Finish`, `Responder.Finish`, and `Session.Export` are the primary caller entry points. Validation rejects missing passwords, missing role-local identities, empty session IDs unless explicitly allowed, oversized fields, closed sessions, and malformed protocol messages.
+- Context and identity binding: package-owned context-info construction binds the draft version, suite, protocol roles, caller-provided party identities, caller context, and session ID. Integration mistakes here can produce authentication failure or weak outer-channel binding, so docs require stable application identities and outer downgrade protection.
 - Wire decoding and framing: message parsers handle attacker-controlled bytes.
   The framing layer uses a package format byte, suite byte, role byte,
   canonical length-value fields, exact public-share and tag lengths, per-field

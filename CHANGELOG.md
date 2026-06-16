@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Pre-v1 caller-input API change (breaking relative to `v0.1.2`): replace public `Config` with role-local `Input`. Removed fields are `InitiatorID`, `ResponderID`, and `AssociatedData`; callers now use `SelfID`, `PeerID`, and `LocalAssociatedData`. Migration rule: the initiator calls `Start` with `SelfID=initiator, PeerID=responder`, and the responder calls `Respond` with `SelfID=responder, PeerID=initiator`. `Password`, `Context`, `SessionID`, and `AllowEmptySessionID` keep the same semantics, and wire format is unchanged.
 - Pre-v1 public lifecycle addition: add `Initiator.Close` and `Responder.Close` for explicit cleanup of abandoned single-use state. Constructed value copies share terminal state; `Close` after `Finish` is a nil no-op, and `Finish` after `Close` returns `ErrStateUsed`. This closes the abandoned-state cleanup gap recorded by ADR-0001/ADR-0008 without changing wire format or package-profile policy.
 - Add ADR-0007 release supply-chain artifacts: Release Validation now verifies signed annotated tags first, generates and validates a CycloneDX 1.5 SBOM, attests the SBOM with GitHub/Sigstore, and publishes the SBOM plus Sigstore bundle on tag pushes. No Go API, protocol, or wire-format impact.
 - Pre-v1 contract/behavior change: `(*Session)(nil).Close()` now returns `nil` as a nil-safe no-op; zero-value `Session` values and nil/zero-value `Export` remain strict `ErrInvalidInput` cases. This is breaking for callers that used `errors.Is(err, ErrInvalidInput)` on `Close` to detect nil receivers.
@@ -33,11 +34,7 @@
   and `docs/spec-matrix.md`: bit-masking is the draft §8.3 recommendation and
   the package adds defense-in-depth retries for the (~2^-125) canonical-decode
   rejection window and the zero scalar; no protocol-visible change.
-- Internal hardening: unify the deferred wipe of normalized config fields so
-  every cloned `Config` byte slice is zeroized on every Start/Respond exit
-  path, and mirror `Responder.Finish`'s deferred ISK wipe in `Initiator.Finish`
-  so future early-returns cannot leak the session key. No public-API or
-  wire-format change.
+- Internal hardening: unify the deferred wipe of normalized caller-input fields so every cloned input byte slice is zeroized on every Start/Respond exit path, and mirror `Responder.Finish`'s deferred ISK wipe in `Initiator.Finish` so future early-returns cannot leak the session key. No public-API or wire-format change.
 - Pin protocol-identity strings (`DraftVersion`, `suiteName`, `currentSuite`) and the byte output of `buildCI` via
   `TestBuildCIWireStability`. Add password-mismatch, nil-receiver,
   Export-prefix-free, and `ErrConfirmationFailed`/`ErrAbort` state-consumption

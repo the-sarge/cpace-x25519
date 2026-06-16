@@ -14,7 +14,7 @@ This document is the module for pinned evidence baselines. It names the commit, 
 
 The current strongest release evidence remains historical external-review evidence, not a production-readiness claim. The current pinned package-code evidence baseline for dependency review, SAST/gosec, Capslock, security/spec audit, and paired long fuzzing is `933ece246e6170b11e838395bf36f852cba0cd02`, captured under Go 1.26.4 in `docs/evidence/go1264-20260611/`.
 
-Security-relevant package-code changes landed after that baseline, including ADR-0003 and the later accepted-ADR/architecture deepening sequence through PR #104. Do not describe any newer commit as release-current on dependency, fuzz, Capslock, or security/spec evidence until those evidence lanes are refreshed at the exact candidate commit.
+Security-relevant package-code changes landed after that baseline, including ADR-0003, the later accepted-ADR/architecture deepening sequence through PR #104, and ADR-0009 caller-input implementation work. Do not describe any newer commit as release-current on dependency, fuzz, Capslock, or security/spec evidence until those evidence lanes are refreshed at the exact candidate commit.
 
 The latest merged code candidate when this module was introduced is PR #104 merge `aa3b30fe6f895655d2d2259e9e1e62c3ad34dc97`. Treat that commit as an evidence-refresh target, not a refreshed evidence baseline.
 

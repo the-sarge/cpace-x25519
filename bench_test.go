@@ -20,16 +20,16 @@ var (
 	benchmarkMessageCSink    messageC
 )
 
-func benchmarkConfigs() (Config, Config) {
-	initCfg := testConfig()
-	initCfg.AssociatedData = []byte("ADa")
-	respCfg := testConfig()
-	respCfg.AssociatedData = []byte("ADb")
+func benchmarkInputs() (Input, Input) {
+	initCfg := testInitiatorInput()
+	initCfg.LocalAssociatedData = []byte("ADa")
+	respCfg := testResponderInput()
+	respCfg.LocalAssociatedData = []byte("ADb")
 	return initCfg, respCfg
 }
 
 func BenchmarkRoundTrip(b *testing.B) {
-	initCfg, respCfg := benchmarkConfigs()
+	initCfg, respCfg := benchmarkInputs()
 	initRand := benchmarkRand(0x11)
 	respRand := benchmarkRand(0x22)
 	b.ReportAllocs()
@@ -56,7 +56,7 @@ func BenchmarkRoundTrip(b *testing.B) {
 }
 
 func BenchmarkStart(b *testing.B) {
-	initCfg, _ := benchmarkConfigs()
+	initCfg, _ := benchmarkInputs()
 	initRand := benchmarkRand(0x11)
 	b.ReportAllocs()
 	for b.Loop() {
@@ -72,7 +72,7 @@ func BenchmarkStart(b *testing.B) {
 }
 
 func BenchmarkRespond(b *testing.B) {
-	initCfg, respCfg := benchmarkConfigs()
+	initCfg, respCfg := benchmarkInputs()
 	_, msgA, err := startWithRandom(initCfg, benchmarkRand(0x11))
 	if err != nil {
 		b.Fatal(err)
@@ -93,7 +93,7 @@ func BenchmarkRespond(b *testing.B) {
 }
 
 func BenchmarkInitiatorFinish(b *testing.B) {
-	initCfg, respCfg := benchmarkConfigs()
+	initCfg, respCfg := benchmarkInputs()
 	b.ReportAllocs()
 	for b.Loop() {
 		b.StopTimer()
@@ -117,7 +117,7 @@ func BenchmarkInitiatorFinish(b *testing.B) {
 }
 
 func BenchmarkResponderFinish(b *testing.B) {
-	initCfg, respCfg := benchmarkConfigs()
+	initCfg, respCfg := benchmarkInputs()
 	b.ReportAllocs()
 	for b.Loop() {
 		b.StopTimer()
@@ -144,7 +144,7 @@ func BenchmarkResponderFinish(b *testing.B) {
 }
 
 func BenchmarkSessionExport(b *testing.B) {
-	initCfg, respCfg := benchmarkConfigs()
+	initCfg, respCfg := benchmarkInputs()
 	initiator, msgA, err := startWithRandom(initCfg, benchmarkRand(0x11))
 	if err != nil {
 		b.Fatal(err)

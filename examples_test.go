@@ -9,24 +9,16 @@ import (
 )
 
 func Example() {
-	common := cpace.Config{
-		Password:    []byte("correct horse battery staple"),
-		InitiatorID: []byte("client@example"),
-		ResponderID: []byte("server@example"),
-		Context:     []byte("example protocol v1"),
-		SessionID:   []byte("session-1234"),
-	}
-
-	initCfg := common
-	initCfg.AssociatedData = []byte("client hello")
+	initCfg := exampleInitiatorInput("session-1234")
+	initCfg.LocalAssociatedData = []byte("client hello")
 	initiator, msgA, err := cpace.Start(initCfg)
 	if err != nil {
 		panic(err)
 	}
 	defer closeExampleInitiator(initiator)
 
-	respCfg := common
-	respCfg.AssociatedData = []byte("server hello")
+	respCfg := exampleResponderInput("session-1234")
+	respCfg.LocalAssociatedData = []byte("server hello")
 	responder, msgB, err := cpace.Respond(respCfg, msgA)
 	if err != nil {
 		panic(err)
@@ -107,18 +99,17 @@ func ExampleSession_TranscriptID() {
 }
 
 func ExampleInitiator_Finish_confirmationFailure() {
-	common := exampleConfig("example-confirmation-failure")
-	initCfg := common
-	initCfg.AssociatedData = []byte("client hello")
+	initCfg := exampleInitiatorInput("example-confirmation-failure")
+	initCfg.LocalAssociatedData = []byte("client hello")
 	initiator, msgA, err := cpace.Start(initCfg)
 	if err != nil {
 		panic(err)
 	}
 	defer closeExampleInitiator(initiator)
 
-	respCfg := common
+	respCfg := exampleResponderInput("example-confirmation-failure")
 	respCfg.Context = []byte("different protocol context")
-	respCfg.AssociatedData = []byte("server hello")
+	respCfg.LocalAssociatedData = []byte("server hello")
 	responder, msgB, err := cpace.Respond(respCfg, msgA)
 	if err != nil {
 		panic(err)
@@ -150,29 +141,37 @@ func ExampleSession_Close() {
 	// true
 }
 
-func exampleConfig(sessionID string) cpace.Config {
-	return cpace.Config{
-		Password:    []byte("correct horse battery staple"),
-		InitiatorID: []byte("client@example"),
-		ResponderID: []byte("server@example"),
-		Context:     []byte("example protocol v1"),
-		SessionID:   []byte(sessionID),
+func exampleInitiatorInput(sessionID string) cpace.Input {
+	return cpace.Input{
+		Password:  []byte("correct horse battery staple"),
+		SelfID:    []byte("client@example"),
+		PeerID:    []byte("server@example"),
+		Context:   []byte("example protocol v1"),
+		SessionID: []byte(sessionID),
+	}
+}
+
+func exampleResponderInput(sessionID string) cpace.Input {
+	return cpace.Input{
+		Password:  []byte("correct horse battery staple"),
+		SelfID:    []byte("server@example"),
+		PeerID:    []byte("client@example"),
+		Context:   []byte("example protocol v1"),
+		SessionID: []byte(sessionID),
 	}
 }
 
 func exampleConfirmedSessions(sessionID string) (*cpace.Session, *cpace.Session, error) {
-	common := exampleConfig(sessionID)
-
-	initCfg := common
-	initCfg.AssociatedData = []byte("client hello")
+	initCfg := exampleInitiatorInput(sessionID)
+	initCfg.LocalAssociatedData = []byte("client hello")
 	initiator, msgA, err := cpace.Start(initCfg)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer closeExampleInitiator(initiator)
 
-	respCfg := common
-	respCfg.AssociatedData = []byte("server hello")
+	respCfg := exampleResponderInput(sessionID)
+	respCfg.LocalAssociatedData = []byte("server hello")
 	responder, msgB, err := cpace.Respond(respCfg, msgA)
 	if err != nil {
 		return nil, nil, err

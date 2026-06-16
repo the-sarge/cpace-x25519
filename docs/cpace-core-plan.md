@@ -37,7 +37,7 @@ its persistent secrets, so the persistent-secret audit concentrates in two
 | Secret ownership | Stateful core objects own **persistent**-secret lifetime (initiator scalar; responder ISK — plus the responder transcript, public wire data zeroed as hygiene). Scratch secrets stay local, cleared eagerly. |
 | Seam content | Decoded cryptographic fields cross; wire framing stays in front. Responder core validates `Ya` before sampling. |
 | Randomness | Core constructor takes `io.Reader` (new core-test seam). `startWithRandom` / `respondWithRandom` **retained**, unexported, as the full-pipeline seam. |
-| `buildCI` | **In front** — `buildCI` runs inside `normalizeConfig`; `normalizedConfig` keeps its `ci` field unchanged. (Revises the earlier "behind the seam" call — lower churn, and it removes the seam contradiction phase-2 flagged.) |
+| `buildCI` | **In front** — `buildCI` runs inside `normalizeInput`; `normalizedConfig` keeps its `ci` field unchanged. (Revises the earlier "behind the seam" call — lower churn, and it removes the seam contradiction phase-2 flagged.) |
 | Session | Core constructs it; only the Session's independent ISK clone persists past `clear()`. |
 | Naming | `initiatorCore` / `responderCore` — concept **CPace core** (`CONTEXT.md`). |
 | Tests | Primitive-level vector tests retained as internal-seam tests; add core-level vector tests + an ISK-isolation test. |
@@ -48,21 +48,21 @@ The sketches below are **literal** — every defensive `defer` and guard the
 current code relies on is shown, because an implementer follows the sketch.
 
 ```go
-// api.go — public shells; frozen surface unchanged
+// api.go — public shells
 type Initiator struct {
     mu   sync.Mutex
     used bool
     core *initiatorCore
 }
 
-func Start(cfg Config) (*Initiator, []byte, error) {
-    return startWithRandom(cfg, rand.Reader)
+func Start(input Input) (*Initiator, []byte, error) {
+    return startWithRandom(input, rand.Reader)
 }
 
 // startWithRandom stays unexported — the deterministic full-pipeline seam for
 // api_test.go / fuzz_test.go / bench_test.go. It owns the password backstop.
-func startWithRandom(cfg Config, random io.Reader) (*Initiator, []byte, error) {
-    nc, err := normalizeConfig(cfg)
+func startWithRandom(input Input, random io.Reader) (*Initiator, []byte, error) {
+    nc, err := normalizeStartInput(input)
     if err != nil {
         return nil, nil, err
     }
@@ -93,12 +93,12 @@ func (i *Initiator) Finish(messageB []byte) ([]byte, *Session, error) {
     return encodeMessageC(tagA), sess, nil
 }
 
-func Respond(cfg Config, messageA []byte) (*Responder, []byte, error) {
-    return respondWithRandom(cfg, messageA, rand.Reader)
+func Respond(input Input, messageA []byte) (*Responder, []byte, error) {
+    return respondWithRandom(input, messageA, rand.Reader)
 }
 
-func respondWithRandom(cfg Config, messageA []byte, random io.Reader) (*Responder, []byte, error) {
-    nc, err := normalizeConfig(cfg)
+func respondWithRandom(input Input, messageA []byte, random io.Reader) (*Responder, []byte, error) {
+    nc, err := normalizeRespondInput(input)
     if err != nil {
         return nil, nil, err
     }
@@ -264,12 +264,7 @@ Diffie-Hellman and peer-share validation, transcript assembly, ISK derivation,
 confirmation tag build and verify, `*Session` construction, and the clearing of
 both persistent and scratch secrets.
 
-**In front (`api.go` shell):** `Config` normalization — *including* `buildCI`,
-which runs inside `normalizeConfig` so `normalizedConfig.ci` reaches the core
-prebuilt — validation, public error wrapping; wire framing
-(`encode`/`decodeMessage*`); the single-use guard; the `a.sid == nc.sid`
-message-vs-config check; and the unexported `startWithRandom` /
-`respondWithRandom` randomness wrappers with their password backstop `defer`.
+**In front (`api.go` shell):** `Input` normalization — *including* `buildCI`, which runs inside `normalizeInput` so `normalizedConfig.ci` reaches the core prebuilt — validation, public error wrapping; wire framing (`encode`/`decodeMessage*`); the single-use guard; the `a.sid == nc.sid` message-vs-config check; and the unexported `startWithRandom` / `respondWithRandom` randomness wrappers with their password backstop `defer`.
 
 Error ownership at the seam: the shells mint config and framing errors (`ErrInvalidInput`, `ErrMessage`); the core returns protocol errors ready-made (`ErrAbort` wraps, `ErrConfirmationFailed`, and `ErrRandomness` propagated from `sampleScalar`), and the shells pass them through without re-wrapping — exactly as the sketches show. An implementer must not introduce internal sentinels that the shell re-wraps; that shape risks double-wrapping and changed error identity.
 
@@ -317,7 +312,7 @@ lands with its tests already in place.
    Compute the goldens at the **primitive seam** —
    `confirmationTag(ISK_IR, sid, Yb, ADb)` and
    `confirmationTag(ISK_IR, sid, Ya, ADa)`, the way `vectors_test.go` already
-   drives primitives — not via the public pipeline: `normalizeConfig` always
+   drives primitives — not via the public pipeline: `normalizeInput` always
    derives `ci` through `buildCI`, so the package-built CI can never equal the
    vector's raw CI, and pipeline-captured tags would not match step 4's core
    tests.

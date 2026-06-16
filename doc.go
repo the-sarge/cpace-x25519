@@ -11,11 +11,11 @@
 //
 // Scalar randomness always comes from crypto/rand.Reader; the package does not
 // accept caller-supplied randomness through the public API.
-// Config and wire fields have package-owned per-field size caps; associated
+// Input and wire fields have package-owned per-field size caps; associated
 // data is capped at 64 KiB and smaller identity/context fields are capped more
 // tightly.
 //
-// Config.SessionID must be non-empty by default. Config.AllowEmptySessionID is
+// Input.SessionID must be non-empty by default. Input.AllowEmptySessionID is
 // only for draft-21 compatibility tests or deliberately compatible profiles
 // that accept weaker replay and transcript separation.
 //
@@ -28,8 +28,9 @@
 // future Export calls fail. PeerAssociatedData and PeerID expose copied,
 // non-secret metadata bound into the confirmed exchange.
 //
-// Both parties must use the same role orientation: InitiatorID identifies the
-// Start side, and ResponderID identifies the Respond side. Applications that
+// Callers provide role-local Input: Start maps SelfID to the initiator identity
+// and PeerID to the responder identity, while Respond maps SelfID to the
+// responder identity and PeerID to the initiator identity. Applications that
 // negotiate PAKE versions, suites, or protocol modes outside this package must
 // provide their own downgrade protection for that outer negotiation.
 package cpace
