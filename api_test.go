@@ -444,9 +444,15 @@ func TestMutableInputsAreCopied(t *testing.T) {
 	initCfg := testInitiatorInput()
 	initCfg.LocalAssociatedData = []byte("ADa")
 	password := []byte("password")
+	initiatorSelfID := []byte("initiator")
 	initiatorPeerID := []byte("responder")
+	initiatorContext := []byte("context")
+	initiatorSessionID := []byte("sid")
 	initCfg.Password = password
+	initCfg.SelfID = initiatorSelfID
 	initCfg.PeerID = initiatorPeerID
+	initCfg.Context = initiatorContext
+	initCfg.SessionID = initiatorSessionID
 	initiator, msgA, err := startTestInitiator(initCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -454,23 +460,47 @@ func TestMutableInputsAreCopied(t *testing.T) {
 	for i := range password {
 		password[i] ^= 0xff
 	}
+	for i := range initiatorSelfID {
+		initiatorSelfID[i] ^= 0xff
+	}
 	for i := range initCfg.LocalAssociatedData {
 		initCfg.LocalAssociatedData[i] ^= 0xff
 	}
 	for i := range initiatorPeerID {
 		initiatorPeerID[i] ^= 0xff
 	}
+	for i := range initiatorContext {
+		initiatorContext[i] ^= 0xff
+	}
+	for i := range initiatorSessionID {
+		initiatorSessionID[i] ^= 0xff
+	}
 
 	respCfg := testResponderInput()
 	respCfg.LocalAssociatedData = []byte("ADb")
+	responderSelfID := []byte("responder")
 	responderPeerID := []byte("initiator")
+	responderContext := []byte("context")
+	responderSessionID := []byte("sid")
+	respCfg.SelfID = responderSelfID
 	respCfg.PeerID = responderPeerID
+	respCfg.Context = responderContext
+	respCfg.SessionID = responderSessionID
 	responder, msgB, err := respondTestResponder(respCfg, msgA)
 	if err != nil {
 		t.Fatal(err)
 	}
+	for i := range responderSelfID {
+		responderSelfID[i] ^= 0xff
+	}
 	for i := range responderPeerID {
 		responderPeerID[i] ^= 0xff
+	}
+	for i := range responderContext {
+		responderContext[i] ^= 0xff
+	}
+	for i := range responderSessionID {
+		responderSessionID[i] ^= 0xff
 	}
 	msgC, sI, err := initiator.Finish(msgB)
 	if err != nil {
@@ -488,6 +518,78 @@ func TestMutableInputsAreCopied(t *testing.T) {
 	}
 	if !bytes.Equal(sI.TranscriptID(), sR.TranscriptID()) {
 		t.Fatal("transcript IDs differ after caller mutation")
+	}
+}
+
+func TestInputErrorPathsDoNotMutateCallerSlices(t *testing.T) {
+	cases := []struct {
+		name  string
+		input Input
+		run   func(Input) error
+		want  error
+	}{
+		{
+			name:  "Start randomness error",
+			input: testInitiatorInput(),
+			run: func(input Input) error {
+				_, _, err := startWithRandom(input, failingReader{err: io.ErrUnexpectedEOF})
+				return err
+			},
+			want: ErrRandomness,
+		},
+		{
+			name:  "Respond malformed message",
+			input: testResponderInput(),
+			run: func(input Input) error {
+				_, _, err := Respond(input, []byte("garbage"))
+				return err
+			},
+			want: ErrMessage,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			input := tc.input
+			input.LocalAssociatedData = []byte("AD")
+			original := cloneInputBytes(input)
+			err := tc.run(input)
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("err=%v want %v", err, tc.want)
+			}
+			assertInputBytesEqual(t, input, original)
+		})
+	}
+}
+
+func cloneInputBytes(input Input) Input {
+	input.Password = clone(input.Password)
+	input.SelfID = clone(input.SelfID)
+	input.PeerID = clone(input.PeerID)
+	input.Context = clone(input.Context)
+	input.SessionID = clone(input.SessionID)
+	input.LocalAssociatedData = clone(input.LocalAssociatedData)
+	return input
+}
+
+func assertInputBytesEqual(t *testing.T, got, want Input) {
+	t.Helper()
+	if !bytes.Equal(got.Password, want.Password) {
+		t.Fatalf("Password mutated: got %q want %q", got.Password, want.Password)
+	}
+	if !bytes.Equal(got.SelfID, want.SelfID) {
+		t.Fatalf("SelfID mutated: got %q want %q", got.SelfID, want.SelfID)
+	}
+	if !bytes.Equal(got.PeerID, want.PeerID) {
+		t.Fatalf("PeerID mutated: got %q want %q", got.PeerID, want.PeerID)
+	}
+	if !bytes.Equal(got.Context, want.Context) {
+		t.Fatalf("Context mutated: got %q want %q", got.Context, want.Context)
+	}
+	if !bytes.Equal(got.SessionID, want.SessionID) {
+		t.Fatalf("SessionID mutated: got %q want %q", got.SessionID, want.SessionID)
+	}
+	if !bytes.Equal(got.LocalAssociatedData, want.LocalAssociatedData) {
+		t.Fatalf("LocalAssociatedData mutated: got %q want %q", got.LocalAssociatedData, want.LocalAssociatedData)
 	}
 }
 
