@@ -1466,3 +1466,34 @@ PR #138 landed issue #80 by reusing the responder's prevalidated initiator peer 
 
 - Resolve #139 as internal cleanup before v1.0.0 if time permits.
 - Refresh pinned dependency-review, fuzz, Capslock, and security/spec-audit evidence against the exact candidate commit before making stronger release-readiness claims.
+
+---
+
+## Architecture slices landed - 2026-06-16 14:47 EDT
+
+**Main:** `3835b8736a69`
+**Actor:** Codex
+
+### Summary
+
+Completed the architecture-slice batch after the release-readiness freeze was explicitly lifted for this work: PR #130 collapsed copied single-use terminal state into one private terminal module, PR #132 hardened release helper contract tests and validation, and PR #134 centralized length-value encoding and reuse across string/framing/crypto code without changing public API or wire behavior.
+
+### Completed
+
+- Merged PR #130 (`refactor: collapse single-use terminal state`) as `6eb018db5037969ec7218a8b2c52b5969e8e865e`; its RAS review-fix run `20260616T170948-f7b7cf160cb1c1cfcb39639f` completed with no merge-blocking findings, and the low/nit cleanup was filed as issue #131.
+- Merged PR #132 (`test: deepen release helper contracts`) as `086812a5a6b1c08a26252a112b57f9373f6aad2a`; its RAS review-fix run `20260616T172442-18a13fc8f4401aac4d67cf65` completed with no merge-blocking findings, and the newline-bearing tag follow-up was filed as issue #133.
+- Merged PR #134 (`refactor: deepen length-value encoding`) as `3835b8736a699bae9aa5ca1e48dd4d576bb809fd`; review follow-ups from runs `20260616T173416-f119c481f2391f21ede13e39` and `20260616T175128-d8bce5d2be304754406fdd54` were folded back into the PR, and the final RAS review-fix run `20260616T180735-9770be235a471c08073f28c6` reported no actionable findings on the reviewed head before merge.
+- Added issue #136 for the deferred Caller input architecture question instead of widening this batch beyond the three selected low-risk slices.
+- Closed issue #135 after PR #134 merged and completed its OmniFocus task `fwQqC9coN-n`; remaining open follow-up tasks are #131 (`acrb5smRKe9`), #133 (`nv9mcl6_6TF`), and #136 (`i3nngrHasAi`).
+
+### Validation
+
+- PR #130 local gates passed before merge: focused single-use lifecycle tests, `go test ./...`, `go test -race ./...`, and `task check`; hosted checks passed before merge.
+- PR #132 local gates passed before merge: `scripts/test-release-helpers.sh`, `(cd tools/releasepolicy && go test ./...)`, and `task check`; hosted checks passed after updating the branch with a signed-off merge commit.
+- PR #134 local gates passed before merge: focused length-value/framing/string tests, `task check`, and `go run github.com/securego/gosec/v2/cmd/gosec@v2.26.1 -exclude-dir=.ras -tests ./...`; after the final signed-off base update, `task check` passed again and hosted checks passed before merge.
+
+### Next
+
+- Resolve #131 and #133 as non-blocking cleanup when convenient.
+- Evaluate #136 separately before deciding whether to concentrate Caller input field policy.
+- Stronger release-readiness claims still require refreshing dependency-review, fuzz, security-audit, and related pinned evidence against the exact candidate commit after these security-relevant changes.
