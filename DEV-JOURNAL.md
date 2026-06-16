@@ -1599,3 +1599,36 @@ PR #147 completed issue #131 by trimming unreachable private defensive paths fro
 
 - Continue the phase-2 implementation sequence with #133, the release-helper newline tag hardening.
 - Stronger release-readiness claims still require the planned exact-candidate evidence refresh after these internal lifecycle changes.
+
+---
+
+## Release helper newline hardening landed - 2026-06-16 18:34 EDT
+
+**Main:** `09b82c4bdcd1`
+**Actor:** Codex
+
+**Summary**
+
+PR #149 completed issue #133 by making release helper tag validation reject multiline scalar inputs before SemVer regex checks, preserving accepted tag syntax while preventing line-oriented matching from accepting only the first line.
+
+**Completed**
+
+- Merged PR #149 (`test: reject multiline release helper tags`) as `09b82c4bdcd19772fa2e7ff594399964dcfa54ab`; issue #133 closed automatically at merge.
+- Added release helper smoke tests for multiline release-note tags, multiline release metadata tags, and newline-bearing SBOM filenames.
+- Added early newline rejection to `scripts/extract-release-notes.sh`, `scripts/release-tag-metadata.sh`, and `scripts/validate-cyclonedx-sbom.sh` before their existing SemVer regex checks.
+- RAS review-fix run `20260616T222801-771919b91d3e76aa58e5c2ff` reported no merge-blocking findings; its only low-severity maintainability item became follow-up issue #150 and OmniFocus task `iZmGBhcCHRi`.
+- Completed OmniFocus task `nv9mcl6_6TF` with merge, validation, RAS, and follow-up evidence.
+
+**Validation**
+
+- The new smoke tests failed before the helper changes, then passed after the newline guards were added.
+- Release helper validation passed with `scripts/test-release-helpers.sh`; the optional Syft validation skip remained expected because `syft` is not installed.
+- Release policy tests passed with `(cd tools/releasepolicy && go test ./...)`.
+- Whitespace and full local gates passed with `git diff --check` and `task check`.
+- GitHub checks on PR #149 passed before merge: Check, DCO, Dependency Gate, and SAST Gate; the standalone gosec child check was neutral/skipping as expected.
+
+**Next**
+
+- Continue the phase-2 implementation sequence with #136, the caller-input field-policy evaluation.
+- Keep #150 separate from the implementation sequence unless a maintainer wants to deduplicate release-tag validation now.
+- Stronger release-readiness claims still require the planned exact-candidate evidence refresh after these release-helper changes.
