@@ -1117,6 +1117,15 @@ func TestInputValidation(t *testing.T) {
 			want:       "cpace: invalid input: context too large",
 			wantErrors: []error{ErrInvalidInput},
 		},
+		{
+			name: "oversized session id before oversized local associated data",
+			edit: func(c *Input) {
+				c.SessionID = bytes.Repeat([]byte{0x42}, sessionIDCap.length+1)
+				c.LocalAssociatedData = bytes.Repeat([]byte{0x42}, localAssociatedDataCap.length+1)
+			},
+			want:       "cpace: invalid input: session id too large",
+			wantErrors: []error{ErrInvalidInput},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
