@@ -1264,3 +1264,33 @@ Merged PR #111 to make Evidence baseline own summary-doc discovery while preserv
 **Next**
 
 - Issue #112 tracks low/nit follow-up hardening for manifest shape guards, explicit shell error propagation, and a short note on the Go `--list-summary-docs` inspection flag.
+
+---
+
+## Package cap policy deepening landed - 2026-06-15 22:47 EDT
+
+**Main:** `68b8443694e2`
+**Actor:** Codex
+
+**Summary**
+
+PR #114 deepened the Package-owned cap policy module without changing public API, wire format, cap values, package-profile policy, or release-readiness claims. Config cap acceptance now validates all local byte fields before cloning and returns package-owned copies through one internal module; Message framing now delegates field length, truncation, and cloning checks to the same cap-policy implementation while keeping header, role, aggregate-size, and LEB128 orchestration in framing.
+
+**Completed**
+
+- Merged PR #114 as `68b8443694e25f8fa8f08bdb0ec65a32246e848e` from reviewed head `d9615218af8e58e590390c3fa83af49fa36f8b27`.
+- Updated `caps.go` with `acceptConfig`, cap-policy Config copy ownership, Message framing field acceptance, and a shipped cap-policy catalogue for tests.
+- Simplified `normalizeConfig` so it delegates local byte-field acceptance to Package-owned cap policy, then transfers accepted copies into `normalizedConfig`.
+- Simplified `messageReader.readField` so Message framing delegates field cap, exact-length, truncation, and clone behavior to Package-owned cap policy.
+- Updated cap-policy tests to pin the shipped catalogue through the policy interface and cover Config copy ownership plus no caller-input mutation on cap failure.
+- Ran RAS review-fix on PR #114; implementation id `20260616T023946-93fea2d66c355775659a93b5` finished `done` with no merge-blocking findings. The only reported item was a non-blocking nit about documenting the ownership-transfer rollback guard; no follow-up issue was opened because it does not affect behavior, verification, or future implementation work.
+
+**Validation**
+
+- Local pre-merge gates passed: `go test ./...`, `task quick`, `go test -race ./...`, `task check`, and `git diff --check`.
+- `task check` included docs validation, release-helper smoke tests, CI classifier tests, evidence baseline validation, nested evidence-checker linting, root tests, race tests, gofmt/goimports checks, root `go vet`, root Staticcheck, ast-grep, and `govulncheck -test ./...`; the helper script skipped only optional real Syft SBOM validation because `syft` was not installed.
+- GitHub checks on PR #114 passed before merge: Check, CodeQL Analyze/CodeQL, macOS smoke, Windows smoke, DCO, Dependency Gate, SAST Gate, and Staticcheck; the standalone `gosec` child check was neutral/skipping as expected.
+
+**Next**
+
+- Treat this as security-relevant internal validation movement for evidence discipline: stronger release claims still require refreshing pinned dependency-review, fuzz, Capslock, and security/spec-audit evidence against the exact candidate commit.
