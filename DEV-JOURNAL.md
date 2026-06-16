@@ -1367,3 +1367,34 @@ PR #120 accepted ADR-0009, recording a broad Caller input replacement whose auth
 
 - Implement ADR-0009 in a separate TDD code PR, using issue #121 as part of the copy-ownership test checklist.
 - Do not claim refreshed release evidence from ADR-0009 until the exact-candidate evidence refresh covers the implementation commit and reviewer-packet re-pin.
+
+---
+
+## Caller input implementation landed - 2026-06-16 04:58 EDT
+
+**Main:** `5b7e61576751`
+**Actor:** Codex
+
+**Summary**
+
+PR #123 implemented accepted ADR-0009 by replacing the public `Config` caller-input surface with role-local `Input`, mapping `SelfID`/`PeerID` per role before CI construction, and preserving wire format while updating examples, fuzz, benchmarks, live docs, evidence caveats, and the named secret-lifetime audit.
+
+**Completed**
+
+- Merged PR #123 as `5b7e615767518edac7cf7251520e7ed9a72ec909` from reviewed implementation head `d76015c68f891182075e1656252ae0b5fee9f7cc`.
+- Added `Input{Password, SelfID, PeerID, Context, SessionID, LocalAssociatedData, AllowEmptySessionID}` and removed public `Config`; `Start` and `Respond` now accept `Input`.
+- Added public coverage for role-local mapping, peer metadata, validation diagnostics and precedence, nil/empty `LocalAssociatedData`, reversed role-local identity confirmation failure, and copy ownership including `Session.TranscriptID()` stability.
+- Added `docs/adr-0009-secret-lifetime-audit.md` and updated README, package docs, integration guidance, threat model, security assessment, spec matrix, external-review handoff, evidence baseline, security/spec audit, changelog, and CONTEXT.md for role-local caller-input language.
+- Closed issue #121 through the implementation PR.
+- Ran `ras review-fix` on PR #123; run `20260616T084506-a42497f8f2a063f8958f91a6` finished `done` with no merge-blocking findings. The two low-severity follow-ups were filed as #124 and #125 and added to OmniFocus as `o-CyFwzIIEr` and `aNp2T318MJz`.
+
+**Validation**
+
+- Local final gates passed before merge: `go test ./...`, `go vet ./...`, `go test -race ./...`, `task docs:check`, `task check`, and `git diff --check`.
+- ADR-0009 acceptance sweeps were run: public-surface grep, deterministic-seam grep, docs vocabulary grep, and `go doc . Input`, `go doc . Start`, `go doc . Respond`.
+- GitHub checks on PR #123 passed before merge: Check, CodeQL Analyze/CodeQL, macOS smoke, Windows smoke, DCO, Dependency Gate, SAST Gate, and Staticcheck; the standalone gosec child check was neutral/skipping as expected.
+
+**Next**
+
+- Non-blocking follow-ups remain open as #124 and #125.
+- Stronger release claims still require refreshing pinned dependency-review, fuzz, Capslock, and security/spec-audit evidence against the exact candidate commit.
