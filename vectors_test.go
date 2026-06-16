@@ -402,8 +402,8 @@ func TestCoreDraft21Vectors(t *testing.T) {
 	}
 }
 
-func draftVectorConfig(v draftVector, ad []byte) normalizedConfig {
-	return normalizedConfig{
+func draftVectorConfig(v draftVector, ad []byte) normalizedInput {
+	return normalizedInput{
 		password:    clone(v["PRS"]),
 		initiatorID: []byte("A_initiator"),
 		responderID: []byte("B_responder"),

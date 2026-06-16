@@ -21,33 +21,6 @@ const (
 
 const suiteName = "CPACE-RISTR255-SHA512"
 
-// Input contains the local inputs for one CPace role.
-//
-// Password, SelfID, and PeerID must be non-empty. Context and
-// LocalAssociatedData may be empty. Password, Context, and SessionID are shared
-// session values both parties supply identically. SelfID, PeerID, and
-// LocalAssociatedData are role-local values: Start treats SelfID as the
-// initiator identity and PeerID as the responder identity; Respond treats
-// SelfID as the responder identity and PeerID as the initiator identity.
-// SessionID must be a fresh, non-secret, parties-agree-on value for every
-// session. Empty SessionID values are rejected by default because they weaken
-// replay and transcript separation properties. Set AllowEmptySessionID only for
-// draft-21 compatibility tests or profiles that have deliberately accepted the
-// weaker empty-sid behavior. Scalar randomness always comes from
-// crypto/rand.Reader. Field lengths are capped at 4 KiB for Password and IDs,
-// 1 KiB for Context and SessionID, and 64 KiB for LocalAssociatedData. Inputs
-// exceeding these caps are rejected before copying; accepted byte slices are
-// copied by Start and Respond before use.
-type Input struct {
-	Password            []byte
-	SelfID              []byte
-	PeerID              []byte
-	Context             []byte
-	SessionID           []byte
-	LocalAssociatedData []byte
-	AllowEmptySessionID bool
-}
-
 // Initiator is a single-use initiator state returned by Start.
 type Initiator struct {
 	state *initiatorState
@@ -91,30 +64,6 @@ type sessionState struct {
 	mu     sync.Mutex
 	closed bool
 	isk    []byte
-}
-
-type normalizedConfig struct {
-	password    []byte
-	initiatorID []byte
-	responderID []byte
-	ci          []byte
-	sid         []byte
-	ad          []byte
-}
-
-// wipe performs best-effort zeroization of every byte slice owned by the
-// normalized config. Called via defer in startWithRandom and respondWithRandom
-// so that all cloned input bytes are cleared on every exit path — including
-// core-constructor error returns and panics. Idempotent against fields whose
-// backing arrays were already zeroed behind the core seam (the password is
-// eagerly cleared inside the core constructors).
-func (nc *normalizedConfig) wipe() {
-	clearBytes(nc.password)
-	clearBytes(nc.initiatorID)
-	clearBytes(nc.responderID)
-	clearBytes(nc.ci)
-	clearBytes(nc.sid)
-	clearBytes(nc.ad)
 }
 
 // Start creates initiator state and message A.
@@ -308,59 +257,6 @@ func (s *responderState) claimClose() (*responderCore, error) {
 	}
 	s.used = true
 	return s.core, nil
-}
-
-func normalizeStartInput(input Input) (normalizedConfig, error) {
-	return normalizeInput(input, false)
-}
-
-func normalizeRespondInput(input Input) (normalizedConfig, error) {
-	return normalizeInput(input, true)
-}
-
-func normalizeInput(input Input, responder bool) (normalizedConfig, error) {
-	accepted, err := acceptInput(input)
-	if err != nil {
-		return normalizedConfig{}, err
-	}
-	keep := false
-	defer func() {
-		if !keep {
-			accepted.wipe()
-		}
-	}()
-	initiatorID := accepted.selfID
-	responderID := accepted.peerID
-	if responder {
-		initiatorID, responderID = accepted.peerID, accepted.selfID
-	}
-	ci := buildCI(initiatorID, responderID, accepted.context)
-	clearBytes(accepted.context)
-	accepted.context = nil
-	nc := normalizedConfig{
-		password:    accepted.password,
-		initiatorID: initiatorID,
-		responderID: responderID,
-		ci:          ci,
-		sid:         accepted.sid,
-		ad:          accepted.localAD,
-	}
-	keep = true
-	return nc, nil
-}
-
-func buildCI(initiatorID, responderID, context []byte) []byte {
-	return lvCat(
-		[]byte("CPace-Go-CI"),
-		[]byte(DraftVersion),
-		[]byte(suiteName),
-		[]byte("initiator"),
-		initiatorID,
-		[]byte("responder"),
-		responderID,
-		[]byte("context"),
-		context,
-	)
 }
 
 func newSession(isk, transcript, peerAD, peerID []byte) *Session {

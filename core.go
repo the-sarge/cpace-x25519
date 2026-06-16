@@ -25,7 +25,7 @@ type responderCore struct {
 	peerID     []byte
 }
 
-func newInitiatorCore(nc normalizedConfig, random io.Reader) (*initiatorCore, []byte, error) {
+func newInitiatorCore(nc normalizedInput, random io.Reader) (*initiatorCore, []byte, error) {
 	if random == nil {
 		random = rand.Reader
 	}
@@ -72,7 +72,7 @@ func (c *initiatorCore) finish(peerYb, peerAdb, peerTag []byte) ([]byte, *Sessio
 	return tagA, newSession(isk, tr, peerAdb, c.peerID), nil
 }
 
-func newResponderCore(nc normalizedConfig, peerYa, peerAda []byte, random io.Reader) (*responderCore, []byte, []byte, error) {
+func newResponderCore(nc normalizedInput, peerYa, peerAda []byte, random io.Reader) (*responderCore, []byte, []byte, error) {
 	if random == nil {
 		random = rand.Reader
 	}

@@ -24,67 +24,6 @@ func exactPackageCapField(name string, wantLen int) packageCapField {
 	return packageCapField{name: name, length: wantLen, exact: true}
 }
 
-type acceptedInput struct {
-	password []byte
-	selfID   []byte
-	peerID   []byte
-	context  []byte
-	sid      []byte
-	localAD  []byte
-}
-
-func acceptInput(input Input) (acceptedInput, error) {
-	if len(input.Password) == 0 {
-		return acceptedInput{}, fmt.Errorf("%w: empty password", ErrInvalidInput)
-	}
-	if len(input.SelfID) == 0 {
-		return acceptedInput{}, fmt.Errorf("%w: empty self id", ErrInvalidInput)
-	}
-	if len(input.PeerID) == 0 {
-		return acceptedInput{}, fmt.Errorf("%w: empty peer id", ErrInvalidInput)
-	}
-	if len(input.SessionID) == 0 && !input.AllowEmptySessionID {
-		return acceptedInput{}, fmt.Errorf("%w: %w", ErrInvalidInput, ErrEmptySessionID)
-	}
-
-	for _, field := range []struct {
-		cap   packageCapField
-		value []byte
-	}{
-		{passwordCap, input.Password},
-		{selfIDCap, input.SelfID},
-		{peerIDCap, input.PeerID},
-		{contextCap, input.Context},
-		{sessionIDCap, input.SessionID},
-		{localAssociatedDataCap, input.LocalAssociatedData},
-	} {
-		if err := field.cap.validateInputLength(len(field.value)); err != nil {
-			return acceptedInput{}, err
-		}
-	}
-
-	return acceptedInput{
-		password: clone(input.Password),
-		selfID:   clone(input.SelfID),
-		peerID:   clone(input.PeerID),
-		context:  clone(input.Context),
-		sid:      clone(input.SessionID),
-		localAD:  clone(input.LocalAssociatedData),
-	}, nil
-}
-
-func (c *acceptedInput) wipe() {
-	if c == nil {
-		return
-	}
-	clearBytes(c.password)
-	clearBytes(c.selfID)
-	clearBytes(c.peerID)
-	clearBytes(c.context)
-	clearBytes(c.sid)
-	clearBytes(c.localAD)
-}
-
 func (f packageCapField) validateInputLength(n int) error {
 	if n > f.length {
 		return fmt.Errorf("%w: %s too large", ErrInvalidInput, f.name)
