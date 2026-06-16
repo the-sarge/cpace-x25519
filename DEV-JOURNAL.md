@@ -1336,3 +1336,34 @@ Accepted and merged ADR-0008, recording a narrow public-lifecycle thaw for expli
 - Ran `ras review-fix 118`; review loop `20260616T044602-6333a251248f2384ee160008` reported no fix-first findings and no required code changes.
 - Validation before merge: `task check` passed locally; GitHub checks for PR #118 passed with merge state `CLEAN`.
 - Evidence refresh was intentionally deferred per maintainer direction; exact-candidate evidence refresh remains tracked separately before stronger release claims.
+
+---
+
+## ADR-0009 caller input thaw accepted - 2026-06-16 04:24 EDT
+
+**Main:** `3a3109cc7957`
+**Actor:** Codex
+
+**Summary**
+
+PR #120 accepted ADR-0009, recording a broad Caller input replacement whose authorization is narrowly limited to the follow-up role-local `Input` implementation. The merge updates the domain glossary, top-level freeze guidance, project plan, and agent instructions so future work can implement ADR-0009 without reopening unrelated public API or package-profile policy.
+
+**Completed**
+
+- Merged PR #120 as `3a3109cc7957a79334ce8a288e51d5804f3a5270` from reviewed head `40e61616ae17a4e73ada0c666dc5e0e23cb4e5b5`.
+- Added accepted `docs/adr/0009-caller-input.md`, defining `Input{Password, SelfID, PeerID, Context, SessionID, LocalAssociatedData, AllowEmptySessionID}` as the v1 Caller input module and removing public `Config` from the intended v1 surface.
+- Updated `CONTEXT.md` with Caller input vocabulary and Package-owned cap policy wording; updated `README.md`, `docs/project-plan.md`, and `AGENTS.md` so ADR-0009 is the only caller-input thaw and all unrelated public-surface/package-profile choices remain frozen.
+- Gated the ADR through `ras consider` runs `20260616T065527-779be2a67a01358b100aa80e`, `20260616T071012-53ce69dd6acfbef7baa79635`, and `20260616T072321-d625df82f8b30786dc5ac33d`; `ras verify` `20260616T072321-d625df82f8b30786dc5ac33d-verification-1781595592834070000` returned `unresolved: []`.
+- Ran PR review-fix on PR #120. The first loop applied policy/wording fixes through review runs `20260616T074145-56a39e2f9bb71caa3ffa6539` and `20260616T075521-2392474c90378db8a31180c0`; the final review-fix pass `20260616T081030-b1977c774144d993e87e3f44` reported no merge-blocking fixes.
+- Created non-blocking follow-up issue #121 for adding `Session.TranscriptID()` to caller-input copy-ownership implementation tests and added matching OmniFocus task `bLa0Ezk3_r9`.
+
+**Validation**
+
+- Local docs validation passed on the ADR branch: `task docs:check` and `cmark --validate-utf8 docs/adr/0009-caller-input.md`.
+- RAS PR review-fix final status for the last pass was `done`; its only finding was the low-severity follow-up now tracked as issue #121.
+- GitHub checks on PR #120 passed before merge: Check, DCO, Dependency Gate, and SAST Gate; the standalone gosec child check was neutral/skipped.
+
+**Next**
+
+- Implement ADR-0009 in a separate TDD code PR, using issue #121 as part of the copy-ownership test checklist.
+- Do not claim refreshed release evidence from ADR-0009 until the exact-candidate evidence refresh covers the implementation commit and reviewer-packet re-pin.
