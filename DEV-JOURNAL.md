@@ -1632,3 +1632,35 @@ PR #149 completed issue #133 by making release helper tag validation reject mult
 - Continue the phase-2 implementation sequence with #136, the caller-input field-policy evaluation.
 - Keep #150 separate from the implementation sequence unless a maintainer wants to deduplicate release-tag validation now.
 - Stronger release-readiness claims still require the planned exact-candidate evidence refresh after these release-helper changes.
+
+---
+
+## Caller input field-policy evaluation recorded - 2026-06-16 18:45 EDT
+
+**Main:** `c5013fc1fc96`
+**Actor:** Codex
+
+**Summary**
+
+PR #152 completed issue #136 by recording the caller-input field-policy evaluation outcome: do not add a private field-policy catalogue now because the current `input.go` validation, copy, normalization, and wipe functions remain small and inspectable after the follow-up coverage work.
+
+**Completed**
+
+- Merged PR #152 (`docs: record caller input field policy evaluation`) as `c5013fc1fc96427e7985e0962b0e673ce5fdb325`; issue #136 closed automatically at merge.
+- Added the evaluation result to `docs/project-plan.md` as later-investigation guidance: revisit concentration only if future caller-input changes create drift or a behavior-preserving simplification appears.
+- Updated the touched project-plan integration-guidance row to current role-local identity terminology; follow-up #145 remains the separate reviewer-outreach cleanup.
+- RAS review-fix run `20260616T223845-12a45e3b38718d7dbc42292f` reported no actionable findings.
+- Completed OmniFocus task `i3nngrHasAi` with merge, validation, and RAS evidence.
+
+**Validation**
+
+- Docs validation passed with `task docs:check` and `git diff --check`.
+- Targeted terminology inspection passed for the touched project-plan row; the only remaining stale reviewer-facing wording is tracked by #145.
+- Full local gate passed with `task check`; the optional Syft validation skip remained expected because `syft` is not installed.
+- GitHub checks on PR #152 passed before merge: Check, DCO, Dependency Gate, and SAST Gate; the standalone gosec child check was neutral/skipping as expected.
+
+**Next**
+
+- Complete the parent phase-2 implementation task audit and close the OmniFocus parent if no open child implementation tasks remain.
+- Keep #145 and #150 as non-blocking follow-up tasks outside this implementation sequence.
+- Stronger release-readiness claims still require the planned exact-candidate evidence refresh after the merged security-relevant changes.
