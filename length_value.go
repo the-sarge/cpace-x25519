@@ -22,11 +22,7 @@ func appendLengthValue(dst, data []byte) []byte {
 }
 
 func lengthValueLen(n int) int {
-	return leb128Len(uint64(n)) + n
-}
-
-func encodeLEB128(n uint64) []byte {
-	return appendLEB128(make([]byte, 0, leb128Len(n)), n)
+	return leb128LenInt(n) + n
 }
 
 func appendLEB128(dst []byte, n uint64) []byte {
@@ -43,7 +39,7 @@ func appendLEB128(dst []byte, n uint64) []byte {
 	}
 }
 
-func leb128Len(n uint64) int {
+func leb128LenInt(n int) int {
 	out := 1
 	for n >= 0x80 {
 		n >>= 7
