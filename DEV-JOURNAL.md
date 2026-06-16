@@ -1567,3 +1567,35 @@ PR #144 landed the first remaining caller-input follow-up slice for issues #124,
 - Continue the phase-2 implementation sequence with #131, the private single-use terminal-state cleanup.
 - Keep #145 separate from the implementation sequence unless a maintainer intentionally broadens reviewer-facing documentation cleanup.
 - Stronger release-readiness claims still require the planned exact-candidate evidence refresh after these security-relevant changes.
+
+---
+
+## Single-use terminal cleanup landed - 2026-06-16 18:22 EDT
+
+**Main:** `23eba7eb3275`
+**Actor:** Codex
+
+**Summary**
+
+PR #147 completed issue #131 by trimming unreachable private defensive paths from the shared single-use terminal-state helper while adding direct coverage for the retained nil-core diagnostic branch.
+
+**Completed**
+
+- Merged PR #147 (`refactor: trim single-use terminal defenses`) as `23eba7eb3275cf073dd8f6e5c560d58ab88ca01c`; issue #131 closed automatically at merge.
+- Added `TestSingleUseTerminalNilCoreReturnsUninitializedDiagnostic` for direct package-internal nil-core initiator and responder terminal states, covering both finish and close claims without consuming state.
+- Removed unreachable private nil-receiver guards from `claimFinish` and `claimClose`; public `Initiator` and `Responder` methods still own nil and zero-value diagnostics before calling the helper.
+- Removed the empty diagnostic fallback from `uninitializedError`, relying on the private constructor call sites that pass role-specific messages.
+- RAS review-fix run `20260616T221621-1d59a9c0e3d6ba5aaea8d4de` reported no actionable or blocking findings; its only nit concerned an impossible package-internal nil-core plus empty-message diagnostic and did not warrant a follow-up issue.
+- Completed OmniFocus task `acrb5smRKe9` with merge, validation, and RAS evidence.
+
+**Validation**
+
+- Focused verification passed with `go test -run 'TestSingleUse|TestZero|Test.*Uninitialized' ./...`.
+- Full tests passed with `go test ./...`.
+- Whitespace and full local gates passed with `git diff --check` and `task check`.
+- GitHub checks on PR #147 passed before merge: Check, CodeQL Analyze/CodeQL, macOS smoke, Windows smoke, DCO, Dependency Gate, SAST Gate, and Staticcheck; the standalone gosec child check was neutral/skipping as expected.
+
+**Next**
+
+- Continue the phase-2 implementation sequence with #133, the release-helper newline tag hardening.
+- Stronger release-readiness claims still require the planned exact-candidate evidence refresh after these internal lifecycle changes.
