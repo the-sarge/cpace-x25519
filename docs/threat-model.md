@@ -119,9 +119,10 @@ Critical code paths and interactions:
 ## Review Focus
 
 External reviewers should evaluate whether the package-owned context-info
-construction, identity orientation, binary framing, size caps, empty-session-ID
-policy, scalar sampling profile, invalid-point handling, exporter semantics,
-session lifecycle, and release evidence match the claims in the public docs.
+construction, role-local identity input, binary framing, size caps,
+empty-session-ID policy, scalar sampling profile, invalid-point handling,
+exporter semantics, session lifecycle, and release evidence match the claims in
+the public docs.
 
 Independent cryptographic review remains required before any production-ready
 claim.
