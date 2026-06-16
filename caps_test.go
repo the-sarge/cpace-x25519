@@ -13,11 +13,11 @@ func TestPackageOwnedCapPolicyPinsShippedValues(t *testing.T) {
 		wantExact  bool
 	}{
 		{"password", "password", 4 << 10, false},
-		{"initiator id", "initiator id", 4 << 10, false},
-		{"responder id", "responder id", 4 << 10, false},
+		{"self id", "self id", 4 << 10, false},
+		{"peer id", "peer id", 4 << 10, false},
 		{"context", "context", 1 << 10, false},
 		{"session id", "session id", 1 << 10, false},
-		{"associated data", "associated data", 64 << 10, false},
+		{"local associated data", "local associated data", 64 << 10, false},
 		{"message A session id", "message A session id", 1 << 10, false},
 		{"message A point", "message A point", pointSize, true},
 		{"message A associated data", "message A associated data", 64 << 10, false},
@@ -54,9 +54,9 @@ func TestPackageOwnedCapPolicyFeedsMessageFramingSpecs(t *testing.T) {
 	}{
 		{"message A session id", messageASpec.fields[0], messageASessionIDCap},
 		{"message A point", messageASpec.fields[1], messageAPointCap},
-		{"message A associated data", messageASpec.fields[2], messageAAssociatedDataCap},
+		{"message A local associated data", messageASpec.fields[2], messageAAssociatedDataCap},
 		{"message B point", messageBSpec.fields[0], messageBPointCap},
-		{"message B associated data", messageBSpec.fields[1], messageBAssociatedDataCap},
+		{"message B local associated data", messageBSpec.fields[1], messageBAssociatedDataCap},
 		{"message B tag", messageBSpec.fields[2], messageBTagCap},
 		{"message C tag", messageCSpec.fields[0], messageCTagCap},
 	}
@@ -69,10 +69,10 @@ func TestPackageOwnedCapPolicyFeedsMessageFramingSpecs(t *testing.T) {
 	}
 }
 
-func TestPackageOwnedCapPolicyAcceptsConfigCopies(t *testing.T) {
-	cfg := testConfig()
-	cfg.AssociatedData = []byte("AD")
-	accepted, err := acceptConfig(cfg)
+func TestPackageOwnedCapPolicyAcceptsInputCopies(t *testing.T) {
+	cfg := testInitiatorInput()
+	cfg.LocalAssociatedData = []byte("AD")
+	accepted, err := acceptInput(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,11 +80,11 @@ func TestPackageOwnedCapPolicyAcceptsConfigCopies(t *testing.T) {
 
 	for _, field := range [][]byte{
 		cfg.Password,
-		cfg.InitiatorID,
-		cfg.ResponderID,
+		cfg.SelfID,
+		cfg.PeerID,
 		cfg.Context,
 		cfg.SessionID,
-		cfg.AssociatedData,
+		cfg.LocalAssociatedData,
 	} {
 		for i := range field {
 			field[i] ^= 0xff
@@ -94,11 +94,11 @@ func TestPackageOwnedCapPolicyAcceptsConfigCopies(t *testing.T) {
 	if !bytes.Equal(accepted.password, []byte("password")) {
 		t.Fatalf("accepted password aliases caller input: %q", accepted.password)
 	}
-	if !bytes.Equal(accepted.initiatorID, []byte("initiator")) {
-		t.Fatalf("accepted initiator ID aliases caller input: %q", accepted.initiatorID)
+	if !bytes.Equal(accepted.selfID, []byte("initiator")) {
+		t.Fatalf("accepted self ID aliases caller input: %q", accepted.selfID)
 	}
-	if !bytes.Equal(accepted.responderID, []byte("responder")) {
-		t.Fatalf("accepted responder ID aliases caller input: %q", accepted.responderID)
+	if !bytes.Equal(accepted.peerID, []byte("responder")) {
+		t.Fatalf("accepted peer ID aliases caller input: %q", accepted.peerID)
 	}
 	if !bytes.Equal(accepted.context, []byte("context")) {
 		t.Fatalf("accepted context aliases caller input: %q", accepted.context)
@@ -106,22 +106,22 @@ func TestPackageOwnedCapPolicyAcceptsConfigCopies(t *testing.T) {
 	if !bytes.Equal(accepted.sid, []byte("sid")) {
 		t.Fatalf("accepted session ID aliases caller input: %q", accepted.sid)
 	}
-	if !bytes.Equal(accepted.ad, []byte("AD")) {
-		t.Fatalf("accepted associated data aliases caller input: %q", accepted.ad)
+	if !bytes.Equal(accepted.localAD, []byte("AD")) {
+		t.Fatalf("accepted local associated data aliases caller input: %q", accepted.localAD)
 	}
 }
 
-func TestPackageOwnedCapPolicyRejectsConfigBeforeCopying(t *testing.T) {
-	cfg := testConfig()
-	cfg.AssociatedData = bytes.Repeat([]byte{0x42}, associatedDataCap.length+1)
+func TestPackageOwnedCapPolicyRejectsInputBeforeCopying(t *testing.T) {
+	cfg := testInitiatorInput()
+	cfg.LocalAssociatedData = bytes.Repeat([]byte{0x42}, localAssociatedDataCap.length+1)
 	originalPassword := clone(cfg.Password)
 
-	accepted, err := acceptConfig(cfg)
+	accepted, err := acceptInput(cfg)
 	if err == nil {
 		accepted.wipe()
-		t.Fatal("acceptConfig succeeded for oversized associated data")
+		t.Fatal("acceptInput succeeded for oversized local associated data")
 	}
 	if !bytes.Equal(cfg.Password, originalPassword) {
-		t.Fatal("acceptConfig mutated caller input on a later cap failure")
+		t.Fatal("acceptInput mutated caller input on a later cap failure")
 	}
 }

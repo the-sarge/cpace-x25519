@@ -32,10 +32,10 @@ func (r *countingFailingReader) Read([]byte) (int, error) {
 }
 
 func TestInternalRandomHelpersDefaultNilRandomness(t *testing.T) {
-	initCfg := testConfig()
-	initCfg.AssociatedData = []byte("ADa")
-	respCfg := testConfig()
-	respCfg.AssociatedData = []byte("ADb")
+	initCfg := testInitiatorInput()
+	initCfg.LocalAssociatedData = []byte("ADa")
+	respCfg := testResponderInput()
+	respCfg.LocalAssociatedData = []byte("ADb")
 
 	initiator, msgA, err := startWithRandom(initCfg, nil)
 	if err != nil {
@@ -59,10 +59,10 @@ func TestInternalRandomHelpersDefaultNilRandomness(t *testing.T) {
 }
 
 func TestConfirmedExchangeAndExport(t *testing.T) {
-	initCfg := testConfig()
-	initCfg.AssociatedData = []byte("ADa")
-	respCfg := testConfig()
-	respCfg.AssociatedData = []byte("ADb")
+	initCfg := testInitiatorInput()
+	initCfg.LocalAssociatedData = []byte("ADa")
+	respCfg := testResponderInput()
+	respCfg.LocalAssociatedData = []byte("ADb")
 
 	initiator, msgA, err := startTestInitiator(initCfg)
 	if err != nil {
@@ -97,7 +97,7 @@ func TestConfirmedExchangeAndExport(t *testing.T) {
 }
 
 func TestExportLengthBoundaries(t *testing.T) {
-	sI, _ := completeExchange(t, testConfig(), testConfig())
+	sI, _ := completeExchange(t, testInitiatorInput(), testResponderInput())
 
 	cases := []struct {
 		name    string
@@ -134,23 +134,23 @@ func TestExportLengthBoundaries(t *testing.T) {
 }
 
 func TestSessionPeerMetadata(t *testing.T) {
-	initCfg := testConfig()
-	initCfg.AssociatedData = []byte("ADa")
-	respCfg := testConfig()
-	respCfg.AssociatedData = []byte("ADb")
+	initCfg := testInitiatorInput()
+	initCfg.LocalAssociatedData = []byte("ADa")
+	respCfg := testResponderInput()
+	respCfg.LocalAssociatedData = []byte("ADb")
 
 	sI, sR := completeExchange(t, initCfg, respCfg)
-	if got := sI.PeerAssociatedData(); !bytes.Equal(got, respCfg.AssociatedData) {
-		t.Fatalf("initiator peer AD=%q want %q", got, respCfg.AssociatedData)
+	if got := sI.PeerAssociatedData(); !bytes.Equal(got, respCfg.LocalAssociatedData) {
+		t.Fatalf("initiator peer AD=%q want %q", got, respCfg.LocalAssociatedData)
 	}
-	if got := sR.PeerAssociatedData(); !bytes.Equal(got, initCfg.AssociatedData) {
-		t.Fatalf("responder peer AD=%q want %q", got, initCfg.AssociatedData)
+	if got := sR.PeerAssociatedData(); !bytes.Equal(got, initCfg.LocalAssociatedData) {
+		t.Fatalf("responder peer AD=%q want %q", got, initCfg.LocalAssociatedData)
 	}
-	if got := sI.PeerID(); !bytes.Equal(got, initCfg.ResponderID) {
-		t.Fatalf("initiator peer ID=%q want %q", got, initCfg.ResponderID)
+	if got := sI.PeerID(); !bytes.Equal(got, initCfg.PeerID) {
+		t.Fatalf("initiator peer ID=%q want %q", got, initCfg.PeerID)
 	}
-	if got := sR.PeerID(); !bytes.Equal(got, respCfg.InitiatorID) {
-		t.Fatalf("responder peer ID=%q want %q", got, respCfg.InitiatorID)
+	if got := sR.PeerID(); !bytes.Equal(got, respCfg.PeerID) {
+		t.Fatalf("responder peer ID=%q want %q", got, respCfg.PeerID)
 	}
 
 	peerAD := sI.PeerAssociatedData()
@@ -164,7 +164,7 @@ func TestSessionPeerMetadata(t *testing.T) {
 		t.Fatal("PeerID returned mutable session storage")
 	}
 
-	emptySI, emptySR := completeExchange(t, testConfig(), testConfig())
+	emptySI, emptySR := completeExchange(t, testInitiatorInput(), testResponderInput())
 	if got := emptySI.PeerAssociatedData(); len(got) != 0 {
 		t.Fatalf("initiator empty peer AD=%q want empty", got)
 	}
@@ -174,10 +174,10 @@ func TestSessionPeerMetadata(t *testing.T) {
 }
 
 func TestSessionClose(t *testing.T) {
-	initCfg := testConfig()
-	initCfg.AssociatedData = []byte("ADa")
-	respCfg := testConfig()
-	respCfg.AssociatedData = []byte("ADb")
+	initCfg := testInitiatorInput()
+	initCfg.LocalAssociatedData = []byte("ADa")
+	respCfg := testResponderInput()
+	respCfg.LocalAssociatedData = []byte("ADb")
 
 	sI, _ := completeExchange(t, initCfg, respCfg)
 	transcriptID := sI.TranscriptID()
@@ -210,7 +210,7 @@ func TestSessionClose(t *testing.T) {
 }
 
 func TestSessionValueCopiesShareCloseState(t *testing.T) {
-	sI, _ := completeExchange(t, testConfig(), testConfig())
+	sI, _ := completeExchange(t, testInitiatorInput(), testResponderInput())
 	copied := *sI
 	if _, err := copied.Export([]byte("label"), []byte("ctx"), 32); err != nil {
 		t.Fatal(err)
@@ -300,7 +300,7 @@ func TestNilReceiverMethods(t *testing.T) {
 }
 
 func TestSessionCloseConcurrentExport(t *testing.T) {
-	sI, _ := completeExchange(t, testConfig(), testConfig())
+	sI, _ := completeExchange(t, testInitiatorInput(), testResponderInput())
 	const workers = 8
 	var wg sync.WaitGroup
 	start := make(chan struct{})
@@ -353,7 +353,7 @@ func TestSessionCloseConcurrentExport(t *testing.T) {
 }
 
 func TestSessionCloseConcurrentClose(t *testing.T) {
-	sI, _ := completeExchange(t, testConfig(), testConfig())
+	sI, _ := completeExchange(t, testInitiatorInput(), testResponderInput())
 	const workers = 16
 	var wg sync.WaitGroup
 	errs := make(chan error, workers)
@@ -375,10 +375,10 @@ func TestSessionCloseConcurrentClose(t *testing.T) {
 }
 
 func TestSessionMetadataConcurrentClose(t *testing.T) {
-	initCfg := testConfig()
-	initCfg.AssociatedData = []byte("ADa")
-	respCfg := testConfig()
-	respCfg.AssociatedData = []byte("ADb")
+	initCfg := testInitiatorInput()
+	initCfg.LocalAssociatedData = []byte("ADa")
+	respCfg := testResponderInput()
+	respCfg.LocalAssociatedData = []byte("ADb")
 	sI, _ := completeExchange(t, initCfg, respCfg)
 	transcriptID := sI.TranscriptID()
 	peerAD := sI.PeerAssociatedData()
@@ -441,12 +441,12 @@ func TestSessionMetadataConcurrentClose(t *testing.T) {
 }
 
 func TestMutableInputsAreCopied(t *testing.T) {
-	initCfg := testConfig()
-	initCfg.AssociatedData = []byte("ADa")
+	initCfg := testInitiatorInput()
+	initCfg.LocalAssociatedData = []byte("ADa")
 	password := []byte("password")
 	initiatorPeerID := []byte("responder")
 	initCfg.Password = password
-	initCfg.ResponderID = initiatorPeerID
+	initCfg.PeerID = initiatorPeerID
 	initiator, msgA, err := startTestInitiator(initCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -454,17 +454,17 @@ func TestMutableInputsAreCopied(t *testing.T) {
 	for i := range password {
 		password[i] ^= 0xff
 	}
-	for i := range initCfg.AssociatedData {
-		initCfg.AssociatedData[i] ^= 0xff
+	for i := range initCfg.LocalAssociatedData {
+		initCfg.LocalAssociatedData[i] ^= 0xff
 	}
 	for i := range initiatorPeerID {
 		initiatorPeerID[i] ^= 0xff
 	}
 
-	respCfg := testConfig()
-	respCfg.AssociatedData = []byte("ADb")
+	respCfg := testResponderInput()
+	respCfg.LocalAssociatedData = []byte("ADb")
 	responderPeerID := []byte("initiator")
-	respCfg.InitiatorID = responderPeerID
+	respCfg.PeerID = responderPeerID
 	responder, msgB, err := respondTestResponder(respCfg, msgA)
 	if err != nil {
 		t.Fatal(err)
@@ -486,13 +486,16 @@ func TestMutableInputsAreCopied(t *testing.T) {
 	if got := sR.PeerID(); !bytes.Equal(got, []byte("initiator")) {
 		t.Fatalf("responder peer ID=%q after caller mutation", got)
 	}
+	if !bytes.Equal(sI.TranscriptID(), sR.TranscriptID()) {
+		t.Fatal("transcript IDs differ after caller mutation")
+	}
 }
 
 func TestFinishCleanupDoesNotAliasReturnedSessions(t *testing.T) {
-	initCfg := testConfig()
-	initCfg.AssociatedData = []byte("ADa")
-	respCfg := testConfig()
-	respCfg.AssociatedData = []byte("ADb")
+	initCfg := testInitiatorInput()
+	initCfg.LocalAssociatedData = []byte("ADa")
+	respCfg := testResponderInput()
+	respCfg.LocalAssociatedData = []byte("ADb")
 
 	initiator, msgA, err := startTestInitiator(initCfg)
 	if err != nil {
@@ -548,7 +551,7 @@ func TestFinishCleanupDoesNotAliasReturnedSessions(t *testing.T) {
 
 func TestClearOnFinishFailurePaths(t *testing.T) {
 	t.Run("initiator parse failure", func(t *testing.T) {
-		initiator, _, err := startTestInitiator(testConfig())
+		initiator, _, err := startTestInitiator(testInitiatorInput())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -565,9 +568,9 @@ func TestClearOnFinishFailurePaths(t *testing.T) {
 	})
 
 	t.Run("initiator confirmation failure", func(t *testing.T) {
-		initCfg := testConfig()
+		initCfg := testInitiatorInput()
 		initCfg.Password = []byte("password-a")
-		respCfg := testConfig()
+		respCfg := testResponderInput()
 		respCfg.Password = []byte("password-b")
 		initiator, msgA, err := startTestInitiator(initCfg)
 		if err != nil {
@@ -590,11 +593,11 @@ func TestClearOnFinishFailurePaths(t *testing.T) {
 	})
 
 	t.Run("responder parse failure", func(t *testing.T) {
-		_, msgA, err := startTestInitiator(testConfig())
+		_, msgA, err := startTestInitiator(testInitiatorInput())
 		if err != nil {
 			t.Fatal(err)
 		}
-		responder, _, err := respondTestResponder(testConfig(), msgA)
+		responder, _, err := respondTestResponder(testResponderInput(), msgA)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -615,11 +618,11 @@ func TestClearOnFinishFailurePaths(t *testing.T) {
 	})
 
 	t.Run("responder confirmation failure", func(t *testing.T) {
-		initiator, msgA, err := startTestInitiator(testConfig())
+		initiator, msgA, err := startTestInitiator(testInitiatorInput())
 		if err != nil {
 			t.Fatal(err)
 		}
-		responder, msgB, err := respondTestResponder(testConfig(), msgA)
+		responder, msgB, err := respondTestResponder(testResponderInput(), msgA)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -646,10 +649,10 @@ func TestClearOnFinishFailurePaths(t *testing.T) {
 }
 
 func TestSessionISKSurvivesCoreClear(t *testing.T) {
-	initCfg := testConfig()
-	initCfg.AssociatedData = []byte("ADa")
-	respCfg := testConfig()
-	respCfg.AssociatedData = []byte("ADb")
+	initCfg := testInitiatorInput()
+	initCfg.LocalAssociatedData = []byte("ADa")
+	respCfg := testResponderInput()
+	respCfg.LocalAssociatedData = []byte("ADb")
 
 	initiator, msgA, err := startTestInitiator(initCfg)
 	if err != nil {
@@ -765,7 +768,7 @@ func TestSingleUseStateCloseNilAndZeroValue(t *testing.T) {
 }
 
 func TestSingleUseStateCloseCleansAbandonedState(t *testing.T) {
-	initiator, msgA, err := startTestInitiator(testConfig())
+	initiator, msgA, err := startTestInitiator(testInitiatorInput())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -786,7 +789,7 @@ func TestSingleUseStateCloseCleansAbandonedState(t *testing.T) {
 		t.Fatalf("Initiator.Finish after Close err=%v want ErrStateUsed", err)
 	}
 
-	responder, _, err := respondTestResponder(testConfig(), msgA)
+	responder, _, err := respondTestResponder(testResponderInput(), msgA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -814,11 +817,11 @@ func TestSingleUseStateCloseCleansAbandonedState(t *testing.T) {
 
 func TestSingleUseStateCloseAfterFinish(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		initiator, msgA, err := startTestInitiator(testConfig())
+		initiator, msgA, err := startTestInitiator(testInitiatorInput())
 		if err != nil {
 			t.Fatal(err)
 		}
-		responder, msgB, err := respondTestResponder(testConfig(), msgA)
+		responder, msgB, err := respondTestResponder(testResponderInput(), msgA)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -845,11 +848,11 @@ func TestSingleUseStateCloseAfterFinish(t *testing.T) {
 	})
 
 	t.Run("failed finish", func(t *testing.T) {
-		initiator, msgA, err := startTestInitiator(testConfig())
+		initiator, msgA, err := startTestInitiator(testInitiatorInput())
 		if err != nil {
 			t.Fatal(err)
 		}
-		responder, _, err := respondTestResponder(testConfig(), msgA)
+		responder, _, err := respondTestResponder(testResponderInput(), msgA)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -867,11 +870,11 @@ func TestSingleUseStateCloseAfterFinish(t *testing.T) {
 			t.Fatalf("Responder.Close after failed Finish err=%v", err)
 		}
 
-		initiator2, msgA2, err := startTestInitiator(testConfig())
+		initiator2, msgA2, err := startTestInitiator(testInitiatorInput())
 		if err != nil {
 			t.Fatal(err)
 		}
-		responder2, msgB2, err := respondTestResponder(testConfig(), msgA2)
+		responder2, msgB2, err := respondTestResponder(testResponderInput(), msgA2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -890,7 +893,7 @@ func TestSingleUseStateCloseAfterFinish(t *testing.T) {
 }
 
 func TestSingleUseStateCopiesShareTerminalState(t *testing.T) {
-	initiator, msgA, err := startTestInitiator(testConfig())
+	initiator, msgA, err := startTestInitiator(testInitiatorInput())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -905,7 +908,7 @@ func TestSingleUseStateCopiesShareTerminalState(t *testing.T) {
 		t.Fatalf("copied Initiator.Close after original Close err=%v", err)
 	}
 
-	responder, _, err := respondTestResponder(testConfig(), msgA)
+	responder, _, err := respondTestResponder(testResponderInput(), msgA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -943,52 +946,174 @@ func TestSingleUseTerminalClaimsDoNotReturnCoreOnLosingPaths(t *testing.T) {
 
 func TestInputValidation(t *testing.T) {
 	cases := []struct {
-		name string
-		edit func(*Config)
+		name       string
+		edit       func(*Input)
+		want       string
+		wantErrors []error
 	}{
-		{"password", func(c *Config) { c.Password = nil }},
-		{"initiator", func(c *Config) { c.InitiatorID = nil }},
-		{"responder", func(c *Config) { c.ResponderID = nil }},
-		{"session id", func(c *Config) { c.SessionID = nil }},
+		{
+			name:       "password",
+			edit:       func(c *Input) { c.Password = nil },
+			want:       "cpace: invalid input: empty password",
+			wantErrors: []error{ErrInvalidInput},
+		},
+		{
+			name:       "self id",
+			edit:       func(c *Input) { c.SelfID = nil },
+			want:       "cpace: invalid input: empty self id",
+			wantErrors: []error{ErrInvalidInput},
+		},
+		{
+			name:       "peer id",
+			edit:       func(c *Input) { c.PeerID = nil },
+			want:       "cpace: invalid input: empty peer id",
+			wantErrors: []error{ErrInvalidInput},
+		},
+		{
+			name:       "session id",
+			edit:       func(c *Input) { c.SessionID = nil },
+			want:       "cpace: invalid input: cpace: empty session id",
+			wantErrors: []error{ErrInvalidInput, ErrEmptySessionID},
+		},
+		{
+			name: "self id before oversized context",
+			edit: func(c *Input) {
+				c.SelfID = nil
+				c.Context = bytes.Repeat([]byte{0x42}, contextCap.length+1)
+			},
+			want:       "cpace: invalid input: empty self id",
+			wantErrors: []error{ErrInvalidInput},
+		},
+		{
+			name: "session id before oversized context",
+			edit: func(c *Input) {
+				c.SessionID = nil
+				c.Context = bytes.Repeat([]byte{0x42}, contextCap.length+1)
+			},
+			want:       "cpace: invalid input: cpace: empty session id",
+			wantErrors: []error{ErrInvalidInput, ErrEmptySessionID},
+		},
+		{
+			name: "oversized context before oversized session id",
+			edit: func(c *Input) {
+				c.Context = bytes.Repeat([]byte{0x42}, contextCap.length+1)
+				c.SessionID = bytes.Repeat([]byte{0x42}, sessionIDCap.length+1)
+			},
+			want:       "cpace: invalid input: context too large",
+			wantErrors: []error{ErrInvalidInput},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := testConfig()
+			cfg := testInitiatorInput()
 			tc.edit(&cfg)
-			if _, _, err := startTestInitiator(cfg); !errors.Is(err, ErrInvalidInput) {
-				t.Fatalf("Start err=%v", err)
+			assertInputValidationError(t, cfg, tc.want, tc.wantErrors...)
+		})
+	}
+}
+
+func assertInputValidationError(t *testing.T, cfg Input, want string, wantErrors ...error) {
+	t.Helper()
+	calls := []struct {
+		name string
+		run  func(Input) error
+	}{
+		{
+			name: "Start",
+			run: func(input Input) error {
+				_, _, err := Start(input)
+				return err
+			},
+		},
+		{
+			name: "Respond",
+			run: func(input Input) error {
+				_, _, err := Respond(input, nil)
+				return err
+			},
+		},
+	}
+	for _, call := range calls {
+		t.Run(call.name, func(t *testing.T) {
+			err := call.run(cfg)
+			if err == nil {
+				t.Fatal("err=nil")
+			}
+			for _, wantErr := range wantErrors {
+				if !errors.Is(err, wantErr) {
+					t.Fatalf("err=%v want errors.Is(..., %v)", err, wantErr)
+				}
+			}
+			if err.Error() != want {
+				t.Fatalf("err=%q want %q", err.Error(), want)
 			}
 		})
 	}
 }
 
-func TestConfigFieldSizeLimits(t *testing.T) {
+func TestInputFieldSizeLimits(t *testing.T) {
 	cases := []struct {
 		field packageCapField
-		edit  func(*Config, []byte)
+		edit  func(*Input, []byte)
 	}{
-		{passwordCap, func(c *Config, b []byte) { c.Password = b }},
-		{initiatorIDCap, func(c *Config, b []byte) { c.InitiatorID = b }},
-		{responderIDCap, func(c *Config, b []byte) { c.ResponderID = b }},
-		{contextCap, func(c *Config, b []byte) { c.Context = b }},
-		{sessionIDCap, func(c *Config, b []byte) { c.SessionID = b }},
-		{associatedDataCap, func(c *Config, b []byte) { c.AssociatedData = b }},
+		{passwordCap, func(c *Input, b []byte) { c.Password = b }},
+		{selfIDCap, func(c *Input, b []byte) { c.SelfID = b }},
+		{peerIDCap, func(c *Input, b []byte) { c.PeerID = b }},
+		{contextCap, func(c *Input, b []byte) { c.Context = b }},
+		{sessionIDCap, func(c *Input, b []byte) { c.SessionID = b }},
+		{localAssociatedDataCap, func(c *Input, b []byte) { c.LocalAssociatedData = b }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.field.name+" max", func(t *testing.T) {
-			cfg := testConfig()
+			cfg := testInitiatorInput()
 			tc.edit(&cfg, bytes.Repeat([]byte{0x42}, tc.field.length))
 			if _, _, err := startTestInitiator(cfg); err != nil {
 				t.Fatalf("Start rejected max-size field: %v", err)
 			}
 		})
 		t.Run(tc.field.name+" oversized", func(t *testing.T) {
-			cfg := testConfig()
+			cfg := testInitiatorInput()
 			tc.edit(&cfg, bytes.Repeat([]byte{0x42}, tc.field.length+1))
 			if _, _, err := startTestInitiator(cfg); !errors.Is(err, ErrInvalidInput) {
 				t.Fatalf("Start err=%v", err)
 			} else if want := ErrInvalidInput.Error() + ": " + tc.field.name + " too large"; err.Error() != want {
 				t.Fatalf("Start err=%q want %q", err.Error(), want)
+			}
+			if _, _, err := Respond(cfg, nil); !errors.Is(err, ErrInvalidInput) {
+				t.Fatalf("Respond err=%v", err)
+			} else if want := ErrInvalidInput.Error() + ": " + tc.field.name + " too large"; err.Error() != want {
+				t.Fatalf("Respond err=%q want %q", err.Error(), want)
+			}
+		})
+	}
+}
+
+func TestProtocolAllowsEmptyLocalAssociatedData(t *testing.T) {
+	cases := []struct {
+		name   string
+		initAD []byte
+		respAD []byte
+	}{
+		{"nil nil", nil, nil},
+		{"empty empty", []byte{}, []byte{}},
+		{"nil empty", nil, []byte{}},
+		{"empty nil", []byte{}, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			initCfg := testInitiatorInput()
+			initCfg.LocalAssociatedData = tc.initAD
+			respCfg := testResponderInput()
+			respCfg.LocalAssociatedData = tc.respAD
+			sI, sR := completeExchange(t, initCfg, respCfg)
+			if !bytes.Equal(sI.TranscriptID(), sR.TranscriptID()) {
+				t.Fatal("transcript IDs differ")
+			}
+			if got := sI.PeerAssociatedData(); len(got) != 0 {
+				t.Fatalf("initiator peer associated data=%q want empty", got)
+			}
+			if got := sR.PeerAssociatedData(); len(got) != 0 {
+				t.Fatalf("responder peer associated data=%q want empty", got)
 			}
 		})
 	}
@@ -1035,7 +1160,7 @@ func TestProtocolRejectsEmptySessionIDByDefault(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := testConfig()
+			cfg := testInitiatorInput()
 			cfg.SessionID = tc.sid
 			if _, _, err := startTestInitiator(cfg); !errors.Is(err, ErrInvalidInput) ||
 				!errors.Is(err, ErrEmptySessionID) {
@@ -1065,14 +1190,14 @@ func TestProtocolAllowsEmptySessionIDWithCompatibilityFlag(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			initCfg := testConfig()
+			initCfg := testInitiatorInput()
 			initCfg.SessionID = tc.initSID
 			initCfg.AllowEmptySessionID = true
-			initCfg.AssociatedData = []byte("ADa")
-			respCfg := testConfig()
+			initCfg.LocalAssociatedData = []byte("ADa")
+			respCfg := testResponderInput()
 			respCfg.SessionID = tc.respSID
 			respCfg.AllowEmptySessionID = true
-			respCfg.AssociatedData = []byte("ADb")
+			respCfg.LocalAssociatedData = []byte("ADb")
 			sI, sR := completeExchange(t, initCfg, respCfg)
 			if !bytes.Equal(sI.TranscriptID(), sR.TranscriptID()) {
 				t.Fatalf("transcript IDs differ")
@@ -1120,10 +1245,10 @@ func TestProtocolRejectsAsymmetricSessionID(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			initCfg := testConfig()
+			initCfg := testInitiatorInput()
 			initCfg.SessionID = tc.initSID
 			initCfg.AllowEmptySessionID = tc.allowInitEmpty
-			respCfg := testConfig()
+			respCfg := testResponderInput()
 			respCfg.SessionID = tc.respSID
 			respCfg.AllowEmptySessionID = tc.allowRespEmpty
 			_, msgA, err := startTestInitiator(initCfg)
@@ -1148,9 +1273,9 @@ func TestProtocolAllowsNonEmptySessionIDWithAsymmetricCompatibilityFlag(t *testi
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			initCfg := testConfig()
+			initCfg := testInitiatorInput()
 			initCfg.AllowEmptySessionID = tc.allowInitEmpty
-			respCfg := testConfig()
+			respCfg := testResponderInput()
 			respCfg.AllowEmptySessionID = tc.allowRespEmpty
 			sI, sR := completeExchange(t, initCfg, respCfg)
 			if !bytes.Equal(sI.TranscriptID(), sR.TranscriptID()) {
@@ -1161,9 +1286,26 @@ func TestProtocolAllowsNonEmptySessionIDWithAsymmetricCompatibilityFlag(t *testi
 }
 
 func TestConfirmationFailsOnBoundInputMismatch(t *testing.T) {
-	initCfg := testConfig()
-	respCfg := testConfig()
+	initCfg := testInitiatorInput()
+	respCfg := testResponderInput()
 	respCfg.Context = []byte("different")
+
+	initiator, msgA, err := startTestInitiator(initCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, msgB, err := respondTestResponder(respCfg, msgA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := initiator.Finish(msgB); !errors.Is(err, ErrConfirmationFailed) {
+		t.Fatalf("Finish err=%v", err)
+	}
+}
+
+func TestRoleLocalIdentityReversalFailsConfirmation(t *testing.T) {
+	initCfg := testInitiatorInput()
+	respCfg := testInitiatorInput()
 
 	initiator, msgA, err := startTestInitiator(initCfg)
 	if err != nil {
@@ -1181,7 +1323,7 @@ func TestConfirmationFailsOnBoundInputMismatch(t *testing.T) {
 func TestTranscriptLockingMismatches(t *testing.T) {
 	cases := []struct {
 		name       string
-		editResp   func(*Config)
+		editResp   func(*Input)
 		tamperA    func([]byte) []byte
 		tamperB    func([]byte) []byte
 		respondErr error
@@ -1189,22 +1331,22 @@ func TestTranscriptLockingMismatches(t *testing.T) {
 	}{
 		{
 			name:      "initiator identity",
-			editResp:  func(c *Config) { c.InitiatorID = []byte("other initiator") },
+			editResp:  func(c *Input) { c.SelfID = []byte("other initiator") },
 			finishErr: ErrConfirmationFailed,
 		},
 		{
 			name:      "responder identity",
-			editResp:  func(c *Config) { c.ResponderID = []byte("other responder") },
+			editResp:  func(c *Input) { c.PeerID = []byte("other responder") },
 			finishErr: ErrConfirmationFailed,
 		},
 		{
 			name:      "context",
-			editResp:  func(c *Config) { c.Context = []byte("other context") },
+			editResp:  func(c *Input) { c.Context = []byte("other context") },
 			finishErr: ErrConfirmationFailed,
 		},
 		{
 			name:       "session id",
-			editResp:   func(c *Config) { c.SessionID = []byte("other sid") },
+			editResp:   func(c *Input) { c.SessionID = []byte("other sid") },
 			respondErr: ErrMessage,
 		},
 		{
@@ -1233,10 +1375,10 @@ func TestTranscriptLockingMismatches(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			initCfg := testConfig()
-			initCfg.AssociatedData = []byte("ADa")
-			respCfg := testConfig()
-			respCfg.AssociatedData = []byte("ADb")
+			initCfg := testInitiatorInput()
+			initCfg.LocalAssociatedData = []byte("ADa")
+			respCfg := testResponderInput()
+			respCfg.LocalAssociatedData = []byte("ADb")
 			if tc.editResp != nil {
 				tc.editResp(&respCfg)
 			}
@@ -1328,8 +1470,8 @@ func assertMessageFramingError(t *testing.T, err error, wantErrContains string) 
 }
 
 func TestStateReuseAndConcurrentFinish(t *testing.T) {
-	initCfg := testConfig()
-	respCfg := testConfig()
+	initCfg := testInitiatorInput()
+	respCfg := testResponderInput()
 	initiator, msgA, err := startTestInitiator(initCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1385,11 +1527,11 @@ func TestStateReuseAndConcurrentFinish(t *testing.T) {
 
 func TestSingleUseStateConcurrentFinishClose(t *testing.T) {
 	t.Run("initiator original finish versus copied close", func(t *testing.T) {
-		initiator, msgA, err := startTestInitiator(testConfig())
+		initiator, msgA, err := startTestInitiator(testInitiatorInput())
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, msgB, err := respondTestResponder(testConfig(), msgA)
+		_, msgB, err := respondTestResponder(testResponderInput(), msgA)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1435,11 +1577,11 @@ func TestSingleUseStateConcurrentFinishClose(t *testing.T) {
 	})
 
 	t.Run("responder copied finish versus original close", func(t *testing.T) {
-		initiator, msgA, err := startTestInitiator(testConfig())
+		initiator, msgA, err := startTestInitiator(testInitiatorInput())
 		if err != nil {
 			t.Fatal(err)
 		}
-		responder, msgB, err := respondTestResponder(testConfig(), msgA)
+		responder, msgB, err := respondTestResponder(testResponderInput(), msgA)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1490,7 +1632,7 @@ func TestSingleUseStateConcurrentFinishClose(t *testing.T) {
 }
 
 func TestProtocolAbortsOnInvalidRistrettoEncoding(t *testing.T) {
-	cfg := testConfig()
+	cfg := testResponderInput()
 	invalid := mustLoadDraftInvalidVector(t)
 	badA := encodeMessageA([]byte("sid"), invalid.InvalidY1, nil)
 	if _, _, err := respondTestResponder(cfg, badA); !errors.Is(err, ErrAbort) {
@@ -1509,7 +1651,7 @@ func TestResponderPrevalidatesInvalidInitiatorShareBeforeRandomness(t *testing.T
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := testConfig()
+			cfg := testResponderInput()
 			random := &countingFailingReader{err: io.ErrUnexpectedEOF}
 			badA := encodeMessageA([]byte("sid"), tc.ya, nil)
 			_, _, err := respondWithRandom(cfg, badA, random)
@@ -1520,7 +1662,7 @@ func TestResponderPrevalidatesInvalidInitiatorShareBeforeRandomness(t *testing.T
 				t.Fatalf("Respond read randomness %d times before rejecting share", random.reads)
 			}
 
-			nc, err := normalizeConfig(cfg)
+			nc, err := normalizeRespondInput(cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1551,7 +1693,7 @@ func TestInitiatorAbortsOnInvalidResponderShare(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := testConfig()
+			cfg := testInitiatorInput()
 			initiator, _, err := startTestInitiator(cfg)
 			if err != nil {
 				t.Fatal(err)
@@ -1609,7 +1751,7 @@ func TestPeerShareErrorsWrapErrAbort(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error
 			if tc.viaFinish {
-				initiator, _, startErr := Start(testConfig())
+				initiator, _, startErr := Start(testInitiatorInput())
 				if startErr != nil {
 					t.Fatal(startErr)
 				}
@@ -1617,7 +1759,7 @@ func TestPeerShareErrorsWrapErrAbort(t *testing.T) {
 				_, _, err = initiator.Finish(msgB)
 			} else {
 				badA := encodeMessageA([]byte("sid"), tc.share, nil)
-				_, _, err = Respond(testConfig(), badA)
+				_, _, err = Respond(testInitiatorInput(), badA)
 			}
 			if err == nil {
 				t.Fatal("expected peer-share rejection, got nil error")
@@ -1643,7 +1785,7 @@ func TestPeerShareErrorsWrapErrAbort(t *testing.T) {
 func TestPeerShareEncodingRejection(t *testing.T) {
 	invalid := mustLoadDraftInvalidVector(t)
 	badA := encodeMessageA([]byte("sid"), invalid.InvalidY1, nil)
-	_, _, err := Respond(testConfig(), badA)
+	_, _, err := Respond(testInitiatorInput(), badA)
 	if !errors.Is(err, ErrPeerShareEncoding) {
 		t.Fatalf("Respond err=%v want ErrPeerShareEncoding", err)
 	}
@@ -1655,7 +1797,7 @@ func TestPeerShareEncodingRejection(t *testing.T) {
 func TestPeerShareIdentityRejection(t *testing.T) {
 	invalid := mustLoadDraftInvalidVector(t)
 	badA := encodeMessageA([]byte("sid"), invalid.InvalidY2, nil)
-	_, _, err := Respond(testConfig(), badA)
+	_, _, err := Respond(testInitiatorInput(), badA)
 	if !errors.Is(err, ErrPeerShareIdentity) {
 		t.Fatalf("Respond err=%v want ErrPeerShareIdentity", err)
 	}
@@ -1777,7 +1919,7 @@ func TestWireLengthRejectionIsMessageNotPeerShare(t *testing.T) {
 	// ErrAbort or a peer-share sentinel.
 	for _, n := range []int{pointSize - 1, pointSize + 1} {
 		badA := encodeMessageA([]byte("sid"), make([]byte, n), nil)
-		_, _, err := Respond(testConfig(), badA)
+		_, _, err := Respond(testInitiatorInput(), badA)
 		if !errors.Is(err, ErrMessage) {
 			t.Fatalf("len=%d: Respond err=%v want ErrMessage", n, err)
 		}
@@ -1811,7 +1953,7 @@ func TestScalarMultVFYPostMultiplyIdentityDefense(t *testing.T) {
 }
 
 func TestInitiatorReflectedShareFailsConfirmationNotAbort(t *testing.T) {
-	cfg := testConfig()
+	cfg := testInitiatorInput()
 	initiator, msgA, err := startTestInitiator(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1827,8 +1969,8 @@ func TestInitiatorReflectedShareFailsConfirmationNotAbort(t *testing.T) {
 }
 
 func TestResponderRejectsTamperedMessageC(t *testing.T) {
-	initCfg := testConfig()
-	respCfg := testConfig()
+	initCfg := testInitiatorInput()
+	respCfg := testResponderInput()
 	initiator, msgA, err := startTestInitiator(initCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1848,8 +1990,8 @@ func TestResponderRejectsTamperedMessageC(t *testing.T) {
 }
 
 func TestFinishConsumesStateOnParseFailure(t *testing.T) {
-	initCfg := testConfig()
-	respCfg := testConfig()
+	initCfg := testInitiatorInput()
+	respCfg := testResponderInput()
 	initiator, msgA, err := startTestInitiator(initCfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1875,9 +2017,9 @@ func TestFinishConsumesStateOnParseFailure(t *testing.T) {
 }
 
 func TestConfirmationFailsOnPasswordMismatch(t *testing.T) {
-	initCfg := testConfig()
+	initCfg := testInitiatorInput()
 	initCfg.Password = []byte("password-a")
-	respCfg := testConfig()
+	respCfg := testResponderInput()
 	respCfg.Password = []byte("password-b")
 
 	initiator, msgA, err := startTestInitiator(initCfg)
@@ -1959,7 +2101,7 @@ func TestNilReceiverFinishAndExport(t *testing.T) {
 }
 
 func TestExportDomainSeparation(t *testing.T) {
-	sI, _ := completeExchange(t, testConfig(), testConfig())
+	sI, _ := completeExchange(t, testInitiatorInput(), testResponderInput())
 
 	cases := []struct {
 		name                       string
@@ -2019,9 +2161,9 @@ func TestExportDomainSeparation(t *testing.T) {
 }
 
 func TestFinishConsumesStateOnConfirmationFailure(t *testing.T) {
-	initCfg := testConfig()
+	initCfg := testInitiatorInput()
 	initCfg.Password = []byte("password-a")
-	respCfg := testConfig()
+	respCfg := testResponderInput()
 	respCfg.Password = []byte("password-b")
 
 	initiator, msgA, err := startTestInitiator(initCfg)
@@ -2039,11 +2181,11 @@ func TestFinishConsumesStateOnConfirmationFailure(t *testing.T) {
 		t.Fatalf("initiator second Finish after ErrConfirmationFailed err=%v want ErrStateUsed", err)
 	}
 
-	initiator2, msgA2, err := startTestInitiator(testConfig())
+	initiator2, msgA2, err := startTestInitiator(testInitiatorInput())
 	if err != nil {
 		t.Fatal(err)
 	}
-	responder2, msgB2, err := respondTestResponder(testConfig(), msgA2)
+	responder2, msgB2, err := respondTestResponder(testResponderInput(), msgA2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2062,7 +2204,7 @@ func TestFinishConsumesStateOnConfirmationFailure(t *testing.T) {
 }
 
 func TestInitiatorFinishConsumesStateOnAbort(t *testing.T) {
-	initiator, _, err := startTestInitiator(testConfig())
+	initiator, _, err := startTestInitiator(testInitiatorInput())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2088,7 +2230,7 @@ func mustLoadDraftInvalidVector(t *testing.T) draftInvalidVector {
 	return v
 }
 
-func completeExchange(t *testing.T, initCfg, respCfg Config) (*Session, *Session) {
+func completeExchange(t *testing.T, initCfg, respCfg Input) (*Session, *Session) {
 	t.Helper()
 	initiator, msgA, err := startTestInitiator(initCfg)
 	if err != nil {

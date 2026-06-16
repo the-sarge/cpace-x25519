@@ -31,11 +31,7 @@ Any outer application negotiation of PAKE version, ciphersuite, protocol mode,
 or whether CPace is used needs downgrade protection outside this package. The
 package authenticates only the inputs it is given and has no negotiation API.
 
-Both parties must use a consistent role-ID orientation: `InitiatorID` names the
-party running `Start`, and `ResponderID` names the party running `Respond`. If
-each side puts itself first, the CI values differ and confirmation fails. Role
-labels such as `"client"` and `"server"` are not enough as global identities for
-all users or deployments; callers should bind stable party identities.
+Each party supplies role-local identities: the initiator uses `SelfID=initiator, PeerID=responder`, and the responder uses `SelfID=responder, PeerID=initiator`. If one side swaps those values, the CI values differ and confirmation fails. Role labels such as `"client"` and `"server"` are not enough as global identities for all users or deployments; callers should bind stable party identities.
 
 Scalar randomness always comes from Go's `crypto/rand.Reader`; callers cannot inject a custom random reader through the public API. Scalar sampling masks the top four bits of byte 31 (clearing bits above group size 252), parses the result as a canonical Ristretto255 scalar, and rejects the zero scalar. The Ristretto255 scalar order `L = 2^252 + 27742...` exceeds `2^252` by approximately `2^125`, so a uniformly random masked value has probability approximately `2^-125` of falling in `[L, 2^252)` and being rejected by `SetCanonicalBytes`. That outcome is statistically negligible but reachable in principle; the sampling loop treats it as an unusable sample and retries rather than aborting. The zero check creates a secret-dependent loop only for the all-zero masked scalar case, which has negligible probability with the system random reader. Sampling failure after `maxScalarTries` retries wraps `ErrRandomness`. The package implements draft §8.3 bit-masking with defense-in-depth retries for unusable samples; using the ristretto255 library's `SetUniformBytes` plus zero rejection/retry would be an allowed draft alternative, but it consumes 64 random bytes and reduces modulo the scalar order, changing deterministic behavior and defining a different package profile.
 
@@ -56,10 +52,7 @@ Raw `K`, scalar values, and ISK are not exposed through the public API. Exported
 application material is derived from the confirmed ISK using HKDF-SHA512 and is
 deterministic for a given label and context; it is not fresh randomness or a
 randomness pool. A session is returned only after key confirmation succeeds.
-`Respond` success alone does not authenticate the peer. `Session.PeerID` and
-`Session.PeerAssociatedData` return metadata that each side configured locally
-and that the confirmed exchange proves both sides agreed on. `PeerID` is copied
-from `Config`, not parsed from peer-controlled wire data.
+`Respond` success alone does not authenticate the peer. `Session.PeerID` and `Session.PeerAssociatedData` return metadata that each side configured locally and that the confirmed exchange proves both sides agreed on. `PeerID` is copied from `Input`, not parsed from peer-controlled wire data.
 
 ## Framing
 
@@ -69,7 +62,7 @@ draft LEB128 length-value fields. Decoders reject trailing data, wrong
 version/suite/role, malformed or non-canonical LEB128, oversized fields, invalid
 point lengths, and invalid tag lengths.
 
-Size limits for valid package-owned message shapes are per-field: passwords and party IDs are capped at 4 KiB, context and session IDs at 1 KiB, and associated data at 64 KiB. Public-share and confirmation-tag fields are decoded with exact 32-byte and 64-byte limits. Malformed framed inputs also hit a 128 KiB aggregate decoder backstop before field parsing proceeds; this is an invalid-message throttle, not a replacement for the per-field valid-message caps. Associated data is intended to bind outer protocol context; large external artifacts should normally be represented by a digest, Merkle root, exporter, or other fixed-size commitment.
+Size limits for valid package-owned message shapes are per-field: passwords and party IDs are capped at 4 KiB, context and session IDs at 1 KiB, and local associated data at 64 KiB. Public-share and confirmation-tag fields are decoded with exact 32-byte and 64-byte limits. Malformed framed inputs also hit a 128 KiB aggregate decoder backstop before field parsing proceeds; this is an invalid-message throttle, not a replacement for the per-field valid-message caps. Local associated data is intended to bind outer protocol context; large external artifacts should normally be represented by a digest, Merkle root, exporter, or other fixed-size commitment.
 
 Confirmation tags intentionally remain draft-compatible. This package does not
 add extra role-label inputs to the draft-21 confirmation MACs.

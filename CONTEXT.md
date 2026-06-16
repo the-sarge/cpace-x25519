@@ -28,7 +28,7 @@ The internal policy that names and caps caller-provided **Caller input** fields 
 _Avoid_: limit constants, validation helpers, size settings.
 
 **Caller input**:
-The public-facing module for application facts supplied before `Start` or `Respond` can construct **single-use state**: password, role identities, context, SessionID, associated data, and compatibility flags after package policy accepts them. ADR-0009 names `Input` as the intended role-local adapter, with `SelfID`, `PeerID`, and `LocalAssociatedData` mapped by the package while `Password`, `Context`, and `SessionID` remain shared session values. **Caller input** is the seam where validation, role mapping, **Package-owned cap policy**, copy ownership, accepted/normalized input plumbing, and package-profile commitments meet.
+The public-facing module for application facts supplied before `Start` or `Respond` can construct **single-use state**: password, role-local identities, context, SessionID, local associated data, and compatibility flags after package policy accepts them. ADR-0009 names `Input` as the role-local adapter, with `SelfID`, `PeerID`, and `LocalAssociatedData` mapped by the package while `Password`, `Context`, and `SessionID` remain shared session values. **Caller input** is the seam where validation, role mapping, **Package-owned cap policy**, copy ownership, accepted/normalized input plumbing, and package-profile commitments meet.
 _Avoid_: config validation, options, input helper.
 
 **Release policy checker**:

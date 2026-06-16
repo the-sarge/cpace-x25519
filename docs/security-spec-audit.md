@@ -105,6 +105,8 @@ Residual memory risks after the ADR-0001 addendum are unchanged in kind: a singl
 
 ADR-0002 (suite API cleanup) landed on this feature branch after the audit's implementation baseline. It removes only the exported inert suite markers (`Suite` and `SuiteCPaceRistretto255SHA512`) before v1.0.0, keeps the package single-suite, and preserves the wire suite byte as `0x01` through internal `currentSuite`/`wireSuite` constants. Interim verification for the ADR-0002 implementation: `task check` passed; `go test ./...`, `go test -race ./...`, and `gosec -tests ./...` passed; and `FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=8m PARALLEL=2 task fuzz` ran locally on `darwin/arm64` with Go 1.26.4 and Task 3.51.1 from `2026-06-12T14:48:13Z` to `2026-06-12T15:44:29Z`, passing all 14 registered targets with `rc=0`. This is an interim gate only and does not replace the pinned paired long-fuzz evidence or the consolidated Phase 3 exact-candidate refresh.
 
+ADR-0009 (caller input) landed after the audit's implementation baseline. It replaces the public `Config` caller-input shape with role-local `Input`, maps `SelfID` and `PeerID` per role before building CI, renames caller local associated data to `LocalAssociatedData`, and preserves the wire format. This is a security-relevant package-code change; the pinned dependency, Capslock, security/spec audit, and paired long-fuzz evidence remain historical until refreshed at the exact release candidate. The named manual secret-lifetime audit for this implementation is `docs/adr-0009-secret-lifetime-audit.md`.
+
 ## Residual Risk
 
 External review of package-owned CI/framing/profile choices remains open.

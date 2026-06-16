@@ -33,8 +33,7 @@ cryptographic review before any production-ready claim.
 - `docs/security-spec-audit.md` for the latest internal security/spec audit.
 - `docs/threat-model.md` for assets, attackers, non-goals, and security
   boundaries.
-- `docs/integration-guidance.md` for outer negotiation, downgrade protection,
-  identity orientation, and session-output guidance.
+- `docs/integration-guidance.md` for outer negotiation, downgrade protection, role-local identity input, and session-output guidance.
 - `docs/dependency-review.md` for dependency and vulnerability scan evidence.
 - `docs/fuzz-evidence.md` for local smoke and long-fuzz campaign evidence.
 - `docs/capslock-report.md` for static capability-analysis evidence.
@@ -65,8 +64,7 @@ outer negotiation that happens before CPace inputs are fixed.
 
 ## Package-Owned Choices To Review
 
-- `cpace-go` CI construction from draft version, suite, role labels, initiator
-  ID, responder ID, and caller context.
+- `cpace-go` CI construction from draft version, suite, role labels, role-local party identities, and caller context.
 - Binary wire framing with format byte `0xc1`, suite and role bytes, and
   draft LEB128 length-value fields.
 - Non-configurable per-field size caps: passwords and party IDs at 4 KiB,
@@ -108,9 +106,7 @@ upstream review.
 
 ## Review Questions
 
-- Is the package-owned CI construction appropriate for a Go package profile over
-  draft-21, and are the role and identity-orientation requirements clear enough
-  for real integrations?
+- Is the package-owned CI construction appropriate for a Go package profile over draft-21, and are the role-local identity-input requirements clear enough for real integrations?
 - Is the binary wire framing unambiguous, injective for the represented fields,
   and sufficiently future-versioned?
 - Are the per-field size caps reasonable for a library API, and are the

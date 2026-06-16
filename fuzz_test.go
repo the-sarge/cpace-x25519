@@ -43,13 +43,23 @@ func (r *repeatingReader) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func testConfig() Config {
-	return Config{
-		Password:    []byte("password"),
-		InitiatorID: []byte("initiator"),
-		ResponderID: []byte("responder"),
-		Context:     []byte("context"),
-		SessionID:   []byte("sid"),
+func testInitiatorInput() Input {
+	return Input{
+		Password:  []byte("password"),
+		SelfID:    []byte("initiator"),
+		PeerID:    []byte("responder"),
+		Context:   []byte("context"),
+		SessionID: []byte("sid"),
+	}
+}
+
+func testResponderInput() Input {
+	return Input{
+		Password:  []byte("password"),
+		SelfID:    []byte("responder"),
+		PeerID:    []byte("initiator"),
+		Context:   []byte("context"),
+		SessionID: []byte("sid"),
 	}
 }
 
@@ -57,11 +67,11 @@ func repeatingRand(fill byte) io.Reader {
 	return &repeatingReader{buf: bytes.Repeat([]byte{fill}, scalarSize)}
 }
 
-func startTestInitiator(cfg Config) (*Initiator, []byte, error) {
+func startTestInitiator(cfg Input) (*Initiator, []byte, error) {
 	return startWithRandom(cfg, repeatingRand(0x11))
 }
 
-func respondTestResponder(cfg Config, messageA []byte) (*Responder, []byte, error) {
+func respondTestResponder(cfg Input, messageA []byte) (*Responder, []byte, error) {
 	return respondWithRandom(cfg, messageA, repeatingRand(0x22))
 }
 
@@ -162,27 +172,33 @@ func FuzzProtocolConsistency(f *testing.F) {
 		if len(sid) == 0 || len(sid) > sessionIDCap.length || len(ctx) > contextCap.length || len(ada) > 1024 || len(adb) > 1024 {
 			t.Skip()
 		}
-		initCfg := Config{
-			Password:       []byte("password"),
-			InitiatorID:    []byte("initiator"),
-			ResponderID:    []byte("responder"),
-			Context:        ctx,
-			SessionID:      sid,
-			AssociatedData: ada,
+		initCfg := Input{
+			Password:            []byte("password"),
+			SelfID:              []byte("initiator"),
+			PeerID:              []byte("responder"),
+			Context:             ctx,
+			SessionID:           sid,
+			LocalAssociatedData: ada,
 		}
-		respCfg := initCfg
-		respCfg.AssociatedData = adb
+		respCfg := Input{
+			Password:            []byte("password"),
+			SelfID:              []byte("responder"),
+			PeerID:              []byte("initiator"),
+			Context:             ctx,
+			SessionID:           sid,
+			LocalAssociatedData: adb,
+		}
 		initiator, msgA, err := startTestInitiator(initCfg)
 		if err != nil {
-			t.Fatalf("Start failed for bounded valid config: %v", err)
+			t.Fatalf("Start failed for bounded valid input: %v", err)
 		}
 		responder, msgB, err := respondTestResponder(respCfg, msgA)
 		if err != nil {
-			t.Fatalf("Respond failed for matching config: %v", err)
+			t.Fatalf("Respond failed for matching input: %v", err)
 		}
 		msgC, sI, err := initiator.Finish(msgB)
 		if err != nil {
-			t.Fatalf("initiator Finish failed for matching config: %v", err)
+			t.Fatalf("initiator Finish failed for matching input: %v", err)
 		}
 		sR, err := responder.Finish(msgC)
 		if err != nil {
@@ -202,20 +218,25 @@ func FuzzProtocolMismatch(f *testing.F) {
 		if len(sid) == 0 || len(sid) > sessionIDCap.length || len(ctx) >= contextCap.length || len(ada) > 1024 || len(adb) > 1024 {
 			t.Skip()
 		}
-		initCfg := Config{
-			Password:       []byte("password"),
-			InitiatorID:    []byte("initiator"),
-			ResponderID:    []byte("responder"),
-			Context:        ctx,
-			SessionID:      sid,
-			AssociatedData: ada,
+		initCfg := Input{
+			Password:            []byte("password"),
+			SelfID:              []byte("initiator"),
+			PeerID:              []byte("responder"),
+			Context:             ctx,
+			SessionID:           sid,
+			LocalAssociatedData: ada,
 		}
-		respCfg := initCfg
-		respCfg.Context = append(clone(ctx), 0xff)
-		respCfg.AssociatedData = adb
+		respCfg := Input{
+			Password:            []byte("password"),
+			SelfID:              []byte("responder"),
+			PeerID:              []byte("initiator"),
+			Context:             append(clone(ctx), 0xff),
+			SessionID:           sid,
+			LocalAssociatedData: adb,
+		}
 		initiator, msgA, err := startTestInitiator(initCfg)
 		if err != nil {
-			t.Fatalf("Start failed for bounded valid config: %v", err)
+			t.Fatalf("Start failed for bounded valid input: %v", err)
 		}
 		_, msgB, err := respondTestResponder(respCfg, msgA)
 		if err != nil {
@@ -237,7 +258,7 @@ func FuzzRespondWithFuzzedMessageA(f *testing.F) {
 		if len(messageA) > fuzzProtocolInputCap {
 			t.Skip()
 		}
-		cfg := fuzzResponderConfig()
+		cfg := fuzzResponderInput()
 		_, msgB, err := respondWithRandom(cfg, messageA, repeatingRand(0x22))
 		if err == nil {
 			if _, err := decodeMessageB(msgB); err != nil {
@@ -257,7 +278,7 @@ func FuzzInitiatorFinishWithFuzzedMessageB(f *testing.F) {
 		if len(messageB) > fuzzProtocolInputCap {
 			t.Skip()
 		}
-		initiator, _, err := startTestInitiator(fuzzInitiatorConfig())
+		initiator, _, err := startTestInitiator(fuzzInitiatorInput())
 		if err != nil {
 			t.Fatalf("Start failed for fixed fuzz config: %v", err)
 		}
@@ -445,11 +466,11 @@ func markFuzzHelper(tb fuzzFataler) {
 
 func makeFuzzExchange(tb fuzzFataler) (*Initiator, *Responder, *Session, []byte, []byte, []byte) {
 	markFuzzHelper(tb)
-	initiator, msgA, err := startTestInitiator(fuzzInitiatorConfig())
+	initiator, msgA, err := startTestInitiator(fuzzInitiatorInput())
 	if err != nil {
 		tb.Fatalf("Start failed for fixed fuzz config: %v", err)
 	}
-	responder, msgB, err := respondTestResponder(fuzzResponderConfig(), msgA)
+	responder, msgB, err := respondTestResponder(fuzzResponderInput(), msgA)
 	if err != nil {
 		tb.Fatalf("Respond failed for fixed fuzz config: %v", err)
 	}
@@ -460,15 +481,15 @@ func makeFuzzExchange(tb fuzzFataler) (*Initiator, *Responder, *Session, []byte,
 	return initiator, responder, sess, msgA, msgB, msgC
 }
 
-func fuzzInitiatorConfig() Config {
-	cfg := testConfig()
-	cfg.AssociatedData = []byte("ADa")
+func fuzzInitiatorInput() Input {
+	cfg := testInitiatorInput()
+	cfg.LocalAssociatedData = []byte("ADa")
 	return cfg
 }
 
-func fuzzResponderConfig() Config {
-	cfg := testConfig()
-	cfg.AssociatedData = []byte("ADb")
+func fuzzResponderInput() Input {
+	cfg := testResponderInput()
+	cfg.LocalAssociatedData = []byte("ADb")
 	return cfg
 }
 
