@@ -233,7 +233,14 @@ func messageFieldsAcceptedBySpec(spec messageSpec, fields ...[]byte) bool {
 		return false
 	}
 	for i, field := range spec.fields {
-		if err := field.validateMessageLength(len(fields[i])); err != nil {
+		gotLength := len(fields[i])
+		if field.exact {
+			if gotLength != field.length {
+				return false
+			}
+			continue
+		}
+		if gotLength > field.length {
 			return false
 		}
 	}

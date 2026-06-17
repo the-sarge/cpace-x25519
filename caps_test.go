@@ -74,12 +74,12 @@ func TestPackageOwnedCapPolicyFeedsMessageFramingSpecs(t *testing.T) {
 				t.Fatalf("fields=%#v want %#v", spec.fields, tc.fields)
 			}
 			for _, field := range spec.fields {
-				want, ok := capPolicy[field.name]
+				policyField, ok := capPolicy[field.name]
 				if !ok {
 					t.Fatalf("message field %q is missing from shipped cap policy", field.name)
 				}
-				if field != want {
-					t.Fatalf("message field=%#v want cap policy field %#v", field, want)
+				if field != policyField {
+					t.Fatalf("message field=%#v want cap policy field %#v", field, policyField)
 				}
 			}
 		})
