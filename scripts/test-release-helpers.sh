@@ -51,6 +51,9 @@ assert_release_tag_rejected v1.0.0-rc..1
 assert_release_tag_rejected v1/foo
 assert_release_tag_rejected "$(printf 'v1.0.0\nlatest=true')"
 
+sh -c '. "$1"; release_tag=before; release_tag_is_supported v1.2.3 >/dev/null; test "$release_tag" = before' sh "$repo_root/scripts/release-tag-policy.sh"
+sh -c '. "$1"; release_tag=before; release_tag_require_supported v1.2.3 >/dev/null; test "$release_tag" = before' sh "$repo_root/scripts/release-tag-policy.sh"
+
 "$repo_root/scripts/extract-release-notes.sh" "$changelog" v1.2.3 >"$tmpdir/notes.txt"
 grep -q 'Release note one' "$tmpdir/notes.txt"
 
