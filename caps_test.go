@@ -47,23 +47,20 @@ func TestPackageOwnedCapPolicyPinsShippedValues(t *testing.T) {
 }
 
 func TestPackageOwnedCapPolicyFeedsMessageFramingSpecs(t *testing.T) {
-	cases := []struct {
-		name string
-		got  packageCapField
-		want packageCapField
-	}{
-		{"message A session id", messageASpec.fields[0], messageASessionIDCap},
-		{"message A point", messageASpec.fields[1], messageAPointCap},
-		{"message A local associated data", messageASpec.fields[2], messageAAssociatedDataCap},
-		{"message B point", messageBSpec.fields[0], messageBPointCap},
-		{"message B local associated data", messageBSpec.fields[1], messageBAssociatedDataCap},
-		{"message B tag", messageBSpec.fields[2], messageBTagCap},
-		{"message C tag", messageCSpec.fields[0], messageCTagCap},
+	capPolicy := map[string]packageCapField{}
+	for _, field := range shippedPackageCapPolicy() {
+		capPolicy[field.name] = field
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if tc.got != tc.want {
-				t.Fatalf("message field=%#v want cap policy field %#v", tc.got, tc.want)
+	for _, spec := range messageFramingCatalogue() {
+		t.Run(spec.name, func(t *testing.T) {
+			for _, field := range spec.fields {
+				want, ok := capPolicy[field.name]
+				if !ok {
+					t.Fatalf("message field %q is missing from shipped cap policy", field.name)
+				}
+				if field != want {
+					t.Fatalf("message field=%#v want cap policy field %#v", field, want)
+				}
 			}
 		})
 	}
