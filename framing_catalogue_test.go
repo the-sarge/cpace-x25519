@@ -159,7 +159,12 @@ func overDeclaredMessageField(spec messageSpec, fieldIndex int) []byte {
 	for i := range fieldIndex {
 		msg = appendLengthValue(msg, fields[i])
 	}
-	return appendLEB128(msg, uint64(spec.fields[fieldIndex].length+1))
+	fieldLength := spec.fields[fieldIndex].length
+	if fieldLength < 0 {
+		panic("cpace test: message field length must be non-negative")
+	}
+	declaredLength := uint64(fieldLength)
+	return appendLEB128(msg, declaredLength+1)
 }
 
 func messageAFuzzSeeds(validA, crossRoleB, invalidY []byte) [][]byte {
@@ -232,8 +237,14 @@ func messageFieldsAcceptedBySpec(spec messageSpec, fields ...[]byte) bool {
 	if len(fields) != len(spec.fields) {
 		return false
 	}
-	for i, field := range spec.fields {
-		gotLength := len(fields[i])
+	remainingSpecs := spec.fields
+	for _, got := range fields {
+		if len(remainingSpecs) == 0 {
+			return false
+		}
+		field := remainingSpecs[0]
+		remainingSpecs = remainingSpecs[1:]
+		gotLength := len(got)
 		if field.exact {
 			if gotLength != field.length {
 				return false
