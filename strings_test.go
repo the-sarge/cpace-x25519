@@ -115,6 +115,47 @@ func TestIRTranscriptOwnsInputsAndOutput(t *testing.T) {
 	}
 }
 
+func TestIRTranscriptInitiatorAD(t *testing.T) {
+	ada := []byte("ada")
+	tr := newIRTranscript([]byte("ya"), ada, []byte("yb"), []byte("adb"))
+
+	got := tr.initiatorAD()
+	if !bytes.Equal(got, []byte("ada")) {
+		t.Fatalf("initiatorAD=%q want %q", got, "ada")
+	}
+
+	// Returned slice is an independent copy: mutating it must not affect the transcript.
+	got[0] ^= 0xff
+	if again := tr.initiatorAD(); !bytes.Equal(again, []byte("ada")) {
+		t.Fatalf("initiatorAD returned aliased slice: %q", again)
+	}
+
+	// Transcript owns its inputs: mutating the caller's slice must not change it.
+	ada[0] = 'A'
+	if again := tr.initiatorAD(); !bytes.Equal(again, []byte("ada")) {
+		t.Fatalf("initiatorAD changed after caller mutation: %q", again)
+	}
+}
+
+func TestIRTranscriptClear(t *testing.T) {
+	tr := newIRTranscript([]byte("ya"), []byte("ada"), []byte("yb"), []byte("adb"))
+	body := tr.transcript // alias the concatenated backing array before clearing
+	if allZero(body) {
+		t.Fatal("precondition: transcript bytes should be non-zero")
+	}
+
+	tr.clear()
+
+	if !allZero(body) {
+		t.Fatalf("clear did not zero transcript backing bytes: %x", body)
+	}
+	if tr.bytes() != nil {
+		t.Fatalf("clear did not nil transcript: %x", tr.bytes())
+	}
+
+	tr.clear() // second call must be a safe no-op
+}
+
 func TestWireFormatPrefixByte(t *testing.T) {
 	if wireFormatV1 != 0xc1 {
 		t.Fatalf("wireFormatV1=%#x, want 0xc1", wireFormatV1)

@@ -38,20 +38,39 @@ func (t irTranscript) deriveISK(sid, k []byte) []byte {
 	return deriveISK(sid, k, t.transcript)
 }
 
+// initiatorAD returns a copy of the initiator's associated data bound into the
+// transcript. The responder uses it to populate the confirmed Session's peer
+// associated data without retaining a decomposed field of its own.
+func (t irTranscript) initiatorAD() []byte {
+	return clone(t.ada)
+}
+
+// clear zeroes then nils the transcript's public byte fields. The responder
+// calls it from responderCore.clear so the stored transcript is wiped
+// alongside the ISK as hygiene (ADR-0001); the transcript holds no secret of
+// its own. Safe to call more than once and on a nil receiver.
+func (t *irTranscript) clear() {
+	if t == nil {
+		return
+	}
+	clearBytes(t.transcript)
+	clearBytes(t.ya)
+	clearBytes(t.ada)
+	clearBytes(t.yb)
+	clearBytes(t.adb)
+	t.transcript = nil
+	t.ya = nil
+	t.ada = nil
+	t.yb = nil
+	t.adb = nil
+}
+
 func (t irTranscript) initiatorConfirmationTag(isk, sid []byte) []byte {
-	return initiatorRoleConfirmationTag(isk, sid, t.ya, t.ada)
+	return confirmationTag(isk, sid, t.ya, t.ada)
 }
 
 func (t irTranscript) responderConfirmationTag(isk, sid []byte) []byte {
-	return responderRoleConfirmationTag(isk, sid, t.yb, t.adb)
-}
-
-func initiatorRoleConfirmationTag(isk, sid, ya, ada []byte) []byte {
-	return confirmationTag(isk, sid, ya, ada)
-}
-
-func responderRoleConfirmationTag(isk, sid, yb, adb []byte) []byte {
-	return confirmationTag(isk, sid, yb, adb)
+	return confirmationTag(isk, sid, t.yb, t.adb)
 }
 
 func transcriptID(transcript []byte) []byte {
