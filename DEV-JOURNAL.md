@@ -1664,3 +1664,67 @@ PR #152 completed issue #136 by recording the caller-input field-policy evaluati
 - Complete the parent phase-2 implementation task audit and close the OmniFocus parent if no open child implementation tasks remain.
 - Keep #145 and #150 as non-blocking follow-up tasks outside this implementation sequence.
 - Stronger release-readiness claims still require the planned exact-candidate evidence refresh after the merged security-relevant changes.
+
+---
+
+## Message framing catalogue landed - 2026-06-17 20:09 EDT
+
+**Main:** `84006defb969`
+**Actor:** Codex
+
+**Summary**
+
+PR #154 moved Message framing facts into a small internal catalogue around `messageSpec`, keeping the public API, wire bytes, cap values, package-profile policy, and error identities unchanged.
+
+**Completed**
+
+- Merged PR #154 (`refactor: deepen message framing catalogue`) as `84006defb969012d13c32a3ca20b0c6b471ede10`.
+- Added `messageFramingCatalogue()` and `messageSpec` encode/decode methods so production wrappers and tests use the same Message A/B/C role and field facts.
+- Reworked framing catalogue tests, cap-policy tests, and fuzz seed helpers to derive malformed cases, field-limit cases, max-field messages, cross-role cases, and round-trip oracles from the catalogue instead of hand-coded A/B/C tables.
+- Restored ordered field assertions after RAS review identified that cap-policy membership checks alone did not pin positional decoding semantics.
+- Kept the fuzz round-trip length oracle independent from production `validateMessageLength`, and kept test helpers clean under the hosted SAST/gosec gate.
+- Final RAS review-fix run `20260617T230313-08079563f71bc239c64a4eaf` reported no merge-blocking findings on final head `cae2a1db8be8d2a00ec5aecdb93ffe6a0587691f`; non-blocking test-helper follow-ups became issue #155 and OmniFocus task `b409eHqcIdr`.
+
+**Validation**
+
+- Focused tests passed for Message framing catalogue field limits, max fields, round trips, and cap-policy field order.
+- Full local gates passed before merge: `go test ./...`, `go test -race ./...`, `task check`, `git diff --check`, and local `gosec -exclude-dir=.ras -tests -fmt=json ./...` with zero findings after the SAST cleanup.
+- GitHub checks on PR #154 passed before merge: Check, CodeQL Analyze/CodeQL, macOS smoke, Windows smoke, DCO, Dependency Gate, SAST Gate, and Staticcheck; the standalone gosec child check was neutral/skipping as expected.
+
+**Next**
+
+- Keep #155 as a non-blocking follow-up for Message framing catalogue test hardening.
+- Stronger release-readiness claims still require refreshing pinned dependency, fuzz, and security-audit evidence against the exact candidate commit after these parser-adjacent changes.
+
+---
+
+## Release tag policy centralization landed - 2026-06-17 20:10 EDT
+
+**Main:** `0f416ec81885`
+**Actor:** Codex
+
+**Summary**
+
+PR #156 completed issue #150 by moving accepted release-tag validation into a shared shell policy module used by release metadata, release-note extraction, and CycloneDX SBOM filename validation.
+
+**Completed**
+
+- Merged PR #156 (`refactor: centralize release tag policy`) as `0f416ec81885e19a49a7a8c845bade760e6a2a7b`; issue #150 closed automatically at merge.
+- Added `scripts/release-tag-policy.sh` with `release_tag_is_supported` and `release_tag_require_supported`, keeping accepted SemVer tag syntax and newline rejection in one maintained shell module.
+- Updated `scripts/extract-release-notes.sh`, `scripts/release-tag-metadata.sh`, and `scripts/validate-cyclonedx-sbom.sh` to source the shared policy while preserving the SBOM helper's filename-specific diagnostic wording.
+- Extended release-helper smoke tests for direct shared-policy acceptance/rejection and for sourced-helper scope behavior.
+- Added `scripts/release-tag-policy.sh` to the accepted release policy checker’s required helper catalogue.
+- Final RAS review-fix run `20260617T235842-22d699c1b4b4a989d0b0afa0` reported no merge-blocking findings on final head `7d4e60b1b42b049462f4f704b123c2acbc70840b`; non-blocking release-helper coverage hardening became issue #157 and OmniFocus task `lZktldDGmfi`.
+
+**Validation**
+
+- TDD red checks failed before implementation for the missing shared helper and missing accepted release-policy requirement, then passed after the helper and policy catalogue were updated.
+- Release helper validation passed with `scripts/test-release-helpers.sh`; the optional Syft validation skip remained expected because `syft` is not installed.
+- Release policy tests passed with `(cd tools/releasepolicy && go test ./...)`.
+- Full local gates passed before merge: `go test ./...`, `task check`, `git diff --check`, and local `gosec -exclude-dir=.ras -tests -fmt=json ./...` with zero findings.
+- GitHub checks on PR #156 passed before merge after rebasing onto PR #154's merge: Check, CodeQL Analyze/CodeQL, macOS smoke, Windows smoke, DCO, Dependency Gate, SAST Gate, and Staticcheck; the standalone gosec child check was neutral/skipping as expected.
+
+**Next**
+
+- Keep #157 as a non-blocking follow-up for release-helper anti-drift and SBOM invalid-tag coverage.
+- Stronger release-readiness claims still require refreshing pinned release evidence against the exact candidate commit after these release-tooling changes.
