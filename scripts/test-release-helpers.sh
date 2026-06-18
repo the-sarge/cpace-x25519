@@ -51,18 +51,80 @@ assert_release_tag_rejected v1.0.0-rc..1
 assert_release_tag_rejected v1/foo
 assert_release_tag_rejected "$(printf 'v1.0.0\nlatest=true')"
 
-assert_helper_reuses_release_tag_policy() {
+assert_helper_path_reuses_release_tag_policy() {
   helper=$1
-  helper_path="$repo_root/$helper"
+  helper_path=$2
 
   if ! grep -Fq '. "$script_dir/release-tag-policy.sh"' "$helper_path"; then
     echo "$helper does not source scripts/release-tag-policy.sh" >&2
     exit 1
   fi
+  assert_helper_path_defines_no_local_release_tag_policy_functions "$helper" "$helper_path"
   if grep -Fq 'release_tag_semver_re=' "$helper_path" || grep -Fq '^v(0|' "$helper_path"; then
     echo "$helper redefines the release tag SemVer policy" >&2
     exit 1
   fi
+}
+
+assert_helper_path_defines_no_local_release_tag_policy_functions() {
+  helper=$1
+  helper_path=$2
+
+  if grep -Eq '^[[:space:]]*release_tag_[A-Za-z0-9_]+[[:space:]]*\([[:space:]]*\)' "$helper_path" ||
+    grep -Eq '^[[:space:]]*function[[:space:]]+release_tag_[A-Za-z0-9_]+' "$helper_path"; then
+    echo "$helper defines a local release tag policy function" >&2
+    exit 1
+  fi
+}
+
+assert_helper_reuses_release_tag_policy() {
+  helper=$1
+  assert_helper_path_reuses_release_tag_policy "$helper" "$repo_root/$helper"
+}
+
+assert_helper_rejects_release_tag_policy_function_shadow() {
+  helper=$1
+  function_name=$2
+  function_definition=$3
+  shadow_helper="$tmpdir/$(basename -- "$helper")-$function_name-shadow.sh"
+  injected=false
+
+  while IFS= read -r line || [ -n "$line" ]; do
+    printf '%s\n' "$line"
+    if [ "$line" = '. "$script_dir/release-tag-policy.sh"' ]; then
+      printf '%s\n' "$function_definition"
+      injected=true
+    fi
+  done <"$repo_root/$helper" >"$shadow_helper"
+
+  if [ "$injected" != true ]; then
+    echo "injection anchor not found in $helper" >&2
+    exit 1
+  fi
+
+  if ( assert_helper_path_reuses_release_tag_policy "$helper with local $function_name" "$shadow_helper" ) >"$shadow_helper.out" 2>"$shadow_helper.err"; then
+    echo "$helper unexpectedly allowed local $function_name definition: $function_definition" >&2
+    exit 1
+  fi
+  if ! grep -q 'defines a local release tag policy function' "$shadow_helper.err"; then
+    echo "$helper rejected local $function_name definition with an unexpected diagnostic: $function_definition" >&2
+    cat "$shadow_helper.err" >&2
+    exit 1
+  fi
+}
+
+assert_helper_rejects_release_tag_policy_function_shadow_forms() {
+  helper=$1
+  function_name=$2
+
+  assert_helper_rejects_release_tag_policy_function_shadow "$helper" "$function_name" "$function_name() { return 0; }"
+  assert_helper_rejects_release_tag_policy_function_shadow "$helper" "$function_name" "$function_name( ) { return 0; }"
+  assert_helper_rejects_release_tag_policy_function_shadow "$helper" "$function_name" "$function_name() # local override
+{ return 0; }"
+  assert_helper_rejects_release_tag_policy_function_shadow "$helper" "$function_name" "$function_name( ) # local override
+{ return 0; }"
+  assert_helper_rejects_release_tag_policy_function_shadow "$helper" "$function_name" "function $function_name() { return 0; }"
+  assert_helper_rejects_release_tag_policy_function_shadow "$helper" "$function_name" "function $function_name { return 0; }"
 }
 
 assert_helper_reuses_release_metadata_module() {
@@ -118,6 +180,11 @@ assert_release_metadata_module_preserves_caller_names() {
 assert_helper_reuses_release_tag_policy scripts/extract-release-notes.sh
 assert_helper_reuses_release_tag_policy scripts/release-tag-metadata.sh
 assert_helper_reuses_release_tag_policy scripts/validate-cyclonedx-sbom.sh
+assert_helper_path_defines_no_local_release_tag_policy_functions scripts/release-metadata.sh "$repo_root/scripts/release-metadata.sh"
+assert_helper_rejects_release_tag_policy_function_shadow_forms scripts/release-tag-metadata.sh release_tag_is_supported
+assert_helper_rejects_release_tag_policy_function_shadow_forms scripts/release-tag-metadata.sh release_tag_require_supported
+assert_helper_rejects_release_tag_policy_function_shadow scripts/release-tag-metadata.sh release_tag_policy_is_supported 'release_tag_policy_is_supported() { return 0; }'
+assert_helper_rejects_release_tag_policy_function_shadow scripts/release-tag-metadata.sh release_tag_policy_require_supported_for_metadata 'release_tag_policy_require_supported_for_metadata() { return 0; }'
 assert_helper_reuses_release_metadata_module scripts/release-tag-metadata.sh
 
 assert_release_tag_policy_preserves_caller_names release_tag_is_supported
