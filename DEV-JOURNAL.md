@@ -1664,3 +1664,34 @@ PR #152 completed issue #136 by recording the caller-input field-policy evaluati
 - Complete the parent phase-2 implementation task audit and close the OmniFocus parent if no open child implementation tasks remain.
 - Keep #145 and #150 as non-blocking follow-up tasks outside this implementation sequence.
 - Stronger release-readiness claims still require the planned exact-candidate evidence refresh after the merged security-relevant changes.
+
+---
+
+## Message framing catalogue landed - 2026-06-17 20:09 EDT
+
+**Main:** `84006defb969`
+**Actor:** Codex
+
+**Summary**
+
+PR #154 moved Message framing facts into a small internal catalogue around `messageSpec`, keeping the public API, wire bytes, cap values, package-profile policy, and error identities unchanged.
+
+**Completed**
+
+- Merged PR #154 (`refactor: deepen message framing catalogue`) as `84006defb969012d13c32a3ca20b0c6b471ede10`.
+- Added `messageFramingCatalogue()` and `messageSpec` encode/decode methods so production wrappers and tests use the same Message A/B/C role and field facts.
+- Reworked framing catalogue tests, cap-policy tests, and fuzz seed helpers to derive malformed cases, field-limit cases, max-field messages, cross-role cases, and round-trip oracles from the catalogue instead of hand-coded A/B/C tables.
+- Restored ordered field assertions after RAS review identified that cap-policy membership checks alone did not pin positional decoding semantics.
+- Kept the fuzz round-trip length oracle independent from production `validateMessageLength`, and kept test helpers clean under the hosted SAST/gosec gate.
+- Final RAS review-fix run `20260617T230313-08079563f71bc239c64a4eaf` reported no merge-blocking findings on final head `cae2a1db8be8d2a00ec5aecdb93ffe6a0587691f`; non-blocking test-helper follow-ups became issue #155 and OmniFocus task `b409eHqcIdr`.
+
+**Validation**
+
+- Focused tests passed for Message framing catalogue field limits, max fields, round trips, and cap-policy field order.
+- Full local gates passed before merge: `go test ./...`, `go test -race ./...`, `task check`, `git diff --check`, and local `gosec -exclude-dir=.ras -tests -fmt=json ./...` with zero findings after the SAST cleanup.
+- GitHub checks on PR #154 passed before merge: Check, CodeQL Analyze/CodeQL, macOS smoke, Windows smoke, DCO, Dependency Gate, SAST Gate, and Staticcheck; the standalone gosec child check was neutral/skipping as expected.
+
+**Next**
+
+- Keep #155 as a non-blocking follow-up for Message framing catalogue test hardening.
+- Stronger release-readiness claims still require refreshing pinned dependency, fuzz, and security-audit evidence against the exact candidate commit after these parser-adjacent changes.
