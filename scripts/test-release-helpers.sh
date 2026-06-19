@@ -568,7 +568,7 @@ fi
 
 if command -v syft >/dev/null 2>&1; then
   real_sbom="$tmpdir/cpace-v9.9.9.cdx.json"
-  (cd "$repo_root" && syft dir:. -o "cyclonedx-json@1.5=$real_sbom" >/dev/null)
+  (cd "$repo_root" && syft dir:. --config .github/syft-release.yaml -o "cyclonedx-json@1.5=$real_sbom" >/dev/null)
   "$repo_root/scripts/validate-cyclonedx-sbom.sh" "$real_sbom"
 else
   echo "syft not found; skipping optional real Syft SBOM validation"

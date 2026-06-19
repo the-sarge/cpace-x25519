@@ -24,7 +24,6 @@ type messageFramingCase struct {
 func messageFramingTargets() []messageFramingTarget {
 	targets := make([]messageFramingTarget, 0, len(messageFramingCatalogue()))
 	for _, spec := range messageFramingCatalogue() {
-		spec := spec
 		targets = append(targets, messageFramingTarget{
 			name:  spec.name,
 			role:  spec.role,
@@ -157,7 +156,7 @@ func validMessageFieldsForCatalogue(spec messageSpec) [][]byte {
 			fields[i] = bytes.Repeat([]byte{byte(0x40 + i)}, field.length)
 			continue
 		}
-		fields[i] = []byte(fmt.Sprintf("field-%d", i))
+		fields[i] = fmt.Appendf(nil, "field-%d", i)
 	}
 	return fields
 }
@@ -607,10 +606,7 @@ func exactMessageFieldBytes(spec messageSpec, length int, fill byte, delta int) 
 	if !ok {
 		panic("cpace test: exact message field missing from catalogue")
 	}
-	n := spec.fields[i].length + delta
-	if n < 0 {
-		n = 0
-	}
+	n := max(spec.fields[i].length+delta, 0)
 	return bytes.Repeat([]byte{fill}, n)
 }
 

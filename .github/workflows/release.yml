@@ -218,6 +218,7 @@ jobs:
           format: cyclonedx-json@1.5
           output-file: ${{ needs.verify-tag.outputs.sbom-file }}
           syft-version: v1.45.1
+          config: .github/syft-release.yaml
           upload-artifact: false
           upload-release-assets: false
 
