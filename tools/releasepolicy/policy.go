@@ -25,6 +25,7 @@ type releasePolicy struct {
 
 	jobs            []releaseJobPolicy
 	requiredScripts []string
+	requiredConfigs []releaseConfigPolicy
 	expectedSigners string
 }
 
@@ -54,6 +55,12 @@ type releaseStepPolicy struct {
 	ifCond          string
 	shell           string
 	continueOnError string
+}
+
+type releaseConfigPolicy struct {
+	path       string
+	sourceName string
+	excludes   []string
 }
 
 const (
@@ -284,6 +291,7 @@ var acceptedReleasePolicy = releasePolicy{
 						"format":                "cyclonedx-json@1.5",
 						"output-file":           "${{ needs.verify-tag.outputs.sbom-file }}",
 						"syft-version":          "v1.45.1",
+						"config":                ".github/syft-release.yaml",
 						"upload-artifact":       "false",
 						"upload-release-assets": "false",
 					},
@@ -484,6 +492,13 @@ var acceptedReleasePolicy = releasePolicy{
 		"scripts/release-tag-metadata.sh",
 		"scripts/validate-cyclonedx-sbom.sh",
 		"scripts/extract-release-notes.sh",
+	},
+	requiredConfigs: []releaseConfigPolicy{
+		{
+			path:       ".github/syft-release.yaml",
+			sourceName: "github.com/the-sarge/cpace",
+			excludes:   []string{"./.git/**", "./.ras/**"},
+		},
 	},
 	expectedSigners: `the-sarge@the-sarge.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFDxEpP8Q6LERBcA5//zwD5dBisHL7uHQsFa+TTibRXC
 the-sarge@the-sarge.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFF32/OwUJwQ/8OX5i2VNBO8oZf6B8l07U/R5n1rj0z6

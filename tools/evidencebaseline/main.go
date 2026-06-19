@@ -247,9 +247,10 @@ func parseSummaryDocsManifest(content string) ([]string, []finding, error) {
 }
 
 func writeSummaryDocsManifest(repoRoot string, refs []string) error {
-	content := "# Generated from docs/evidence-baseline.md by tools/evidencebaseline --write-summary-docs.\n"
+	var content strings.Builder
+	content.WriteString("# Generated from docs/evidence-baseline.md by tools/evidencebaseline --write-summary-docs.\n")
 	for _, ref := range refs {
-		content += ref + "\n"
+		content.WriteString(ref + "\n")
 	}
 
 	path, err := summaryDocsManifestWritePath(repoRoot)
@@ -269,7 +270,7 @@ func writeSummaryDocsManifest(repoRoot string, refs []string) error {
 		}
 	}()
 
-	if _, err := tmp.WriteString(content); err != nil {
+	if _, err := tmp.WriteString(content.String()); err != nil {
 		_ = tmp.Close()
 		return err
 	}
@@ -491,7 +492,7 @@ func safeSlashPath(ref string, allowTrailingSlash bool) bool {
 			return false
 		}
 	}
-	for _, part := range strings.Split(ref, "/") {
+	for part := range strings.SplitSeq(ref, "/") {
 		if part == "" || part == "." || part == ".." {
 			return false
 		}

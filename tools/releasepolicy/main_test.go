@@ -1,8 +1,11 @@
 package main
 
 import (
+	"maps"
+	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -100,6 +103,22 @@ func TestAcceptedReleasePolicyCatalogueIsComplete(t *testing.T) {
 	if !seenScripts["scripts/release-metadata.sh"] {
 		t.Fatal("accepted release policy must require scripts/release-metadata.sh")
 	}
+	seenConfigs := map[string]bool{}
+	for _, config := range acceptedReleasePolicy.requiredConfigs {
+		if config.path == "" {
+			t.Fatal("required config path is empty")
+		}
+		if seenConfigs[config.path] {
+			t.Fatalf("duplicate required config %q", config.path)
+		}
+		seenConfigs[config.path] = true
+		if config.sourceName == "" {
+			t.Fatalf("required config %q has empty source name", config.path)
+		}
+	}
+	if !seenConfigs[".github/syft-release.yaml"] {
+		t.Fatal("accepted release policy must require .github/syft-release.yaml")
+	}
 }
 
 func TestAcceptedReleasePolicyCatalogueRejectsConceptDefects(t *testing.T) {
@@ -183,6 +202,9 @@ func TestCloneReleasePolicyIsDeep(t *testing.T) {
 	requireStringSliceNotAliased(t, "push tags", acceptedReleasePolicy.pushTags, clone.pushTags, 0, "changed")
 	requireStringMapNotAliased(t, "top permissions", acceptedReleasePolicy.topPermission, clone.topPermission, "contents", "write")
 	requireStringSliceNotAliased(t, "required scripts", acceptedReleasePolicy.requiredScripts, clone.requiredScripts, 0, "changed")
+	requireConfigPolicySliceNotAliased(t, acceptedReleasePolicy.requiredConfigs, clone.requiredConfigs, 0, "changed")
+	syftConfig := indexOfRequiredConfig(t, acceptedReleasePolicy, ".github/syft-release.yaml")
+	requireStringSliceNotAliased(t, "required config excludes", acceptedReleasePolicy.requiredConfigs[syftConfig].excludes, clone.requiredConfigs[syftConfig].excludes, 0, "changed")
 	requireStringMapNotAliased(t, "job permissions", acceptedReleasePolicy.jobs[gosec].permissions, clone.jobs[gosec].permissions, "contents", "write")
 	requireStringMapNotAliased(t, "job outputs", acceptedReleasePolicy.jobs[verifyTag].outputs, clone.jobs[verifyTag].outputs, "release-tag", "changed")
 	requireStringSliceNotAliased(t, "job needs", acceptedReleasePolicy.jobs[sbom].needs, clone.jobs[sbom].needs, 0, "changed")
@@ -204,6 +226,10 @@ func cloneReleasePolicy(policy releasePolicy) releasePolicy {
 		policy.jobs[i] = cloneReleaseJobPolicy(policy.jobs[i])
 	}
 	policy.requiredScripts = append([]string(nil), policy.requiredScripts...)
+	policy.requiredConfigs = append([]releaseConfigPolicy(nil), policy.requiredConfigs...)
+	for i := range policy.requiredConfigs {
+		policy.requiredConfigs[i].excludes = append([]string(nil), policy.requiredConfigs[i].excludes...)
+	}
 	return policy
 }
 
@@ -230,9 +256,7 @@ func cloneStringMap(in map[string]string) map[string]string {
 		return nil
 	}
 	out := make(map[string]string, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
+	maps.Copy(out, in)
 	return out
 }
 
@@ -280,6 +304,28 @@ func requireStringMapNotAliased(t *testing.T, name string, original map[string]s
 	cloned[key] = clonedValue
 }
 
+func requireConfigPolicySliceNotAliased(t *testing.T, original []releaseConfigPolicy, cloned []releaseConfigPolicy, index int, changed string) {
+	t.Helper()
+	if len(original) <= index {
+		t.Fatalf("required config original has length %d, want index %d", len(original), index)
+	}
+	if len(cloned) <= index {
+		t.Fatalf("required config clone has length %d, want index %d", len(cloned), index)
+	}
+	originalValue := original[index].path
+	clonedValue := cloned[index].path
+	if originalValue == changed {
+		t.Fatal("required config alias sentinel matches original value")
+	}
+
+	cloned[index].path = changed
+	if original[index].path == changed {
+		original[index].path = originalValue
+		t.Fatal("required config slice aliased")
+	}
+	cloned[index].path = clonedValue
+}
+
 func indexOfJob(t *testing.T, policy releasePolicy, name string) int {
 	t.Helper()
 	for i, job := range policy.jobs {
@@ -288,6 +334,17 @@ func indexOfJob(t *testing.T, policy releasePolicy, name string) int {
 		}
 	}
 	t.Fatalf("accepted release policy is missing job %q", name)
+	return -1
+}
+
+func indexOfRequiredConfig(t *testing.T, policy releasePolicy, path string) int {
+	t.Helper()
+	for i, config := range policy.requiredConfigs {
+		if config.path == path {
+			return i
+		}
+	}
+	t.Fatalf("accepted release policy is missing required config %q", path)
 	return -1
 }
 
@@ -689,19 +746,120 @@ func TestReleasePolicyStopsStepValidationAfterIdentityMismatch(t *testing.T) {
 
 func TestReleasePolicyRejectsNonExecutableRequiredScripts(t *testing.T) {
 	repoRoot := t.TempDir()
-	mustWriteFile(t, filepath.Join(repoRoot, ".github", "workflows", "release.yml"), []byte(currentWorkflow(t)), 0o644)
-	mustWriteFile(t, filepath.Join(repoRoot, ".github", "allowed_signers"), []byte(acceptedReleasePolicy.expectedSigners), 0o644)
-	mustWriteFile(t, filepath.Join(repoRoot, "scripts", "release-tag-policy.sh"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
-	mustWriteFile(t, filepath.Join(repoRoot, "scripts", "release-metadata.sh"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
-	mustWriteFile(t, filepath.Join(repoRoot, "scripts", "release-tag-metadata.sh"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
-	mustWriteFile(t, filepath.Join(repoRoot, "scripts", "validate-cyclonedx-sbom.sh"), []byte("#!/bin/sh\nexit 0\n"), 0o644)
-	mustWriteFile(t, filepath.Join(repoRoot, "scripts", "extract-release-notes.sh"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	writeReleasePolicyRepoFixture(t, repoRoot)
+	mustChmod(t, filepath.Join(repoRoot, "scripts", "validate-cyclonedx-sbom.sh"), 0o644)
 
 	findings, err := checkRepo(repoRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
 	requireFinding(t, findings, "required release helper must be executable")
+}
+
+func TestReleasePolicyRejectsMissingRequiredConfig(t *testing.T) {
+	repoRoot := t.TempDir()
+	writeReleasePolicyRepoFixture(t, repoRoot)
+	if err := os.Remove(filepath.Join(repoRoot, ".github", "syft-release.yaml")); err != nil {
+		t.Fatal(err)
+	}
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireFinding(t, findings, "missing required release config")
+}
+
+func TestReleasePolicyRejectsSymlinkRequiredConfig(t *testing.T) {
+	repoRoot := t.TempDir()
+	writeReleasePolicyRepoFixture(t, repoRoot)
+	configPath := filepath.Join(repoRoot, ".github", "syft-release.yaml")
+	targetPath := filepath.Join(repoRoot, ".github", "syft-target.yaml")
+	mustWriteFile(t, targetPath, []byte(acceptedSyftReleaseConfig), 0o644)
+	if err := os.Remove(configPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(targetPath, configPath); err != nil {
+		t.Fatal(err)
+	}
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireFinding(t, findings, "required release config must not be a symlink")
+}
+
+func TestReleasePolicyRejectsNonRegularRequiredConfig(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix sockets are not available on windows")
+	}
+	repoRoot, err := os.MkdirTemp("/tmp", "releasepolicy-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(repoRoot); err != nil {
+			t.Error(err)
+		}
+	})
+	writeReleasePolicyRepoFixture(t, repoRoot)
+	configPath := filepath.Join(repoRoot, ".github", "syft-release.yaml")
+	if err := os.Remove(configPath); err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("unix", configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	findings, err := checkRepo(repoRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireFinding(t, findings, "required release config must be a regular file")
+}
+
+func TestReleasePolicyRejectsDriftingSyftReleaseConfig(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "wrong source",
+			in: `source:
+  name: github.com/the-sarge/other
+exclude:
+  - './.git/**'
+  - './.ras/**'
+`,
+			want: `want "github.com/the-sarge/cpace"`,
+		},
+		{
+			name: "missing shared exclude",
+			in: `source:
+  name: github.com/the-sarge/cpace
+exclude:
+  - './.git/**'
+`,
+			want: "sequence must exactly match accepted release policy",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repoRoot := t.TempDir()
+			writeReleasePolicyRepoFixture(t, repoRoot)
+			mustWriteFile(t, filepath.Join(repoRoot, ".github", "syft-release.yaml"), []byte(tt.in), 0o644)
+
+			findings, err := checkRepo(repoRoot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			requireFinding(t, findings, tt.want)
+		})
+	}
 }
 
 func TestReleasePolicyRejectsUnexpectedAllowedSigners(t *testing.T) {
@@ -720,6 +878,25 @@ func TestReleasePolicyAcceptsCRLFAllowedSigners(t *testing.T) {
 	if len(findings) > 0 {
 		t.Fatalf("expected CRLF-normalized allowed_signers to pass, got %#v", findings)
 	}
+}
+
+const acceptedSyftReleaseConfig = `source:
+  name: github.com/the-sarge/cpace
+exclude:
+  - './.git/**'
+  - './.ras/**'
+`
+
+func writeReleasePolicyRepoFixture(t *testing.T, repoRoot string) {
+	t.Helper()
+	mustWriteFile(t, filepath.Join(repoRoot, ".github", "workflows", "release.yml"), []byte(currentWorkflow(t)), 0o644)
+	mustWriteFile(t, filepath.Join(repoRoot, ".github", "allowed_signers"), []byte(acceptedReleasePolicy.expectedSigners), 0o644)
+	mustWriteFile(t, filepath.Join(repoRoot, ".github", "syft-release.yaml"), []byte(acceptedSyftReleaseConfig), 0o644)
+	mustWriteFile(t, filepath.Join(repoRoot, "scripts", "release-tag-policy.sh"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	mustWriteFile(t, filepath.Join(repoRoot, "scripts", "release-metadata.sh"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	mustWriteFile(t, filepath.Join(repoRoot, "scripts", "release-tag-metadata.sh"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	mustWriteFile(t, filepath.Join(repoRoot, "scripts", "validate-cyclonedx-sbom.sh"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
+	mustWriteFile(t, filepath.Join(repoRoot, "scripts", "extract-release-notes.sh"), []byte("#!/bin/sh\nexit 0\n"), 0o755)
 }
 
 func currentWorkflow(t *testing.T) string {
@@ -792,6 +969,13 @@ func mustWriteFile(t *testing.T, path string, content []byte, mode os.FileMode) 
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, content, mode); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mustChmod(t *testing.T, path string, mode os.FileMode) {
+	t.Helper()
+	if err := os.Chmod(path, mode); err != nil {
 		t.Fatal(err)
 	}
 }

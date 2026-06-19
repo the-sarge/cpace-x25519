@@ -52,6 +52,7 @@ func checkRepo(repoRoot string) ([]finding, error) {
 	findings = append(findings, checkWorkflow(workflowPath, workflow)...)
 	findings = append(findings, checkAllowedSigners(repoRoot)...)
 	findings = append(findings, checkRequiredScripts(repoRoot)...)
+	findings = append(findings, checkRequiredConfigs(repoRoot)...)
 	return findings, nil
 }
 
@@ -127,6 +128,22 @@ func checkAcceptedReleasePolicyCatalogue(policy releasePolicy) []finding {
 			continue
 		}
 		seenConcepts[job.concept] = job.name
+	}
+	seenConfigs := map[string]bool{}
+	for _, config := range policy.requiredConfigs {
+		nodePath := policyPath + ":accepted-release-policy.required-configs." + config.path
+		if config.path == "" {
+			findings = append(findings, finding{path: nodePath, msg: "accepted release policy required config path is empty"})
+			continue
+		}
+		if seenConfigs[config.path] {
+			findings = append(findings, finding{path: nodePath, msg: "accepted release policy required config path is duplicated"})
+			continue
+		}
+		seenConfigs[config.path] = true
+		if config.sourceName == "" {
+			findings = append(findings, finding{path: nodePath, msg: "accepted release policy required config source name is empty"})
+		}
 	}
 	return findings
 }
@@ -411,6 +428,78 @@ func checkRequiredScripts(repoRoot string) []finding {
 		}
 	}
 	return findings
+}
+
+func checkRequiredConfigs(repoRoot string) []finding {
+	var findings []finding
+	for _, config := range acceptedReleasePolicy.requiredConfigs {
+		full := filepath.Join(repoRoot, config.path)
+		info, err := os.Lstat(full)
+		switch {
+		case errors.Is(err, os.ErrNotExist):
+			findings = append(findings, finding{path: full, msg: "missing required release config"})
+			continue
+		case err != nil:
+			findings = append(findings, finding{path: full, msg: err.Error()})
+			continue
+		case info.Mode()&os.ModeSymlink != 0:
+			findings = append(findings, finding{path: full, msg: "required release config must not be a symlink"})
+			continue
+		case info.IsDir():
+			findings = append(findings, finding{path: full, msg: "expected file, got directory"})
+			continue
+		case !info.Mode().IsRegular():
+			findings = append(findings, finding{path: full, msg: "required release config must be a regular file"})
+			continue
+		}
+
+		root, err := loadYAML(full)
+		if err != nil {
+			findings = append(findings, finding{path: full, msg: err.Error()})
+			continue
+		}
+		findings = append(findings, checkSyftReleaseConfig(full, root, config)...)
+	}
+	return findings
+}
+
+func checkSyftReleaseConfig(path string, root *yaml.Node, policy releaseConfigPolicy) []finding {
+	c := checker{path: path}
+	c.checkDuplicateKeys("$", root)
+	if len(c.findings) > 0 {
+		return c.findings
+	}
+	if root.Kind != yaml.MappingNode {
+		c.fail("$", "release config must be a mapping")
+		return c.findings
+	}
+	expectOnlyKeys(&c, "$", root, []string{"source", "exclude"})
+	expectExactScalars(&c, "source", mapping(root, "source"), map[string]string{"name": policy.sourceName})
+	expectExactStringSequence(&c, "exclude", mapping(root, "exclude"), policy.excludes)
+	return c.findings
+}
+
+func expectExactStringSequence(c *checker, nodePath string, n *yaml.Node, want []string) {
+	if n == nil {
+		c.fail(nodePath, "missing sequence")
+		return
+	}
+	if n.Kind != yaml.SequenceNode {
+		c.fail(nodePath, "must be a sequence")
+		return
+	}
+	got := make([]string, 0, len(n.Content))
+	for idx, item := range n.Content {
+		value, ok := scalarValue(item)
+		if !ok {
+			c.fail(fmt.Sprintf("%s[%d]", nodePath, idx), "must be a scalar")
+			continue
+		}
+		got = append(got, value)
+	}
+	if !sameStringSlice(got, want) {
+		c.fail(nodePath, fmt.Sprintf("sequence must exactly match accepted release policy: got %q, want %q", got, want))
+	}
 }
 
 func expectScalars(c *checker, nodePath string, n *yaml.Node, want map[string]string) bool {
