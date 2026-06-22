@@ -2308,3 +2308,32 @@ Merged PR #57 to harden Autoscaled Fuzz CI after the GARM runner split and add a
 ### Next
 
 - Keep the post-routing autoscaled fuzz evidence capture open until a post-merge scheduled or manual Autoscaled Fuzz run is captured against the split GARM lanes.
+
+---
+
+## API and backend triage closed - 2026-06-22 15:24 EDT
+
+**Main:** `84ed2f192353`
+**Actor:** Codex
+
+### Summary
+
+Closed two speculative cpace polish tasks after triage: public API expansion and an optional CIRCL Ristretto backend were not accepted into the current work queue.
+
+### Decisions
+
+- Dropped OmniFocus task `pE5IWspuwEl`, `API tweaks`, after deciding that functional options, caller-supplied randomness, package logging, `context.Context` on the exchange calls, and a `Session.Key` convenience wrapper would reopen or duplicate public API choices without a current review finding.
+- Dropped OmniFocus task `kukWYQGiYFI`, `consider using Cloudflare/circl for the reistretto255 implementation?`, after deciding that CIRCL has a stronger organizational maintenance signal but is not clearly stronger for this package's small, auditable Ristretto-only dependency surface.
+- Kept the current dependency posture: `github.com/gtank/ristretto255` remains the direct Ristretto255 backend, with `filippo.io/edwards25519` as its indirect dependency.
+- Preserved the release-readiness policy that public API and package-profile choices stay frozen unless an external review finding, concrete maintenance risk, benchmark evidence, or downstream requirement justifies reopening the decision.
+
+### Validation
+
+- Confirmed the local repo was clean and on `main` at `84ed2f19235352085bf7fa4be8c02f788f5145c9` before starting the journal-only branch.
+- Confirmed `DEV-JOURNAL.md` is the single repository development journal.
+- Confirmed OmniFocus task `pE5IWspuwEl` is dropped with drop date `2026-06-22T19:16:27.895Z`.
+- Confirmed OmniFocus task `kukWYQGiYFI` is dropped with drop date `2026-06-22T19:21:36.115Z`.
+
+### Next
+
+- Revisit either decision only if new review feedback or concrete integration evidence reopens the public API or dependency/package-profile policy.
