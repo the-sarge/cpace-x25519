@@ -285,6 +285,27 @@ tasks:
             ;;
         esac
 
+        gomaxprocs="${GOMAXPROCS:-}"
+        if [ -n "$gomaxprocs" ]; then
+          case "$gomaxprocs" in
+            ''|*[!0-9]*)
+              echo "GOMAXPROCS must be a positive integer (got: '$gomaxprocs')"
+              exit 1
+              ;;
+          esac
+          case "$gomaxprocs" in
+            *[1-9]*) ;;
+            *)
+              echo "GOMAXPROCS must be a positive integer (got: '$gomaxprocs')"
+              exit 1
+              ;;
+          esac
+          if [ "${#gomaxprocs}" -gt 6 ]; then
+            echo "GOMAXPROCS value is too large (got: '$gomaxprocs')"
+            exit 1
+          fi
+        fi
+
         fuzz_test_parallel="${FUZZ_TEST_PARALLEL:-}"
         if [ -n "$fuzz_test_parallel" ]; then
           case "$fuzz_test_parallel" in
@@ -302,7 +323,7 @@ tasks:
           esac
         fi
 
-        echo "Running $target_count fuzz targets (PARALLEL=$parallel, FUZZTIME=$fuzztime, FUZZ_RACE=$race, GOMAXPROCS=${GOMAXPROCS:-default}, FUZZ_TEST_PARALLEL=${fuzz_test_parallel:-default})"
+        echo "Running $target_count fuzz targets (PARALLEL=$parallel, FUZZTIME=$fuzztime, FUZZ_RACE=$race, GOMAXPROCS=${gomaxprocs:-default}, FUZZ_TEST_PARALLEL=${fuzz_test_parallel:-default})"
         log_dir="$(mktemp -d)"
         trap 'rm -rf "$log_dir"' EXIT
 

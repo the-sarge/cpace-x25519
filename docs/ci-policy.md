@@ -21,9 +21,10 @@ Repository CI runs on these events:
 - Pull requests to `main`: required `Check` runs for every PR. Code changes set up Go, run `go test ./...`, and run the evidence baseline validator. Docs-only PRs run whitespace and Markdown validation without Go unless they touch `docs/evidence-baseline.md`, `docs/evidence-baseline-summary-docs.txt`, `docs/evidence/**`, or any summary doc listed in `docs/evidence-baseline-summary-docs.txt`, in which case the job also sets up Go and runs the evidence baseline validator. The DCO workflow checks every PR commit for a `Signed-off-by` trailer.
   `Dependency Gate` runs blocking SCA tooling, and `SAST Gate` runs blocking
   `gosec`.
-- Pull requests that touch Go code, Go module files, or lint configuration:
-  CodeQL, Staticcheck Advisory, and GolangCI-Lint Advisory run as background
-  signal.
+- Pull requests that touch Go code or Go module files: CodeQL and Staticcheck
+  Advisory run as background signal. Pull requests that touch Go code, Go
+  module files, `Taskfile.yml`, `.golangci.yml`, or the GolangCI-Lint workflow
+  also run GolangCI-Lint Advisory.
 - Pushes to `main`: required `Check` runs again, and CodeQL analyzes the main
   branch.
 - Scheduled or manual runs: Vulnerability Scan, Gosec Advisory, GolangCI-Lint
