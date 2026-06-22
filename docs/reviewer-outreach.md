@@ -41,9 +41,14 @@ The public tracking issues for those review areas are:
 - `https://github.com/the-sarge/cpace/issues/30`
 - `https://github.com/the-sarge/cpace/issues/31`
 
-The latest public prerelease is `v0.1.2`, an SSH-signed annotated tag with the
-external-review packet and refreshed Go 1.26.3 evidence. It does not claim
-production readiness.
+The latest public prerelease remains `v0.1.2`, an SSH-signed annotated tag and
+historical prerelease context. The current exact-candidate evidence bundle is
+indexed in `docs/evidence-baseline.md` and captured under Go 1.26.4 at package
+code commit `f7efa6a963a954952b1ecad3f46530f13799fe89`:
+
+`https://github.com/the-sarge/cpace/tree/main/docs/evidence/f7efa6a-20260619`
+
+This is still unaudited prerelease evidence, not a production-readiness claim.
 
 Please report private vulnerabilities through the channels in `SECURITY.md`.
 Public review notes that are not sensitive can be opened as GitHub issues.
@@ -65,6 +70,8 @@ Primary files for review:
 - `docs/fuzz-evidence.md`
 - `docs/security-spec-audit.md`
 - `docs/capslock-report.md`
+- `docs/evidence-baseline.md`
+- `docs/evidence/f7efa6a-20260619/README.md`
 - `docs/performance.md`
 
 Open release blockers:
