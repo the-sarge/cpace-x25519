@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1976,11 +1977,26 @@ func TestPeerShareRolePassesThroughNonSentinelErrors(t *testing.T) {
 		{"post-multiply neutral element", neutralErr},
 	} {
 		for _, role := range []peerShareRole{initiatorPeerShare, responderPeerShare} {
-			if got := role.wrapError(tc.err); got != tc.err {
+			if got := role.wrapError(tc.err); !sameErrorValue(got, tc.err) {
 				t.Fatalf("%s/%s: wrapError returned %v, want the identical error value", tc.name, role, got)
 			}
 		}
 	}
+}
+
+func sameErrorValue(got, want error) bool {
+	if got == nil || want == nil {
+		return got == nil && want == nil
+	}
+	gotValue := reflect.ValueOf(got)
+	wantValue := reflect.ValueOf(want)
+	if gotValue.Type() != wantValue.Type() {
+		return false
+	}
+	if gotValue.Kind() == reflect.Pointer {
+		return gotValue.Pointer() == wantValue.Pointer()
+	}
+	return reflect.DeepEqual(got, want)
 }
 
 func TestPeerShareRoleSharedSecretAddsRoleContext(t *testing.T) {

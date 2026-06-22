@@ -11,20 +11,23 @@ Local validation uses `Taskfile.yml` as the command facade:
 - `task docs:check` validates tracked Markdown and whitespace.
 - `task quick` runs Go formatting checks, docs validation, and `go test ./...`.
 - `task check` runs docs validation, release-helper smoke tests, evidence baseline validation, nested evidence-checker linting, tests, race tests, formatting/import checks, `go vet`, Staticcheck, ast-grep rules, and `govulncheck`; it requires `jq` for CycloneDX SBOM JSON validation.
+- `task lint:golangci` runs a pinned, curated advisory `golangci-lint` analyzer set; it is not part of the required local gate.
 - `task fuzz` runs every fuzz target in `.github/fuzz-targets.json` with the
-  caller-provided `FUZZTIME`, `PARALLEL`, and `FUZZ_RACE` settings.
+  caller-provided `FUZZTIME`, `PARALLEL`, `FUZZ_RACE`, `GOMAXPROCS`, and
+  `FUZZ_TEST_PARALLEL` settings.
 
 Repository CI runs on these events:
 
 - Pull requests to `main`: required `Check` runs for every PR. Code changes set up Go, run `go test ./...`, and run the evidence baseline validator. Docs-only PRs run whitespace and Markdown validation without Go unless they touch `docs/evidence-baseline.md`, `docs/evidence-baseline-summary-docs.txt`, `docs/evidence/**`, or any summary doc listed in `docs/evidence-baseline-summary-docs.txt`, in which case the job also sets up Go and runs the evidence baseline validator. The DCO workflow checks every PR commit for a `Signed-off-by` trailer.
   `Dependency Gate` runs blocking SCA tooling, and `SAST Gate` runs blocking
   `gosec`.
-- Pull requests that touch Go code or Go module files: CodeQL and Staticcheck
-  Advisory run as background signal.
+- Pull requests that touch Go code, Go module files, or lint configuration:
+  CodeQL, Staticcheck Advisory, and GolangCI-Lint Advisory run as background
+  signal.
 - Pushes to `main`: required `Check` runs again, and CodeQL analyzes the main
   branch.
-- Scheduled or manual runs: Vulnerability Scan, Gosec Advisory, Nightly Fuzz,
-  Autoscaled Fuzz, CodeQL, Staticcheck Advisory, Scorecard, and
+- Scheduled or manual runs: Vulnerability Scan, Gosec Advisory, GolangCI-Lint
+  Advisory, Nightly Fuzz, Autoscaled Fuzz, CodeQL, Staticcheck Advisory, Scorecard, and
   cross-platform smoke workflows provide background and release-posture signal.
 - Release tags matching `v*`: Release Validation verifies the signed annotated tag first, runs tests, race tests, `govulncheck`, and `gosec` with SARIF upload, then generates, validates, attests, and publishes the GitHub Release with SBOM assets. `v0.x` and SemVer prerelease tags are published as GitHub prereleases and are explicitly not marked latest.
 
@@ -56,11 +59,12 @@ required gate.
 
 ## Background Signal
 
-`Vulnerability Scan`, `Gosec Advisory`, and `Nightly Fuzz` run on GitHub-hosted
-runners through both `workflow_dispatch` and scheduled triggers. `Autoscaled
-Fuzz` validates inputs on a GitHub-hosted preflight job, then runs fuzzing on the
-self-hosted GARM `cpace-garm-linux-fuzz` runner label through scheduled triggers
-and trusted main-branch manual dispatch. These lanes provide scheduled drift
+`Vulnerability Scan`, `Gosec Advisory`, `GolangCI-Lint Advisory`, and `Nightly
+Fuzz` run on GitHub-hosted runners through both `workflow_dispatch` and scheduled
+triggers. `Autoscaled Fuzz` validates inputs on a GitHub-hosted preflight job,
+then runs fuzzing on the self-hosted GARM `cpace-garm-linux-fuzz-arm64` and
+`cpace-garm-linux-fuzz-amd64` runner labels through scheduled triggers and
+trusted main-branch manual dispatch. These lanes provide scheduled drift
 detection, Code Scanning history, and fuzz regression signal in addition to the
 PR gates.
 
@@ -109,12 +113,13 @@ CI attests the generated SBOM asset, not the CPace protocol implementation, Go A
 GitHub-hosted runners handle untrusted PR validation. Self-hosted runners must
 not run code from untrusted fork PRs.
 
-The current self-hosted lane is `Autoscaled Fuzz`, which uses the
-`infra-autoscale-cpace-fuzz-linux` runner label. Its job-level guard skips the
-checked-in fuzz job except for scheduled runs and manual dispatches from
-`refs/heads/main`. Treat that guard as workflow hygiene and defense in depth:
-the trust boundary is that fork PRs cannot schedule or dispatch this workflow,
-and manual dispatch requires repository write access.
+The current self-hosted lane is `Autoscaled Fuzz`, which uses separate
+`cpace-garm-linux-fuzz-arm64` and `cpace-garm-linux-fuzz-amd64` GitHub runner
+labels. Its job-level guard skips the checked-in fuzz job except for scheduled
+runs and manual dispatches from `refs/heads/main`. Treat that guard as workflow
+hygiene and defense in depth: the trust boundary is that fork PRs cannot
+schedule or dispatch this workflow, and manual dispatch requires repository
+write access.
 
 The autoscaled runner image must provide a POSIX/GNU userland and a working C
 compiler for Linux race-detector fuzz builds. At minimum the workflow checks
