@@ -12,7 +12,7 @@ review-runs:
 
 **Accepted (2026-06-10).** This ADR captures a v1.0.0 release-pipeline architecture decision surfaced by external code review (item H6.a). Gated per the project's ADR policy across two rounds: round 1 changed the Decision (adopting GitHub artifact attestation for the SBOM and a tag-authority ruleset), so a **fresh** `ras consider` round re-reviewed the new decision content rather than a verify; round 2's findings were applied via a maintainer-decided resolution pass, with the round-2 `ras verify` resolving 18/19 — the one open item being the deliberately deferred `[[0001-extract-cpace-core]]` cross-link, which resolved when ADR-0001 merged to main (PR #69, `e44436c`). Evidence trail: PR #66 comments and DEV-JOURNAL cpace.S15. Acceptance settles the signing/SBOM artifact set for v1.0.0 (SLSA deferred per the Decision); future releases follow the same pattern unless re-opened. The tag-authority ruleset acceptance criterion remains an open maintainer action (OmniFocus / release checklist).
 
-**Fork supersession note (2026-07-03).** In `github.com/the-sarge/cpace-x25519`, this ADR remains historical authority for the release-artifact architecture, but fork-specific repository names and SBOM asset prefixes are recorded in ADR-0010 and remain subject to that ADR's acceptance gate.
+**Fork supersession note (2026-07-03).** In `github.com/the-sarge/cpace-x25519`, this ADR remains historical authority for the release-artifact architecture, but fork-specific repository names and SBOM asset prefixes are governed by accepted ADR-0010.
 
 ## Context
 
