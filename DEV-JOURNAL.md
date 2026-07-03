@@ -2703,3 +2703,34 @@ Merged PR #11, `test: assert RFC 7748 checkpoint consumption`, as merge commit `
 
 - Leave issue #12 as a non-blocking maintainability cleanup for the RFC checkpoint guard.
 - Keep release evidence claims stale until issue #6 refreshes dependency-review, long-fuzz, Capslock, and security/spec-audit evidence against an exact candidate commit.
+
+---
+
+## Issue 12 RFC 7748 pending set landed - 2026-07-03 16:15 EDT
+
+**Main:** `640f1fbee16a`
+**Actor:** Codex
+
+**Summary**
+
+Merged PR #14, `test: use set-typed RFC 7748 pending checkpoints`, as squash commit `640f1fbee16aee6795894fa20453a2c4df064d5a`. The change resolves issue #12 by changing the RFC 7748 iterated-vector test's `pending` checkpoint tracker from `map[int]string` to `map[int]struct{}`, keeping expected checkpoint outputs in `checkpoints` and making `pending` communicate set semantics.
+
+**Completed**
+
+- Issue #12 is closed by the merge.
+- The change is test-only and does not change public API, package profile, CPace computation, message framing, dependencies, security surface, or release-evidence claims.
+- RAS review run `20260703T195748-55f481df143ca8a391511ecf` found a DCO metadata blocker; the PR commit was amended with a `Signed-off-by` trailer and verified at pushed head `02c27fbf3630fcb16ad67e016cb328122d1e7438`.
+- RAS verification resolved the DCO blocker with no remaining open findings.
+- Fresh RAS review run `20260703T200644-fc4978a458c5c0765ad37fb8` reported no blocking findings.
+
+**Validation**
+
+- `go test -run TestX25519RFC7748IteratedVectors -count=1 .`
+- `CPACE_RFC7748_FULL=1 go test -run TestX25519RFC7748IteratedVectors -count=1 .`
+- `go test ./...`
+- `git diff --check`
+- GitHub PR checks on #14 were all successful before merge.
+
+**Next**
+
+- Follow-up issue #15 tracks the fresh review's info-level optional cleanup to consider eliminating the duplicate `pending` checkpoint keyset entirely. It was not changed in PR #14 under the low/nit policy.
