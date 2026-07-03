@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"os"
+	"sort"
 	"testing"
 )
 
@@ -78,6 +79,10 @@ func TestX25519RFC7748IteratedVectors(t *testing.T) {
 		checkpoints[1_000_000] = rfc7748Iterated1M
 		iterations = 1_000_000
 	}
+	pending := make(map[int]string, len(checkpoints))
+	for iteration, want := range checkpoints {
+		pending[iteration] = want
+	}
 
 	k := x25519BasepointEncoding()
 	u := x25519BasepointEncoding()
@@ -91,7 +96,16 @@ func TestX25519RFC7748IteratedVectors(t *testing.T) {
 			if got := hex.EncodeToString(k); got != want {
 				t.Fatalf("after %d iterations got %s want %s", i, got, want)
 			}
+			delete(pending, i)
 		}
+	}
+	if len(pending) > 0 {
+		unreached := make([]int, 0, len(pending))
+		for iteration := range pending {
+			unreached = append(unreached, iteration)
+		}
+		sort.Ints(unreached)
+		t.Fatalf("unreached RFC 7748 checkpoints: %v", unreached)
 	}
 }
 
