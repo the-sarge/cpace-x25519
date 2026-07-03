@@ -13,6 +13,10 @@ const (
 	responderPeerShare peerShareRole = "responder"
 )
 
+// peerShareValidationScalar is public, fixed validation input used only to
+// detect low-order X25519 public shares before responder randomness is sampled.
+// X25519 clamping maps this encoding to 2^254, so all low-order points still
+// produce the all-zero shared output while valid public shares are accepted.
 var peerShareValidationScalar = []byte{
 	0x01, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0,
@@ -21,8 +25,7 @@ var peerShareValidationScalar = []byte{
 }
 
 func (r peerShareRole) validate(encoded []byte) error {
-	_, err := validatePublicShare(encoded)
-	if err != nil {
+	if err := validatePublicShare(encoded); err != nil {
 		return r.wrapError(err)
 	}
 	return nil
@@ -67,16 +70,16 @@ func scalarMultVFY(s []byte, encoded []byte) ([]byte, error) {
 	return out, nil
 }
 
-func validatePublicShare(encoded []byte) ([]byte, error) {
+func validatePublicShare(encoded []byte) error {
 	if err := validatePublicShareLength(encoded); err != nil {
-		return nil, err
+		return err
 	}
 	out, err := scalarMultVFY(peerShareValidationScalar, encoded)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	clearBytes(out)
-	return clone(encoded), nil
+	return nil
 }
 
 func validatePublicShareLength(encoded []byte) error {

@@ -2,7 +2,7 @@
 set -eu
 
 usage() {
-  echo "usage: $0 cpace-vX.Y.Z.cdx.json" >&2
+  echo "usage: $0 cpace-x25519-vX.Y.Z.cdx.json" >&2
 }
 
 if [ "$#" -ne 1 ]; then
@@ -22,12 +22,12 @@ if [ ! -s "$sbom" ]; then
 fi
 
 case "$sbom_name" in
-  cpace-v*.cdx.json)
-    sbom_tag=${sbom_name#cpace-}
+  cpace-x25519-v*.cdx.json)
+    sbom_tag=${sbom_name#cpace-x25519-}
     sbom_tag=${sbom_tag%.cdx.json}
     ;;
   *)
-    echo "SBOM filename must be cpace-vMAJOR.MINOR.PATCH[-PRERELEASE].cdx.json: $sbom_name" >&2
+    echo "SBOM filename must be cpace-x25519-vMAJOR.MINOR.PATCH[-PRERELEASE].cdx.json: $sbom_name" >&2
     exit 1
     ;;
 esac

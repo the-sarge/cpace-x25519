@@ -3,6 +3,7 @@ package cpace
 import (
 	"crypto/hmac"
 	"crypto/sha512"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"runtime"
@@ -82,9 +83,7 @@ func elligator2Curve25519(encodedR []byte) []byte {
 
 func setFieldElementUint64(v *field.Element, n uint64) {
 	var b [pointSize]byte
-	for i := range 8 {
-		b[i] = byte(n >> (8 * i))
-	}
+	binary.LittleEndian.PutUint64(b[:8], n)
 	if _, err := v.SetBytes(b[:]); err != nil {
 		panic("cpace: invalid field constant")
 	}

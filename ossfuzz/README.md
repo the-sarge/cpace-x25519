@@ -31,10 +31,11 @@ For native Go fuzzers, `F.Add` seeds are not imported automatically by
 OSS-Fuzz; add explicit seed corpora later if the first coverage reports show a
 need for them.
 
-Local validation on 2026-05-07 used a temporary `google/oss-fuzz` checkout,
-mounted this repository as the source path, and passed:
+Historical local validation on 2026-05-07 used a temporary `google/oss-fuzz` checkout for the original `github.com/the-sarge/cpace` project, not this cpace-x25519 fork, and passed:
 
 ```sh
-DOCKER_DEFAULT_PLATFORM=linux/amd64 python3 infra/helper.py build_fuzzers --architecture x86_64 --sanitizer address cpace-x25519 /Users/josh/code/github.com/the-sarge/cpace-x25519
-DOCKER_DEFAULT_PLATFORM=linux/amd64 python3 infra/helper.py check_build cpace-x25519
+DOCKER_DEFAULT_PLATFORM=linux/amd64 python3 infra/helper.py build_fuzzers --architecture x86_64 --sanitizer address cpace /Users/josh/code/github.com/the-sarge/cpace
+DOCKER_DEFAULT_PLATFORM=linux/amd64 python3 infra/helper.py check_build cpace
 ```
+
+Fresh cpace-x25519 OSS-Fuzz validation and a new upstream submission are still required before treating OSS-Fuzz onboarding as current for this fork.

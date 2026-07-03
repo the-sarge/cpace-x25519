@@ -354,7 +354,7 @@ assert_tag_metadata() {
 
   "$repo_root/scripts/release-tag-metadata.sh" "$tag" >"$metadata"
   grep -Fxq "release-tag=$tag" "$metadata"
-  grep -Fxq "sbom-file=cpace-$tag.cdx.json" "$metadata"
+  grep -Fxq "sbom-file=cpace-x25519-$tag.cdx.json" "$metadata"
   grep -Fxq "prerelease=$expected_prerelease" "$metadata"
   grep -Fxq "latest=$expected_latest" "$metadata"
 }
@@ -367,7 +367,7 @@ assert_release_metadata_module() {
 
   sh -c '. "$1"; . "$2"; release_metadata_write "$3"' sh "$repo_root/scripts/release-tag-policy.sh" "$repo_root/scripts/release-metadata.sh" "$tag" >"$metadata"
   grep -Fxq "release-tag=$tag" "$metadata"
-  grep -Fxq "sbom-file=cpace-$tag.cdx.json" "$metadata"
+  grep -Fxq "sbom-file=cpace-x25519-$tag.cdx.json" "$metadata"
   grep -Fxq "prerelease=$expected_prerelease" "$metadata"
   grep -Fxq "latest=$expected_latest" "$metadata"
 }
@@ -481,7 +481,7 @@ if "$repo_root/scripts/release-tag-metadata.sh" "$multiline_metadata_tag" >"$tmp
 fi
 grep -q 'unsupported release tag' "$tmpdir/tag-multiline.err"
 
-sbom="$tmpdir/cpace-v1.2.3.cdx.json"
+sbom="$tmpdir/cpace-x25519-v1.2.3.cdx.json"
 cat >"$sbom" <<'EOF'
 {
   "bomFormat": "CycloneDX",
@@ -515,8 +515,8 @@ assert_sbom_filename_rejects_unsupported_release_tag() {
   grep -q 'SBOM filename must use a supported release tag' "$tmpdir/$sbom_name.err"
 }
 
-assert_sbom_filename_rejects_unsupported_release_tag cpace-v01.0.0.cdx.json
-assert_sbom_filename_rejects_unsupported_release_tag cpace-v1.2.cdx.json
+assert_sbom_filename_rejects_unsupported_release_tag cpace-x25519-v01.0.0.cdx.json
+assert_sbom_filename_rejects_unsupported_release_tag cpace-x25519-v1.2.cdx.json
 
 wrong_name_sbom="$tmpdir/other-v1.2.3.cdx.json"
 cp "$sbom" "$wrong_name_sbom"
@@ -525,7 +525,7 @@ if "$repo_root/scripts/validate-cyclonedx-sbom.sh" "$wrong_name_sbom" >"$tmpdir/
   exit 1
 fi
 
-newline_name_sbom="$tmpdir/$(printf 'cpace-v1.2.3\nignored.cdx.json')"
+newline_name_sbom="$tmpdir/$(printf 'cpace-x25519-v1.2.3\nignored.cdx.json')"
 cp "$sbom" "$newline_name_sbom"
 if "$repo_root/scripts/validate-cyclonedx-sbom.sh" "$newline_name_sbom" >"$tmpdir/newline-name-sbom.out" 2>"$tmpdir/newline-name-sbom.err"; then
   echo "newline-bearing SBOM filename unexpectedly succeeded" >&2
@@ -533,7 +533,7 @@ if "$repo_root/scripts/validate-cyclonedx-sbom.sh" "$newline_name_sbom" >"$tmpdi
 fi
 grep -q 'SBOM filename must use a supported release tag' "$tmpdir/newline-name-sbom.err"
 
-substring_sbom="$tmpdir/cpace-v1.2.4.cdx.json"
+substring_sbom="$tmpdir/cpace-x25519-v1.2.4.cdx.json"
 cat >"$substring_sbom" <<'EOF'
 {
   "bomFormat": "CycloneDX",
@@ -558,7 +558,7 @@ if "$repo_root/scripts/validate-cyclonedx-sbom.sh" "$substring_sbom" >"$tmpdir/s
 fi
 
 if command -v syft >/dev/null 2>&1; then
-  real_sbom="$tmpdir/cpace-v9.9.9.cdx.json"
+  real_sbom="$tmpdir/cpace-x25519-v9.9.9.cdx.json"
   (cd "$repo_root" && syft dir:. --config .github/syft-release.yaml -o "cyclonedx-json@1.5=$real_sbom" >/dev/null)
   "$repo_root/scripts/validate-cyclonedx-sbom.sh" "$real_sbom"
 else

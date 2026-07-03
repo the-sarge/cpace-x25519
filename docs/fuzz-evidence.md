@@ -13,18 +13,18 @@ Superseded candidate commit: `2e09774f171dde8c62763d6e35a258b0fef88801`
 Supplemental tag commit: `4e661bc1f925ebedf1f270668129d85bab73e468`
 (`v0.1.2`)
 
-Registered fuzz targets: 14 from `.github/fuzz-targets.json` (current registry entries name the target function, package, and OSS-Fuzz binary; `go test ./...` checks registry drift against defined fuzz functions and `ossfuzz/build.sh`)
+Registered fuzz targets: 14 from `.github/fuzz-targets.json` at the inherited parent baseline. The current cpace-x25519 registry still needs its own exact-candidate long-fuzz refresh before release claims.
 
-Baseline status: `docs/evidence-baseline.md` is the current source of truth for whether these pinned fuzz runs are fresh for the latest release candidate.
+Inherited baseline status: `docs/evidence-baseline.md` records that these pinned parent-module fuzz runs are stale for cpace-x25519 release claims.
 
 ## Command
 
-- `FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=1h PARALLEL=1 task fuzz` (current Go 1.26.4 baseline runs)
+- `FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=1h PARALLEL=1 task fuzz` (inherited Go 1.26.4 parent baseline runs)
 - `FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=1h PARALLEL=2 task fuzz` (earlier campaigns below)
 
 ## Go 1.26.4 Exact-Candidate Paired Long Runs
 
-These paired maintainer-machine runs refresh all 14 registered targets under Go 1.26.4 at commit `f7efa6a963a954952b1ecad3f46530f13799fe89`, covering the accepted-ADR implementation sequence, issue #80, PR #199's Go fix modernization, and PR #200's development-journal merge. Raw logs, final status captures, setup/preflight files, and SHA-256 digests are committed under `docs/evidence/f7efa6a-20260619/`.
+These paired maintainer-machine runs refreshed all 14 inherited parent registered targets under Go 1.26.4 at commit `f7efa6a963a954952b1ecad3f46530f13799fe89`, covering the parent accepted-ADR implementation sequence, issue #80, PR #199's Go fix modernization, and PR #200's development-journal merge. Raw logs, final status captures, setup/preflight files, and SHA-256 digests are committed under `docs/evidence/f7efa6a-20260619/`. They do not cover cpace-x25519 protocol code, vectors, dependency shape, or invalid-share behavior.
 
 | Host | Platform | Toolchain | Started | Finished | Result |
 | --- | --- | --- | --- | --- | --- |

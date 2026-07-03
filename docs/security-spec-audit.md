@@ -16,14 +16,14 @@ Evidence transcript: `docs/evidence/f7efa6a-20260619/local-analysis.log`
 
 Vector-stability transcript: `docs/evidence/f7efa6a-20260619/vector-stability.log`
 
-Baseline status: `docs/evidence-baseline.md` is the current source of truth for whether this pinned audit is fresh for the latest release candidate.
+Inherited baseline status: `docs/evidence-baseline.md` records that this pinned parent-module audit is stale for cpace-x25519 release claims.
 
 Draft source: `draft-irtf-cfrg-cpace-21`
 (`https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-cpace-21`)
 
 ## Scope
 
-This audit checked `docs/security-assessment.md` and `docs/spec-matrix.md` against the implementation baseline, tests, refreshed Go 1.26.4 release evidence, and the draft-21 text. It is a documentation and conformance audit, not an independent cryptographic review. This is a project-side self-audit, distinct from independent cryptographic review or external review.
+This inherited audit checked `docs/security-assessment.md` and `docs/spec-matrix.md` against the parent implementation baseline, tests, refreshed Go 1.26.4 release evidence, and the draft-21 text. It is a documentation and conformance audit, not an independent cryptographic review. This is a project-side self-audit, distinct from independent cryptographic review or external review.
 
 The audit covered:
 
@@ -39,12 +39,11 @@ The audit covered:
 
 ## Result
 
-No security/spec drift was found at the implementation baseline.
+No security/spec drift was found at the inherited parent implementation baseline.
 
-`task check` passes under Go 1.26.4 at the implementation baseline (transcript records exit 0 with both test lanes green). The clean-worktree evidence transcript records dependency, gosec, Capslock, pinned Staticcheck, an explicit non-cached race test, and `task check`. Separate bundle artifacts record candidate GitHub status (`github-status-capture.log` and `github-runs-for-candidate.json`), fresh tag-ruleset capture (`tagruleset-capture.log`, `rulesets-list.json`, `ruleset-16048307.json`, and `ruleset-16048307-verify.json`), and the fresh Scorecard run (`github-scorecard-20260619-run.json`).
+`task check` passed under Go 1.26.4 at the inherited parent implementation baseline (transcript records exit 0 with both test lanes green). The clean-worktree evidence transcript records dependency, gosec, Capslock, pinned Staticcheck, an explicit non-cached race test, and `task check`. Separate bundle artifacts record candidate GitHub status (`github-status-capture.log` and `github-runs-for-candidate.json`), tag-ruleset capture for the parent repository (`tagruleset-capture.log`, `rulesets-list.json`, `ruleset-16048307.json`, and `ruleset-16048307-verify.json`), and the Scorecard run (`github-scorecard-20260619-run.json`).
 
-The security assessment and spec matrix accurately describe the current
-implementation:
+At that inherited parent baseline, the security assessment and spec matrix accurately described the Ristretto implementation:
 
 - only `CPACE-RISTR255-SHA512` from draft-21 is implemented;
 - only initiator-responder mode is exposed;
@@ -54,17 +53,13 @@ implementation:
 - package-owned CI construction, binary framing, non-configurable field caps,
   `Session.Export`, `Session.Close`, `PeerAssociatedData`, and `PeerID` are
   correctly documented as package-profile behavior;
-- dependency, Capslock, and paired long-fuzz evidence references point to the refreshed Go 1.26.4 pinned evidence baseline indexed in `docs/evidence-baseline.md`.
+- dependency, Capslock, and paired long-fuzz evidence references pointed to the refreshed Go 1.26.4 pinned parent evidence baseline indexed in `docs/evidence-baseline.md`.
 
-The go1.26.4 release (2026-06-02) is a security release: fixes to
-`crypto/x509`, `mime`, and `net/textproto`, plus bug fixes to
-`crypto/fips140`, the compiler, and the runtime. CPace does not import the
-three patched packages; it does transitively use Go crypto internals including
-`crypto/fips140`, so evidence is re-recorded under Go 1.26.4. The accepted-ADR implementation sequence changed package internals and public caller input, but the current docs correctly record the intended public API, wire format, package profile, error surface, and residual memory-handling limits. At this baseline `task check` reran the draft/RFC vector assertions. No unintended wire/protocol, dependency, or vector behavior change was found.
+For the inherited parent refresh, the go1.26.4 release (2026-06-02) was a security release: fixes to `crypto/x509`, `mime`, and `net/textproto`, plus bug fixes to `crypto/fips140`, the compiler, and the runtime. The parent CPace package did not import the three patched packages; it did transitively use Go crypto internals including `crypto/fips140`, so evidence was re-recorded under Go 1.26.4. The accepted-ADR implementation sequence changed package internals and public caller input, but the then-current parent docs correctly recorded the intended public API, wire format, package profile, error surface, and residual memory-handling limits. At this baseline `task check` reran the inherited draft/RFC vector assertions. No unintended parent wire/protocol, dependency, or vector behavior change was found.
 
 ### Toolchain Vector Stability
 
-For this refresh, the draft/RFC vector assertions were run under both toolchains and recorded in `docs/evidence/f7efa6a-20260619/vector-stability.log`: the default go1.26.4 toolchain, and `GOTOOLCHAIN=go1.26.3` as the previous-toolchain comparison. The selected vector tests pass under both (`TestStringUtilitiesDraftVectors`, `TestEmbeddedDraftVectorJSON`, `TestEmbeddedDraftGeneratorJSON`, `TestEmbeddedDraftConfirmationTagGoldens`, `TestEmbeddedDraftInvalidVectorJSON`, `TestRistrettoDraft21Vectors`, and `TestScalarMultVFYDraftInvalidVectors`). Future toolchain-triggered refreshes should continue the old/new comparison pattern.
+For this inherited refresh, the parent draft/RFC vector assertions were run under both toolchains and recorded in `docs/evidence/f7efa6a-20260619/vector-stability.log`: the default go1.26.4 toolchain, and `GOTOOLCHAIN=go1.26.3` as the previous-toolchain comparison. The selected inherited Ristretto vector tests passed under both (`TestStringUtilitiesDraftVectors`, `TestEmbeddedDraftVectorJSON`, `TestEmbeddedDraftGeneratorJSON`, `TestEmbeddedDraftConfirmationTagGoldens`, `TestEmbeddedDraftInvalidVectorJSON`, `TestRistrettoDraft21Vectors`, and `TestScalarMultVFYDraftInvalidVectors`). Future toolchain-triggered refreshes should continue the old/new comparison pattern against the active cpace-x25519 vector set.
 
 ## Current Implementation Notes
 

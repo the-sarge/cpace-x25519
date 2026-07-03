@@ -1,6 +1,6 @@
 # Triage Labels
 
-The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label vocabulary used in this repo's issue tracker (GitHub Issues on `the-sarge/cpace`).
+The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label vocabulary used in this repo's issue tracker (GitHub Issues on `the-sarge/cpace-x25519`).
 
 The repo's live taxonomy (verify with `gh label list`) is **dimensional, not workflow-state**:
 

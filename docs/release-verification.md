@@ -133,13 +133,13 @@ release notes or evidence docs for that release.
 
 GitHub Releases for signed `v*` tags attach these release-managed assets:
 
-- `cpace-<tag>.cdx.json`: CycloneDX JSON 1.5 SBOM for the source release.
-- `cpace-<tag>.cdx.json.sigstore.json`: GitHub/Sigstore bundle emitted by the SBOM attestation workflow.
+- `cpace-x25519-<tag>.cdx.json`: CycloneDX JSON 1.5 SBOM for the source release.
+- `cpace-x25519-<tag>.cdx.json.sigstore.json`: GitHub/Sigstore bundle emitted by the SBOM attestation workflow.
 
 The release body includes the SBOM's SHA-256 checksum for corruption detection:
 
 ```sh
-shasum -a 256 cpace-<tag>.cdx.json
+shasum -a 256 cpace-x25519-<tag>.cdx.json
 ```
 
 Compare the computed digest with the release-body value before using the SBOM. This checksum is not an authenticity mechanism because the GitHub Release body is mutable release metadata in the same trust domain as the uploaded assets. Use signed-tag verification for source authenticity and the SBOM attestation for SBOM authenticity.
@@ -147,7 +147,7 @@ Compare the computed digest with the release-body value before using the SBOM. T
 Optional layered SBOM attestation verification with the GitHub CLI:
 
 ```sh
-gh attestation verify cpace-<tag>.cdx.json --repo the-sarge/cpace --predicate-type https://cyclonedx.org/bom
+gh attestation verify cpace-x25519-<tag>.cdx.json --repo the-sarge/cpace-x25519 --predicate-type https://cyclonedx.org/bom
 ```
 
 GitHub may display auto-generated source archives for tags. Treat the signed Git tag as the canonical authenticity mechanism for source releases.

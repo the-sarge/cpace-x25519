@@ -14,10 +14,14 @@ import (
 //go:embed testdata/draft21-x25519-generator.json
 var draft21X25519GeneratorJSON []byte
 
+//go:embed testdata/draft21-x25519-confirmation-tags.json
+var draft21X25519ConfirmationTagJSON []byte
+
 const (
 	draft21X25519GeneratorJSONSHA256 = "d8f5c335146d7bfc4e1e21a154f2d4acf447445eb843e30e549cc52b5d29c13c"
 	draft21X25519VectorJSONSHA256    = "7d5384bafc2144b5a73be1a7312a021bad7cb2be6a8c3e84460369ab27c838ec"
 	draft21X25519LowOrderJSONSHA256  = "d6aadd0cdfaa32bae72e862ef90c63bc0f816f1a1fa64396761204cd54b7ac87"
+	draft21X25519TagsJSONSHA256      = "692970229bbc2ae6167cc76523f93970d4e3b272299d93462bb7310fa3f0f9ab"
 )
 
 type draftGeneratorVector struct {
@@ -128,8 +132,8 @@ func pinnedJSONHash(in []byte) string {
 }
 
 func TestEmbeddedDraftVectorJSON(t *testing.T) {
-	// Hashes pin the embedded fixtures to the decoded JSON blocks in draft-21
-	// Appendix B.3.9 and B.3.11.1.
+	// Hashes pin the embedded fixtures re-encoded from the draft-21 Appendix
+	// B.1.9 and B.1.10.1 X25519 vector blocks.
 	if got := pinnedJSONHash(draft21X25519VectorJSON); got != draft21X25519VectorJSONSHA256 {
 		t.Fatalf("vector JSON SHA-256 got %s want %s", got, draft21X25519VectorJSONSHA256)
 	}
@@ -185,6 +189,19 @@ func TestEmbeddedDraftInvalidVectorJSON(t *testing.T) {
 	}
 	if !bytes.Equal(v.LowOrder["Invalid Y0"], identityEncoding) {
 		t.Fatalf("Invalid Y0 got %x want identity encoding", v.LowOrder["Invalid Y0"])
+	}
+}
+
+func TestEmbeddedDraftConfirmationTagGoldens(t *testing.T) {
+	if got := pinnedJSONHash(draft21X25519ConfirmationTagJSON); got != draft21X25519TagsJSONSHA256 {
+		t.Fatalf("confirmation tag JSON SHA-256 got %s want %s", got, draft21X25519TagsJSONSHA256)
+	}
+	tagA, tagB := draftVectorConfirmationTags(t)
+	if len(tagA) != tagSize {
+		t.Fatalf("tagA length=%d want %d", len(tagA), tagSize)
+	}
+	if len(tagB) != tagSize {
+		t.Fatalf("tagB length=%d want %d", len(tagB), tagSize)
 	}
 }
 
@@ -293,7 +310,7 @@ func TestX25519Draft21Vectors(t *testing.T) {
 	if !bytes.Equal(iskIR, wantISKIR) {
 		t.Fatalf("ISK_IR got %x want %x", iskIR, wantISKIR)
 	}
-	tagA, tagB := draftVectorConfirmationTags(v)
+	tagA, tagB := draftVectorConfirmationTags(t)
 	if got := confirmationTag(iskIR, sid, Yb, adb); !bytes.Equal(got, tagB) {
 		t.Fatalf("tagB got %x want %x", got, tagB)
 	}
@@ -323,7 +340,7 @@ func TestCoreDraft21Vectors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tagA, tagB := draftVectorConfirmationTags(v)
+	tagA, tagB := draftVectorConfirmationTags(t)
 
 	initNC := draftVectorInput(v, v["ADa"])
 	defer initNC.wipe()
@@ -395,11 +412,21 @@ func draftVectorInput(v draftVector, ad []byte) normalizedInput {
 	}
 }
 
-func draftVectorConfirmationTags(v draftVector) (tagA, tagB []byte) {
-	tr := newIRTranscript(v["Ya"], v["ADa"], v["Yb"], v["ADb"])
-	isk := v["ISK_IR"]
-	sid := v["sid"]
-	return tr.initiatorConfirmationTag(isk, sid), tr.responderConfirmationTag(isk, sid)
+func draftVectorConfirmationTags(t *testing.T) (tagA, tagB []byte) {
+	t.Helper()
+	var raw map[string]string
+	if err := json.Unmarshal(draft21X25519ConfirmationTagJSON, &raw); err != nil {
+		t.Fatal(err)
+	}
+	tagA, err := hex.DecodeString(raw["tagA"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	tagB, err = hex.DecodeString(raw["tagB"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tagA, tagB
 }
 
 func TestScalarMultVFYDraftInvalidVectors(t *testing.T) {

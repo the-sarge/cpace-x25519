@@ -41,7 +41,7 @@ release_metadata_write() (
   fi
 
   printf 'release-tag=%s\n' "$release_metadata_tag"
-  printf 'sbom-file=cpace-%s.cdx.json\n' "$release_metadata_tag"
+  printf 'sbom-file=cpace-x25519-%s.cdx.json\n' "$release_metadata_tag"
   printf 'prerelease=%s\n' "$release_metadata_prerelease"
   printf 'latest=%s\n' "$release_metadata_latest"
 )

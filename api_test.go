@@ -1689,7 +1689,7 @@ func TestPeerShareLengthDefenseInternal(t *testing.T) {
 	}
 	for _, n := range []int{0, pointSize - 1, pointSize + 1} {
 		short := make([]byte, n)
-		_, err := validatePublicShare(short)
+		err := validatePublicShare(short)
 		assertLengthDefenseError(t, n, err)
 		out, err := scalarMultVFY(s, short)
 		if out != nil {
