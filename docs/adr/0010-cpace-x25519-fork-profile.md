@@ -11,6 +11,8 @@ source-review-runs:
 
 **Proposed (2026-07-03).** This ADR records the X25519 fork profile already implemented on PR #2 so it can receive the independent `ras consider` gate required by this repository's ADR policy before it is marked accepted. The profile touches wire bytes, package identity, generator mapping, scalar behavior, low-order peer-share handling, retained error sentinels, and release-evidence posture; until this ADR is accepted, treat it as the review target rather than a ratified policy exception.
 
+**Maintainer direction recorded during PR #2 fix pass.** The fork-specific release helper and documentation now use the SBOM asset prefix `cpace-x25519-<tag>.cdx.json` rather than the inherited `cpace-<tag>.cdx.json`. This records the maintainer-directed fix for fork identity; broader ADR acceptance for the full X25519 profile still requires the independent `ras consider` gate.
+
 ## Context
 
 This repository is a fork of `github.com/the-sarge/cpace` for a single CPACE-X25519-SHA512 package profile. The inherited ADRs, evidence, and release docs were written for the original Ristretto255 implementation and contain accepted decisions about the original module's pre-v1 API and release process. The fork has no cpace-x25519 release tags; inherited `v0.1.x` tags from the parent were removed from this repository and are historical source-control context only.
