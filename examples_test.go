@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/the-sarge/cpace"
+	"github.com/the-sarge/cpace-x25519"
 )
 
 func Example() {

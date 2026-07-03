@@ -1,5 +1,5 @@
 source:
-  name: github.com/the-sarge/cpace
+  name: github.com/the-sarge/cpace-x25519
 exclude:
   - './.git/**'
   - './.ras/**'

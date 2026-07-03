@@ -51,7 +51,7 @@ bundle shape, required metadata, checksum verification, and optional detached
 signature handling. Summary docs may explain evidence, but the evidence packet
 should preserve the raw logs or immutable workflow links.
 
-Before each release, capture the active `refs/tags/v*` tag-authority ruleset JSON as recurring release evidence. Record `gh api /repos/the-sarge/cpace/rulesets` and `gh api /repos/the-sarge/cpace/rulesets/16048307`, then confirm ruleset `16048307` is active, covers creation/update/deletion for `refs/tags/v*`, has `bypass_actors: []`, and reports `current_user_can_bypass: never`. The 2026-06-10 baseline is committed under `docs/evidence/tagruleset-20260610/`, and the 2026-06-19 exact-candidate capture is committed under `docs/evidence/f7efa6a-20260619/`; each release needs a fresh capture because GitHub ruleset state is admin-mutable.
+Before each release, capture the active `refs/tags/v*` tag-authority ruleset JSON as recurring release evidence. Record `gh api /repos/the-sarge/cpace-x25519/rulesets`, identify the repository-specific active tag ruleset ID, then capture that ruleset with `gh api /repos/the-sarge/cpace-x25519/rulesets/<id>` and confirm it covers creation/update/deletion for `refs/tags/v*`, has `bypass_actors: []`, and reports `current_user_can_bypass: never`. Each release needs a fresh capture because GitHub ruleset state is admin-mutable; do not reuse the original `the-sarge/cpace` numeric ruleset ID for this fork.
 
 ## 4. Long Fuzz Evidence
 
@@ -104,7 +104,7 @@ documented rationale that reviewers can inspect.
 
 ## 7. Release Asset Scope And SBOM
 
-The canonical source release artifact remains the repository content reachable from the signed annotated tag. For signed `v*` tags, the GitHub Release must also include a CycloneDX JSON 1.5 SBOM named `cpace-<tag>.cdx.json` and the SBOM attestation bundle named `cpace-<tag>.cdx.json.sigstore.json`. Tags in the `v0.x` range and SemVer prerelease tags are published as GitHub prereleases and are not marked latest.
+The canonical source release artifact remains the repository content reachable from the signed annotated tag. For signed `v*` tags, the GitHub Release must also include a CycloneDX JSON 1.5 SBOM named `cpace-x25519-<tag>.cdx.json` and the SBOM attestation bundle named `cpace-x25519-<tag>.cdx.json.sigstore.json`. Tags in the `v0.x` range and SemVer prerelease tags are published as GitHub prereleases and are not marked latest.
 
 Do not publish a release until the Release Validation workflow has generated and validated the SBOM, attested it with GitHub artifact attestations, attached the SBOM and Sigstore bundle, and appended the SBOM SHA-256 checksum to the release body. The checksum is release-body corruption detection only; the SBOM's authenticity comes from the attached attestation bundle and `gh attestation verify`.
 
@@ -172,7 +172,7 @@ The Release Validation workflow creates the GitHub release on publishing-eligibl
 - validation workflow run URL;
 - signed-tag verification expectation and a link to
   `docs/release-verification.md`;
-- SBOM asset name `cpace-<tag>.cdx.json`, SBOM SHA-256 checksum, and Sigstore bundle asset name `cpace-<tag>.cdx.json.sigstore.json`;
+- SBOM asset name `cpace-x25519-<tag>.cdx.json`, SBOM SHA-256 checksum, and Sigstore bundle asset name `cpace-x25519-<tag>.cdx.json.sigstore.json`;
 - SLSA Build Level 3 provenance deferral for v1.0.0, if the release notes discuss supply-chain artifact scope;
 - remaining blockers, if any.
 

@@ -2,7 +2,7 @@
 set -eu
 
 usage() {
-  echo "usage: $0 cpace-vX.Y.Z.cdx.json" >&2
+  echo "usage: $0 cpace-x25519-vX.Y.Z.cdx.json" >&2
 }
 
 if [ "$#" -ne 1 ]; then
@@ -22,12 +22,12 @@ if [ ! -s "$sbom" ]; then
 fi
 
 case "$sbom_name" in
-  cpace-v*.cdx.json)
-    sbom_tag=${sbom_name#cpace-}
+  cpace-x25519-v*.cdx.json)
+    sbom_tag=${sbom_name#cpace-x25519-}
     sbom_tag=${sbom_tag%.cdx.json}
     ;;
   *)
-    echo "SBOM filename must be cpace-vMAJOR.MINOR.PATCH[-PRERELEASE].cdx.json: $sbom_name" >&2
+    echo "SBOM filename must be cpace-x25519-vMAJOR.MINOR.PATCH[-PRERELEASE].cdx.json: $sbom_name" >&2
     exit 1
     ;;
 esac
@@ -49,8 +49,7 @@ jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.5"' "$sbom" >/dev/null |
 
 # Keep this expected set aligned with go.mod for release-relevant module graph entries that must appear in Syft's CycloneDX output.
 for module in \
-  github.com/the-sarge/cpace \
-  github.com/gtank/ristretto255 \
+  github.com/the-sarge/cpace-x25519 \
   filippo.io/edwards25519
 do
   jq -e --arg module "$module" '

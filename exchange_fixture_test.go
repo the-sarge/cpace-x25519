@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"io"
 	"testing"
-
-	"github.com/gtank/ristretto255"
 )
 
 type exchangeFixture struct {
@@ -125,7 +123,7 @@ func (x *exchangeFixture) complete() (*Session, *Session) {
 type initiatorSecretSnapshot struct {
 	tb        testing.TB
 	initiator *Initiator
-	scalar    *ristretto255.Scalar
+	scalar    []byte
 }
 
 func snapshotInitiatorSecrets(tb testing.TB, i *Initiator) initiatorSecretSnapshot {
@@ -142,7 +140,7 @@ func (s initiatorSecretSnapshot) assertCleared() {
 	if s.initiator.state.core.scalar != nil {
 		s.tb.Fatal("initiator core retained scalar reference after terminal operation")
 	}
-	if !allZero(s.scalar.Bytes()) {
+	if !allZero(s.scalar) {
 		s.tb.Fatal("initiator scalar backing array was not cleared")
 	}
 }

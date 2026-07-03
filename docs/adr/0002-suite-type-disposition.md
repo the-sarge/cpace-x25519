@@ -11,6 +11,8 @@ review-runs:
 
 **Accepted (2026-06-10).** This ADR captures a v1.0.0 freeze decision surfaced by external code review (item B1). Gated per the project's ADR policy: the `ras consider` run above returned accept-with-revisions; the revisions were applied via a maintainer-decided resolution pass (`ras fix --decisions`) and re-gated, with `ras verify` returning clean (unresolved: []). Evidence trail: PR #66 comments and DEV-JOURNAL cpace.S15. The decision is ratified; the implementation-verification gates below bind the implementing change before v1.0.0 is tagged. Status may later record `implemented at <sha>` once implementation lands.
 
+**Fork supersession note (2026-07-03).** In `github.com/the-sarge/cpace-x25519`, this parent-profile ADR remains historical authority for removing the dead exported `Suite` API, but its Ristretto suite literal and wire-byte acceptance criteria are superseded by ADR-0010's accepted X25519 profile (`currentSuite = 0x02`, `CPACE-X25519-SHA512`).
+
 ## Context
 
 `api.go:22-28` exports `Suite byte` together with the single constant `SuiteCPaceRistretto255SHA512 Suite = 0x01`. No exported function takes a `Suite` parameter, no exported method returns a `Suite`, and no `Config` field has type `Suite`. The constant is used internally only at `framing.go:7` as `wireSuite byte = byte(SuiteCPaceRistretto255SHA512)`, where the type is immediately discarded.

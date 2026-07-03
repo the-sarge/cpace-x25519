@@ -1,5 +1,5 @@
 // Package cpace implements an auditable draft-irtf-cfrg-cpace-21
-// CPACE-RISTR255-SHA512 initiator-responder flow.
+// CPACE-X25519-SHA512 initiator-responder flow.
 //
 // This module is an Internet-Draft implementation. It is not independently
 // audited and must not be treated as production-ready cryptographic software.

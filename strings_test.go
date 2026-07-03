@@ -50,16 +50,12 @@ func TestStringUtilitiesDraftVectors(t *testing.T) {
 }
 
 func TestIRTranscriptDraftVectorFlow(t *testing.T) {
-	v, err := loadDraftVectorJSON(draft21RistrettoVectorJSON)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tags, err := loadDraftVectorJSON(draft21RistrettoConfirmationTagJSON)
+	v, err := loadDraftVectorJSON(draft21X25519VectorJSON)
 	if err != nil {
 		t.Fatal(err)
 	}
 	tr := newIRTranscript(v["Ya"], v["ADa"], v["Yb"], v["ADb"])
-	wantTranscript := hx(t, "20d6bac480f2c386c394efc7c47adb9925dcd2630b64f240c50f8d0eec482b915703414461203ea7e0b19560d7c0b0f5734f63b955286dfa8232b5ebe63324e2d9e7433f725803414462")
+	wantTranscript := hx(t, "201d13c89278cdadd826f6d8d7f887701430f8380ddc17611cdd6dc989ce0c9f320341446120248cccf6d5cdc3646f0ad593f9e6cef4e69d4945f8372e623512ecea3218562303414462")
 	if !bytes.Equal(tr.bytes(), wantTranscript) {
 		t.Fatalf("IR transcript=%x want %x", tr.bytes(), wantTranscript)
 	}
@@ -67,13 +63,7 @@ func TestIRTranscriptDraftVectorFlow(t *testing.T) {
 	if !bytes.Equal(isk, v["ISK_IR"]) {
 		t.Fatalf("ISK_IR=%x want %x", isk, v["ISK_IR"])
 	}
-	if got := tr.responderConfirmationTag(isk, v["sid"]); !bytes.Equal(got, tags["tagB"]) {
-		t.Fatalf("responder confirmation tag=%x want %x", got, tags["tagB"])
-	}
-	if got := tr.initiatorConfirmationTag(isk, v["sid"]); !bytes.Equal(got, tags["tagA"]) {
-		t.Fatalf("initiator confirmation tag=%x want %x", got, tags["tagA"])
-	}
-	wantTranscriptID := hx(t, "bb1c449b35f0ea79a65c209f329a693d475e0ce2387bed9fe4b78f60b2a27c219813fb2cfe175ef40d2222d9261e66da7d78f7c55a303b1b8611dcdfab880c47")
+	wantTranscriptID := v["sid_output_ir"]
 	if got := tr.transcriptID(); !bytes.Equal(got, wantTranscriptID) {
 		t.Fatalf("TranscriptID=%x want %x", got, wantTranscriptID)
 	}
@@ -179,8 +169,8 @@ func TestWireFormatPrefixByte(t *testing.T) {
 	if wireFormatV1 != 0xc1 {
 		t.Fatalf("wireFormatV1=%#x, want 0xc1", wireFormatV1)
 	}
-	if wireSuite != 0x01 {
-		t.Fatalf("wireSuite=%#x, want 0x01", wireSuite)
+	if wireSuite != 0x02 {
+		t.Fatalf("wireSuite=%#x, want 0x02", wireSuite)
 	}
 	cases := []struct {
 		name string

@@ -1,7 +1,7 @@
 # cpace
 
 A Go implementation of the draft-21 CPace password-authenticated key exchange,
-restricted to the `CPACE-RISTR255-SHA512` suite. This glossary covers the
+restricted to the `CPACE-X25519-SHA512` suite. This glossary covers the
 protocol vocabulary and the internal module language used when reasoning about
 the implementation.
 

@@ -3,21 +3,21 @@ package cpace
 import (
 	"crypto/hmac"
 	"crypto/sha512"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"runtime"
 
-	"github.com/gtank/ristretto255"
+	"filippo.io/edwards25519/field"
 )
 
 const (
-	dsiRistretto255 = "CPaceRistretto255"
-	dsiISK          = "CPaceRistretto255_ISK"
+	dsiX25519       = "CPace255"
+	dsiISK          = "CPace255_ISK"
 	sha512BlockSize = 128
 	scalarSize      = 32
 	pointSize       = 32
 	tagSize         = 64
-	maxScalarTries  = 128
 )
 
 var identityEncoding = make([]byte, pointSize)
@@ -31,74 +31,152 @@ func generatorString(dsi, prs, ci, sid []byte, sInBytes int) []byte {
 	return lvCat(dsi, prs, make([]byte, zpadLen), ci, sid)
 }
 
-func calculateGenerator(prs, ci, sid []byte) *ristretto255.Element {
-	genStr := generatorString([]byte(dsiRistretto255), prs, ci, sid, sha512BlockSize)
+func calculateGenerator(prs, ci, sid []byte) []byte {
+	genStr := generatorString([]byte(dsiX25519), prs, ci, sid, sha512BlockSize)
 	hash := sha512.Sum512(genStr)
 	clearBytes(genStr)
-	g, err := ristretto255.NewIdentityElement().SetUniformBytes(hash[:])
+	g := elligator2Curve25519(hash[:pointSize])
 	clearBytes(hash[:])
-	if err != nil {
-		panic("cpace: SHA-512 output rejected by Ristretto255 SetUniformBytes")
-	}
 	return g
 }
 
-//go:noinline
-func clearElement(e *ristretto255.Element) {
-	if e == nil {
-		return
+func elligator2Curve25519(encodedR []byte) []byte {
+	r, err := new(field.Element).SetBytes(encodedR)
+	if err != nil {
+		panic("cpace: invalid X25519 generator field input length")
 	}
-	e.Set(ristretto255.NewIdentityElement())
-	runtime.KeepAlive(e)
+
+	var one, two, a, halfA field.Element
+	one.One()
+	setFieldElementUint64(&two, 2)
+	setFieldElementUint64(&a, 486662)
+	setFieldElementUint64(&halfA, 243331)
+
+	// draft-irtf-cfrg-cpace-21 Appendix A.5:
+	// v = -A / (1 + Z*r^2), where Z = 2 for Curve25519.
+	var r2, denominator, v field.Element
+	r2.Square(r)
+	denominator.Multiply(&two, &r2)
+	denominator.Add(&denominator, &one)
+	v.Invert(&denominator)
+	v.Multiply(&v, &a)
+	v.Negate(&v)
+
+	var v2, v3, av2, rhs field.Element
+	v2.Square(&v)
+	v3.Multiply(&v2, &v)
+	av2.Multiply(&a, &v2)
+	rhs.Add(&v3, &av2)
+	rhs.Add(&rhs, &v)
+
+	_, wasSquare := new(field.Element).SqrtRatio(&rhs, &one)
+	var zero, squareX, nonSquareX, zeroX, x field.Element
+	squareX.Set(&v)
+	nonSquareX.Negate(&v)
+	nonSquareX.Subtract(&nonSquareX, &a)
+	zeroX.Negate(&halfA)
+
+	x.Select(&squareX, &nonSquareX, wasSquare)
+	x.Select(&zeroX, &x, rhs.Equal(&zero))
+	return x.Bytes()
 }
 
-func sampleScalar(r io.Reader) (*ristretto255.Scalar, error) {
-	var b [scalarSize]byte
-	defer clearBytes(b[:])
-	for range maxScalarTries {
-		if _, err := io.ReadFull(r, b[:]); err != nil {
-			return nil, fmt.Errorf("%w: scalar randomness: %w", ErrRandomness, err)
-		}
-		b[31] &= 0x0f
-		s, err := ristretto255.NewScalar().SetCanonicalBytes(b[:])
-		if err != nil {
-			// Masking the top four bits bounds the value below 2^252, and the
-			// Ristretto255 scalar order L = 2^252 + 27742... is above 2^252, so
-			// SetCanonicalBytes cannot reject a masked sample: this branch is
-			// unreachable defense-in-depth, kept like the post-multiply
-			// neutral-element check rather than as a reachable event.
-			continue
-		}
-		if s.Equal(ristretto255.NewScalar().Zero()) == 1 {
-			continue
-		}
-		return s, nil
+func setFieldElementUint64(v *field.Element, n uint64) {
+	var b [pointSize]byte
+	binary.LittleEndian.PutUint64(b[:8], n)
+	if _, err := v.SetBytes(b[:]); err != nil {
+		panic("cpace: invalid field constant")
 	}
-	return nil, fmt.Errorf("%w: scalar randomness produced only usable-rejection samples", ErrRandomness)
+}
+
+func sampleScalar(r io.Reader) ([]byte, error) {
+	b := make([]byte, scalarSize)
+	if _, err := io.ReadFull(r, b); err != nil {
+		clearBytes(b)
+		return nil, fmt.Errorf("%w: scalar randomness: %w", ErrRandomness, err)
+	}
+	return b, nil
 }
 
 //go:noinline
-func clearScalar(s *ristretto255.Scalar) {
+func clearScalar(s []byte) {
 	if s == nil {
 		return
 	}
-	s.Zero()
+	clearBytes(s)
 	runtime.KeepAlive(s)
 }
 
-func scalarFromCanonical(b []byte) (*ristretto255.Scalar, error) {
+func scalarFromCanonical(b []byte) ([]byte, error) {
 	if len(b) != scalarSize {
 		return nil, fmt.Errorf("%w: scalar length", ErrInvalidInput)
 	}
-	s, err := ristretto255.NewScalar().SetCanonicalBytes(b)
-	if err != nil {
-		return nil, fmt.Errorf("%w: invalid scalar", ErrInvalidInput)
-	}
-	return s, nil
+	return clone(b), nil
 }
 
-func scalarMult(s *ristretto255.Scalar, p *ristretto255.Element) []byte {
-	return ristretto255.NewIdentityElement().ScalarMult(s, p).Bytes()
+func scalarMult(s, p []byte) ([]byte, error) {
+	return x25519ScalarMult(s, p)
+}
+
+func x25519ScalarMult(scalar, point []byte) ([]byte, error) {
+	if len(scalar) != scalarSize {
+		return nil, fmt.Errorf("%w: scalar length", ErrInvalidInput)
+	}
+	if len(point) != pointSize {
+		return nil, fmt.Errorf("%w: invalid peer share length", ErrAbort)
+	}
+
+	var e [scalarSize]byte
+	copy(e[:], scalar)
+	e[0] &= 248
+	e[31] &= 127
+	e[31] |= 64
+
+	var x1, x2, z2, x3, z3, tmp0, tmp1 field.Element
+	if _, err := x1.SetBytes(point); err != nil {
+		panic("cpace: invalid X25519 point length after size check")
+	}
+	x2.One()
+	x3.Set(&x1)
+	z3.One()
+
+	swap := 0
+	for pos := 254; pos >= 0; pos-- {
+		b := e[pos/8] >> uint(pos&7)
+		b &= 1
+		swap ^= int(b)
+		x2.Swap(&x3, swap)
+		z2.Swap(&z3, swap)
+		swap = int(b)
+
+		tmp0.Subtract(&x3, &z3)
+		tmp1.Subtract(&x2, &z2)
+		x2.Add(&x2, &z2)
+		z2.Add(&x3, &z3)
+		z3.Multiply(&tmp0, &x2)
+		z2.Multiply(&z2, &tmp1)
+		tmp0.Square(&tmp1)
+		tmp1.Square(&x2)
+		x3.Add(&z3, &z2)
+		z2.Subtract(&z3, &z2)
+		x2.Multiply(&tmp1, &tmp0)
+		tmp1.Subtract(&tmp1, &tmp0)
+		z2.Square(&z2)
+
+		z3.Mult32(&tmp1, 121666)
+		x3.Square(&x3)
+		tmp0.Add(&tmp0, &z3)
+		z3.Multiply(&x1, &z2)
+		z2.Multiply(&tmp1, &tmp0)
+	}
+
+	x2.Swap(&x3, swap)
+	z2.Swap(&z3, swap)
+	z2.Invert(&z2)
+	x2.Multiply(&x2, &z2)
+	out := x2.Bytes()
+	clearBytes(e[:])
+	return out, nil
 }
 
 func deriveISK(sid, k, transcript []byte) []byte {

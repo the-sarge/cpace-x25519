@@ -9,11 +9,11 @@ import (
 	"testing"
 )
 
-//go:embed testdata/draft21-ristretto255-sha512.json
-var draft21RistrettoVectorJSON []byte
+//go:embed testdata/draft21-x25519-sha512.json
+var draft21X25519VectorJSON []byte
 
-//go:embed testdata/draft21-ristretto255-invalid.json
-var draft21RistrettoInvalidJSON []byte
+//go:embed testdata/draft21-x25519-low-order.json
+var draft21X25519LowOrderJSON []byte
 
 const fuzzProtocolInputCap = 4096
 
@@ -23,6 +23,7 @@ type draftInvalidVector struct {
 	Valid     map[string][]byte
 	InvalidY1 []byte
 	InvalidY2 []byte
+	LowOrder  map[string][]byte
 }
 
 func loadDraftVectorJSON(in []byte) (draftVector, error) {
@@ -42,31 +43,36 @@ func loadDraftVectorJSON(in []byte) (draftVector, error) {
 }
 
 func loadDraftInvalidVectorJSON(in []byte) (draftInvalidVector, error) {
-	var raw struct {
-		Valid     map[string]string `json:"Valid"`
-		InvalidY1 string            `json:"Invalid Y1"`
-		InvalidY2 string            `json:"Invalid Y2"`
-	}
+	var raw map[string]string
 	if err := json.Unmarshal(in, &raw); err != nil {
 		return draftInvalidVector{}, err
 	}
-	valid := make(map[string][]byte, len(raw.Valid))
-	for k, v := range raw.Valid {
+	lowOrder := make(map[string][]byte, len(raw))
+	for k, v := range raw {
 		decoded, err := hex.DecodeString(v)
 		if err != nil {
 			return draftInvalidVector{}, err
 		}
-		valid[k] = decoded
+		lowOrder[k] = decoded
 	}
-	invalidY1, err := hex.DecodeString(raw.InvalidY1)
+	vector, err := loadDraftVectorJSON(draft21X25519VectorJSON)
 	if err != nil {
 		return draftInvalidVector{}, err
 	}
-	invalidY2, err := hex.DecodeString(raw.InvalidY2)
-	if err != nil {
-		return draftInvalidVector{}, err
+	valid := map[string][]byte{
+		"s":                        vector["ya"],
+		"X":                        vector["Yb"],
+		"G.scalar_mult_vfy(s,X)":   vector["K"],
+		"G_X25519.scalar_mult_vfy": vector["K"],
+		"G.scalar_mult_vfy(ya,Yb)": vector["K"],
+		"G.scalar_mult_vfy(yb,Ya)": vector["K"],
 	}
-	return draftInvalidVector{Valid: valid, InvalidY1: invalidY1, InvalidY2: invalidY2}, nil
+	return draftInvalidVector{
+		Valid:     valid,
+		InvalidY1: lowOrder["Invalid Y1"],
+		InvalidY2: lowOrder["Invalid Y0"],
+		LowOrder:  lowOrder,
+	}, nil
 }
 
 func FuzzDecodeMessageA(f *testing.F) {
@@ -107,14 +113,14 @@ func FuzzDecodeMessageC(f *testing.F) {
 }
 
 func FuzzDraftVectorJSONLoader(f *testing.F) {
-	f.Add(draft21RistrettoVectorJSON)
+	f.Add(draft21X25519VectorJSON)
 	f.Fuzz(func(t *testing.T, in []byte) {
 		_, _ = loadDraftVectorJSON(in)
 	})
 }
 
 func FuzzDraftInvalidVectorJSONLoader(f *testing.F) {
-	f.Add(draft21RistrettoInvalidJSON)
+	f.Add(draft21X25519LowOrderJSON)
 	f.Fuzz(func(t *testing.T, in []byte) {
 		_, _ = loadDraftInvalidVectorJSON(in)
 	})
@@ -313,25 +319,14 @@ func FuzzScalarMultVFY(f *testing.F) {
 		if !errors.Is(err, ErrAbort) {
 			t.Fatalf("scalarMultVFY rejection err=%v does not wrap ErrAbort", err)
 		}
-		// A canonical decode round-trips its input, and the harness scalar is
-		// the fixed non-zero draft-fixture scalar, so the post-multiply
-		// identity branch is unreachable and the rejection cause is fully
-		// determined by the encoded bytes: wrong length is the internal
-		// defensive branch, the canonical identity encoding is the identity
-		// sentinel, and anything else 32 bytes long failed canonical
-		// decoding. Do not fuzz the scalar without revisiting this oracle.
 		switch {
 		case len(encoded) != pointSize:
 			if errors.Is(err, ErrPeerShareEncoding) || errors.Is(err, ErrPeerShareIdentity) {
 				t.Fatalf("length rejection err=%v wraps a peer-share sentinel", err)
 			}
-		case bytes.Equal(encoded, identityEncoding):
-			if !errors.Is(err, ErrPeerShareIdentity) || errors.Is(err, ErrPeerShareEncoding) {
-				t.Fatalf("identity rejection err=%v want ErrPeerShareIdentity only", err)
-			}
 		default:
-			if !errors.Is(err, ErrPeerShareEncoding) || errors.Is(err, ErrPeerShareIdentity) {
-				t.Fatalf("encoding rejection err=%v want ErrPeerShareEncoding only", err)
+			if !errors.Is(err, ErrPeerShareIdentity) || errors.Is(err, ErrPeerShareEncoding) {
+				t.Fatalf("low-order rejection err=%v want ErrPeerShareIdentity only", err)
 			}
 		}
 	})
@@ -414,7 +409,7 @@ func FuzzMessageCRoundTrip(f *testing.F) {
 
 func fuzzDraftInvalidVector(tb testing.TB) draftInvalidVector {
 	tb.Helper()
-	v, err := loadDraftInvalidVectorJSON(draft21RistrettoInvalidJSON)
+	v, err := loadDraftInvalidVectorJSON(draft21X25519LowOrderJSON)
 	if err != nil {
 		tb.Fatalf("invalid vector fixture failed to load: %v", err)
 	}

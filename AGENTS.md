@@ -11,7 +11,7 @@
 
 ### Issue tracker
 
-Issues are tracked in GitHub Issues for `the-sarge/cpace`, managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues are tracked in GitHub Issues for `the-sarge/cpace-x25519`, managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

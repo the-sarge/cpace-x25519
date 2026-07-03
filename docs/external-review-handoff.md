@@ -1,18 +1,18 @@
 # External Review Handoff
 
-Date: 2026-07-02
+Date: 2026-07-03
 
-Target module: `github.com/the-sarge/cpace`
+Target module: `github.com/the-sarge/cpace-x25519`
 
-Last released tag: `v0.1.2`
+Last released tag: none for the cpace-x25519 module.
 
-Last released commit: `4e661bc1f925ebedf1f270668129d85bab73e468`
+Inherited tags from `github.com/the-sarge/cpace` are historical source-control context only and are not cpace-x25519 releases.
 
-Current evidence baseline: see `docs/evidence-baseline.md`. The original `v0.1.2` external-review packet remains historical prerelease evidence; the current exact-candidate evidence bundle is `docs/evidence/f7efa6a-20260619/`.
+Current evidence baseline: see `docs/evidence-baseline.md`. The inherited `github.com/the-sarge/cpace` evidence bundle under `docs/evidence/f7efa6a-20260619/` predates the X25519 port and is stale for cpace-x25519 release claims.
 
-Evidence status: refreshed for the exact package-code candidate `f7efa6a963a954952b1ecad3f46530f13799fe89` in `docs/evidence/f7efa6a-20260619/`. The signed `v0.1.2` prerelease remains historical prerelease context. The current bundle is still unaudited prerelease evidence, not a production-readiness claim.
+Evidence status: implementation tests pass locally, but dependency review, fuzz evidence, Capslock, and security/spec audit must be refreshed against an exact cpace-x25519 candidate before any stronger release-readiness claim.
 
-Review the package code at `main`. Between the pinned evidence commit `f7efa6a963a954952b1ecad3f46530f13799fe89` and the head of this packet, the only package-source change is a comment-accuracy correction in `crypto.go` with no executable-code, API, or dependency change; every other commit touches tests, CI, tooling, or documentation only, so the pinned evidence applies to the package code as read at `main`.
+Review the package code after the X25519 port branch lands on `main`; do not treat inherited Ristretto evidence as applying to the forked cryptographic code.
 
 Status: auditable draft implementation. This package has not had independent
 cryptographic review and is not production-ready.
@@ -51,17 +51,14 @@ cryptographic review before any production-ready claim.
 
 ## Implemented Scope
 
-The package implements only `CPACE-RISTR255-SHA512` from
+The package implements only `CPACE-X25519-SHA512` from
 `draft-irtf-cfrg-cpace-21`.
 
 The public API exposes initiator-responder mode only. A session is returned
 only after explicit key confirmation succeeds. `Respond` returning success is
 not authentication.
 
-The package is intentionally not a generic CPace framework. It does not expose
-other CPace suites, X25519/X448/NIST curves, symmetric mode, a raw-CI API, or
-application negotiation. Applications must provide downgrade protection for any
-outer negotiation that happens before CPace inputs are fixed.
+The package is intentionally not a generic CPace framework. It does not expose other CPace suites, Ristretto255/X448/NIST curves, symmetric mode, a raw-CI API, or application negotiation. Applications must provide downgrade protection for any outer negotiation that happens before CPace inputs are fixed.
 
 ## Package-Owned Choices To Review
 
@@ -75,10 +72,8 @@ outer negotiation that happens before CPace inputs are fixed.
   for draft-21 compatibility or deliberately compatible profiles.
 - Draft-compatible confirmation tag inputs, with no package-added role labels
   in the confirmation MACs.
-- Scalar sampling profile: masked canonical 32-byte sampling with a bounded
-  defensive retry loop whose only reachable retry is an all-zero masked sample,
-  following the draft-21 Ristretto255 recommendation rather than the allowed
-  64-byte uniform-sampling alternative.
+- Scalar sampling profile: read 32 random bytes and clamp inside the X25519 ladder.
+- X25519 low-order public-share handling: reject all-zero scalar-multiplication output with `ErrAbort` and `ErrPeerShareIdentity`, with responder-side fixed-scalar prevalidation before randomness.
 - `Session.Export` as HKDF-SHA512 over the confirmed ISK, and
   `Session.TranscriptID` as the draft `CPaceSidOutput` rather than a complete
   channel binding for outer negotiation.
@@ -87,24 +82,11 @@ outer negotiation that happens before CPace inputs are fixed.
 
 ## Evidence Snapshot
 
-`v0.1.2` is an SSH-signed annotated prerelease tag at commit
-`4e661bc1f925ebedf1f270668129d85bab73e468`. The tag-triggered Release
-Validation workflow passed `Check`, `Race`, `Govulncheck`, and `Gosec`; the
-Gosec job uploaded SARIF to GitHub Code Scanning:
-
-`https://github.com/the-sarge/cpace/actions/runs/25588835119`
-
-The `v0.1.2` prerelease contains the external-review packet, Go 1.26
-modernization, and refreshed evidence. It has no intended Go API,
-wire/protocol, dependency, or vector behavior change.
-
-The current pinned package-code evidence baseline and freshness caveats are indexed in `docs/evidence-baseline.md`. The `f7efa6a963a954952b1ecad3f46530f13799fe89` exact-candidate bundle refreshes dependency review, long fuzzing, Capslock, security/spec audit support, tag-ruleset capture, GitHub status, Scorecard, and vector stability. Repeat those lanes before any production-readiness claim if protocol, parser/framing, fuzz harness, dependency, toolchain, or package-profile docs change.
+The current inherited package-code evidence baseline and freshness caveats are indexed in `docs/evidence-baseline.md`. The `f7efa6a963a954952b1ecad3f46530f13799fe89` bundle refreshes dependency review, long fuzzing, Capslock, security/spec audit support, tag-ruleset capture, GitHub status, Scorecard, and vector stability for the original Ristretto implementation. The X25519 fork changes protocol behavior, dependency graph, and vectors, so repeat those lanes before any production-readiness or release-current claim.
 
 Capslock capability-analysis evidence is recorded in `docs/capslock-report.md`; its pinned baseline and freshness caveat are indexed in `docs/evidence-baseline.md`.
 
-OSS-Fuzz onboarding is open upstream in `google/oss-fuzz#15480`. The upstream
-PR helper build, header check, and Google CLA check passed; merge is waiting on
-upstream review.
+OSS-Fuzz onboarding needs a fresh cpace-x25519 submission. The inherited `google/oss-fuzz#15480` context was for the original `cpace` project and does not establish fork readiness.
 
 ## Review Questions
 

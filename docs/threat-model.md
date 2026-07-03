@@ -4,7 +4,7 @@ Status: review input for an auditable draft implementation. This document
 describes the security boundaries this package is trying to maintain. It is not
 an independent cryptographic review.
 
-Reference implementation scope: `CPACE-RISTR255-SHA512` from
+Reference implementation scope: `CPACE-X25519-SHA512` from
 `draft-irtf-cfrg-cpace-21`, initiator-responder mode only, with mandatory
 explicit key confirmation.
 
@@ -23,8 +23,7 @@ explicit key confirmation.
 
 - Go runtime and compiler behavior.
 - Go standard-library cryptographic primitives used by this package.
-- `github.com/gtank/ristretto255` and its indirect dependency
-  `filippo.io/edwards25519`.
+- `filippo.io/edwards25519/field`, used by the local X25519 ladder and Elligator2 generator mapping.
 - The package's parser/framing code, context-info construction, confirmation
   logic, exporter, and session lifecycle.
 - Maintainer release process: signed annotated tags, protected `main`, protected
@@ -52,8 +51,7 @@ explicit key confirmation.
 - Authentication of outer application negotiation. If an application negotiates
   PAKE version, ciphersuite, protocol mode, or whether CPace is used at all,
   that negotiation needs its own downgrade protection.
-- Multi-suite CPace support. This package intentionally implements only the
-  Ristretto255/SHA-512 draft-21 suite.
+- Multi-suite CPace support. This package intentionally implements only the X25519/SHA-512 draft-21 suite.
 - Production-readiness claims before external review, independent cryptographic
   review, and exact-candidate evidence refresh are complete.
 
@@ -99,18 +97,12 @@ Critical code paths and interactions:
   The framing layer uses a package format byte, suite byte, role byte,
   canonical length-value fields, exact public-share and tag lengths, per-field
   caps, and trailing-data rejection.
-- Ristretto point and scalar handling: peer public shares and generated group
-  elements cross the cryptographic boundary. Invalid points are rejected, scalar
-  randomness comes from `crypto/rand.Reader`, and draft-21 scalar sampling is
-  documented in the spec matrix.
+- X25519 public-share and scalar handling: peer public shares and generated group elements cross the cryptographic boundary. Low-order shares are rejected when X25519 produces the all-zero output, scalar randomness comes from `crypto/rand.Reader`, and scalar clamping happens inside the X25519 ladder.
 - Key confirmation, exporter, and session lifecycle: confirmation tags
   authenticate the exchange before `Session` is returned. `Session.Export`
   derives domain-separated application key material, and `Session.Close`
   performs best-effort cleanup of session-owned key material.
-- Dependency boundary: the implementation relies on Go, the standard library,
-  `github.com/gtank/ristretto255`, and `filippo.io/edwards25519`. Dependency
-  changes require refreshed dependency review, SCA handling, and release
-  evidence before stronger release claims.
+- Dependency boundary: the implementation relies on Go, the standard library, and `filippo.io/edwards25519`. Dependency changes require refreshed dependency review, SCA handling, and release evidence before stronger release claims.
 - CI and release pipeline: public PRs run untrusted code on hosted runners with
   read-only permissions. Release evidence depends on protected `main`,
   protected `v*` tags, DCO validation, signed annotated tags, SCA/SAST review,

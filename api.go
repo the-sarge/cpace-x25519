@@ -13,12 +13,12 @@ const (
 	// this package.
 	DraftVersion = "draft-irtf-cfrg-cpace-21"
 
-	// currentSuite is the only suite implemented by v1 of this
-	// package.
-	currentSuite byte = 0x01
+	// currentSuite is the package-owned wire identifier for
+	// CPACE-X25519-SHA512.
+	currentSuite byte = 0x02
 )
 
-const suiteName = "CPACE-RISTR255-SHA512"
+const suiteName = "CPACE-X25519-SHA512"
 
 // Initiator is a single-use initiator state returned by Start.
 type Initiator struct {

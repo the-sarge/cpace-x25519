@@ -11,6 +11,8 @@ review-runs:
 
 **Accepted (2026-06-10).** This ADR captures a v1.0.0 error-API decision surfaced by external code review (item H2). Gated per the project's ADR policy: the `ras consider` run above returned accept-with-revisions; the revisions were applied via a maintainer-decided resolution pass (`ras fix --decisions`) and re-gated, with `ras verify` returning clean (unresolved: []). Evidence trail: PR #66 comments and DEV-JOURNAL cpace.S15. The error-sentinel surface and the internal return shape of `scalarMultVFY` are settled; future reviews should not re-litigate them. One implementation-time clarification was tracked as issue #70 (how call sites rewrap the sentinels) and is resolved by the *Call-site sentinel mapping* subsection under Decision (2026-06-10); it refines the implementation outline and does not reopen the decision.
 
+**Fork refinement note (2026-07-03).** In `github.com/the-sarge/cpace-x25519`, this ADR remains historical authority for the exported sentinel names, `ErrAbort` wrapping, and nil-on-failure helper shape, but ADR-0010 refines the live peer-share taxonomy for X25519: exact-length public shares normally reach the ladder, low-order all-zero output maps to `ErrPeerShareIdentity`, malformed wire lengths remain `ErrMessage`, and `ErrPeerShareEncoding` is retained for API continuity rather than being a normal X25519 production outcome.
+
 ## Context
 
 `crypto.go:99-109` defines:

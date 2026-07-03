@@ -51,7 +51,7 @@ fresh randomness.
 
 ## Error Triage
 
-Peer public-share rejections from `Respond` and `Initiator.Finish` always satisfy `errors.Is(err, ErrAbort)`, and two exported sentinels refine the cause for local triage: `ErrPeerShareEncoding` reports 32 bytes that are not a canonical Ristretto255 encoding (a buggy or malicious peer), and `ErrPeerShareIdentity` reports an encoded identity element (almost certainly an active attacker probing for a forced neutral-element shared secret). The error message keeps the role context — `invalid initiator share` from `Respond`, `invalid responder share` from `Initiator.Finish` — so logs distinguish which share was rejected.
+Peer public-share rejections from `Respond` and `Initiator.Finish` always satisfy `errors.Is(err, ErrAbort)`. For this X25519 suite, `ErrPeerShareIdentity` reports a 32-byte public share that produced the all-zero X25519 shared-secret output, which covers the draft low-order public-share cases. The error message keeps the role context — `invalid initiator share` from `Respond`, `invalid responder share` from `Initiator.Finish` — so logs distinguish which share was rejected. `ErrPeerShareEncoding` remains exported for API continuity but is not normally produced by the X25519 public-share path.
 
 Malformed wire lengths never surface as peer-share sentinels. Framing decodes public-share fields with an exact 32-byte limit and rejects any other length with `ErrMessage` before a share reaches point decoding.
 

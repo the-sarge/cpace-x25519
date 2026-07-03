@@ -2,7 +2,7 @@
 
 Report security issues privately before opening a public issue. Email
 `the-sarge@the-sarge.com`, or use GitHub private vulnerability reporting for
-`the-sarge/cpace` if it is enabled.
+`the-sarge/cpace-x25519` if it is enabled.
 
 Do not include vulnerability details, suspected secret leaks, private exploit
 paths, or embargoed findings in public issues or pull requests. Public issues
@@ -111,7 +111,7 @@ Dependency, fuzz, and security/spec audit evidence is recorded in
 
 Supported scope for the initial implementation:
 
-- `CPACE-RISTR255-SHA512`
+- `CPACE-X25519-SHA512`
 - initiator-responder mode
 - mandatory explicit key confirmation
 
@@ -119,7 +119,7 @@ Unsupported scope:
 
 - symmetric mode
 - draft revisions other than draft-21
-- ciphersuites other than Ristretto255 with SHA-512
+- ciphersuites other than X25519 with SHA-512
 
 Outer protocol negotiation, downgrade protection, and application channel
 binding are application responsibilities. See `docs/integration-guidance.md`

@@ -1,8 +1,6 @@
 # Contributing
 
-This repository is an auditable draft implementation of
-`draft-irtf-cfrg-cpace-21` for `CPACE-RISTR255-SHA512`. It has not had
-independent cryptographic review and is not production-ready.
+This repository is an auditable draft implementation of `draft-irtf-cfrg-cpace-21` for `CPACE-X25519-SHA512`. It has not had independent cryptographic review and is not production-ready.
 
 ## Security Issues
 

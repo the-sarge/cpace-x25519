@@ -11,17 +11,17 @@ import (
 	"testing"
 )
 
-//go:embed testdata/draft21-ristretto255-generator.json
-var draft21RistrettoGeneratorJSON []byte
+//go:embed testdata/draft21-x25519-generator.json
+var draft21X25519GeneratorJSON []byte
 
-//go:embed testdata/draft21-ristretto255-confirmation-tags.json
-var draft21RistrettoConfirmationTagJSON []byte
+//go:embed testdata/draft21-x25519-confirmation-tags.json
+var draft21X25519ConfirmationTagJSON []byte
 
 const (
-	draft21RistrettoGeneratorJSONSHA256       = "05c8a34bd623fbdefd7fbffcd261d2420bd34363efa301d0b0dd9817f7f47c94"
-	draft21RistrettoVectorJSONSHA256          = "dc74177668cc2374beaf57fcb6e4c08a908238bab6b74d8edf8c86e04bc663ae"
-	draft21RistrettoInvalidJSONSHA256         = "6288f7ff96dfb8c2d6c4d743927c5fe6ac4aecbc56da2d1f00f27104000b6dfd"
-	draft21RistrettoConfirmationTagJSONSHA256 = "1d0b59b3b7486dee3569ad4e8d6908e2f575dfcd9f26804c34584cb29515e0d4"
+	draft21X25519GeneratorJSONSHA256 = "d8f5c335146d7bfc4e1e21a154f2d4acf447445eb843e30e549cc52b5d29c13c"
+	draft21X25519VectorJSONSHA256    = "7d5384bafc2144b5a73be1a7312a021bad7cb2be6a8c3e84460369ab27c838ec"
+	draft21X25519LowOrderJSONSHA256  = "d6aadd0cdfaa32bae72e862ef90c63bc0f816f1a1fa64396761204cd54b7ac87"
+	draft21X25519TagsJSONSHA256      = "692970229bbc2ae6167cc76523f93970d4e3b272299d93462bb7310fa3f0f9ab"
 )
 
 type draftGeneratorVector struct {
@@ -104,11 +104,11 @@ func loadDraftGeneratorJSON(in []byte) (draftGeneratorVector, error) {
 	if err != nil {
 		return draftGeneratorVector{}, err
 	}
-	hashResult, err := hexField("hash result")
+	hashResult, err := hexField("hash generator string")
 	if err != nil {
 		return draftGeneratorVector{}, err
 	}
-	encodedG, err := hexField("encoded generator g")
+	encodedG, err := hexField("generator g")
 	if err != nil {
 		return draftGeneratorVector{}, err
 	}
@@ -132,12 +132,12 @@ func pinnedJSONHash(in []byte) string {
 }
 
 func TestEmbeddedDraftVectorJSON(t *testing.T) {
-	// Hashes pin the embedded fixtures to the decoded JSON blocks in draft-21
-	// Appendix B.3.9 and B.3.11.1.
-	if got := pinnedJSONHash(draft21RistrettoVectorJSON); got != draft21RistrettoVectorJSONSHA256 {
-		t.Fatalf("vector JSON SHA-256 got %s want %s", got, draft21RistrettoVectorJSONSHA256)
+	// Hashes pin the embedded fixtures re-encoded from the draft-21 Appendix
+	// B.1.9 and B.1.10.1 X25519 vector blocks.
+	if got := pinnedJSONHash(draft21X25519VectorJSON); got != draft21X25519VectorJSONSHA256 {
+		t.Fatalf("vector JSON SHA-256 got %s want %s", got, draft21X25519VectorJSONSHA256)
 	}
-	v, err := loadDraftVectorJSON(draft21RistrettoVectorJSON)
+	v, err := loadDraftVectorJSON(draft21X25519VectorJSON)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,15 +149,15 @@ func TestEmbeddedDraftVectorJSON(t *testing.T) {
 }
 
 func TestEmbeddedDraftGeneratorJSON(t *testing.T) {
-	// Hash pins the decoded JSON block in draft-21 Appendix B.3.1.1.
-	if got := pinnedJSONHash(draft21RistrettoGeneratorJSON); got != draft21RistrettoGeneratorJSONSHA256 {
-		t.Fatalf("generator JSON SHA-256 got %s want %s", got, draft21RistrettoGeneratorJSONSHA256)
+	// Hash pins the decoded JSON block in draft-21 Appendix B.1.1.1.
+	if got := pinnedJSONHash(draft21X25519GeneratorJSON); got != draft21X25519GeneratorJSONSHA256 {
+		t.Fatalf("generator JSON SHA-256 got %s want %s", got, draft21X25519GeneratorJSONSHA256)
 	}
-	v, err := loadDraftGeneratorJSON(draft21RistrettoGeneratorJSON)
+	v, err := loadDraftGeneratorJSON(draft21X25519GeneratorJSON)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if v.H != "SHA-512" || v.HsInBytes != sha512BlockSize || v.ZPADLength != 100 {
+	if v.H != "SHA-512" || v.HsInBytes != sha512BlockSize || v.ZPADLength != 109 {
 		t.Fatalf("unexpected generator metadata H=%q H.s_in_bytes=%d ZPAD=%d", v.H, v.HsInBytes, v.ZPADLength)
 	}
 	gotGS := generatorString(v.DSI, v.PRS, v.CI, v.SID, v.HsInBytes)
@@ -165,78 +165,71 @@ func TestEmbeddedDraftGeneratorJSON(t *testing.T) {
 		t.Fatalf("generator_string got %x want %x", gotGS, v.GeneratorString)
 	}
 	sum := sha512.Sum512(v.GeneratorString)
-	if !bytes.Equal(sum[:], v.HashResult) {
-		t.Fatalf("hash result got %x want %x", sum, v.HashResult)
+	if !bytes.Equal(sum[:pointSize], v.HashResult) {
+		t.Fatalf("hash result got %x want %x", sum[:pointSize], v.HashResult)
 	}
 	g := calculateGenerator(v.PRS, v.CI, v.SID)
-	if !bytes.Equal(g.Bytes(), v.EncodedG) {
-		t.Fatalf("encoded generator got %x want %x", g.Bytes(), v.EncodedG)
-	}
-}
-
-func TestEmbeddedDraftConfirmationTagGoldens(t *testing.T) {
-	// Hash pins package-local confirmation-tag goldens captured at the
-	// primitive seam from the draft-21 Appendix B.3.9 vector.
-	if got := pinnedJSONHash(draft21RistrettoConfirmationTagJSON); got != draft21RistrettoConfirmationTagJSONSHA256 {
-		t.Fatalf("confirmation tag JSON SHA-256 got %s want %s", got, draft21RistrettoConfirmationTagJSONSHA256)
-	}
-	tags, err := loadDraftVectorJSON(draft21RistrettoConfirmationTagJSON)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, key := range []string{"tagA", "tagB"} {
-		if len(tags[key]) != tagSize {
-			t.Fatalf("%s length=%d want %d", key, len(tags[key]), tagSize)
-		}
+	if !bytes.Equal(g, v.EncodedG) {
+		t.Fatalf("encoded generator got %x want %x", g, v.EncodedG)
 	}
 }
 
 func TestEmbeddedDraftInvalidVectorJSON(t *testing.T) {
-	if got := pinnedJSONHash(draft21RistrettoInvalidJSON); got != draft21RistrettoInvalidJSONSHA256 {
-		t.Fatalf("invalid vector JSON SHA-256 got %s want %s", got, draft21RistrettoInvalidJSONSHA256)
+	if got := pinnedJSONHash(draft21X25519LowOrderJSON); got != draft21X25519LowOrderJSONSHA256 {
+		t.Fatalf("invalid vector JSON SHA-256 got %s want %s", got, draft21X25519LowOrderJSONSHA256)
 	}
-	v, err := loadDraftInvalidVectorJSON(draft21RistrettoInvalidJSON)
+	v, err := loadDraftInvalidVectorJSON(draft21X25519LowOrderJSON)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"s", "X", "G.scalar_mult_vfy(s,X)"} {
-		if len(v.Valid[key]) == 0 {
-			t.Fatalf("missing valid.%s", key)
+	for _, key := range []string{"Invalid Y0", "Invalid Y1", "Invalid Y2", "Invalid Y3", "Invalid Y4", "Invalid Y5", "Invalid Y7"} {
+		if len(v.LowOrder[key]) != pointSize {
+			t.Fatalf("%s length=%d want %d", key, len(v.LowOrder[key]), pointSize)
 		}
 	}
-	if len(v.InvalidY1) == 0 || len(v.InvalidY2) == 0 {
-		t.Fatal("missing invalid vectors")
-	}
-	if !bytes.Equal(v.InvalidY2, identityEncoding) {
-		t.Fatalf("Invalid Y2 got %x want identity encoding", v.InvalidY2)
+	if !bytes.Equal(v.LowOrder["Invalid Y0"], identityEncoding) {
+		t.Fatalf("Invalid Y0 got %x want identity encoding", v.LowOrder["Invalid Y0"])
 	}
 }
 
-func TestRistrettoDraft21Vectors(t *testing.T) {
-	v, err := loadDraftVectorJSON(draft21RistrettoVectorJSON)
+func TestEmbeddedDraftConfirmationTagGoldens(t *testing.T) {
+	if got := pinnedJSONHash(draft21X25519ConfirmationTagJSON); got != draft21X25519TagsJSONSHA256 {
+		t.Fatalf("confirmation tag JSON SHA-256 got %s want %s", got, draft21X25519TagsJSONSHA256)
+	}
+	tagA, tagB := draftVectorConfirmationTags(t)
+	if len(tagA) != tagSize {
+		t.Fatalf("tagA length=%d want %d", len(tagA), tagSize)
+	}
+	if len(tagB) != tagSize {
+		t.Fatalf("tagB length=%d want %d", len(tagB), tagSize)
+	}
+}
+
+func TestX25519Draft21Vectors(t *testing.T) {
+	v, err := loadDraftVectorJSON(draft21X25519VectorJSON)
 	if err != nil {
 		t.Fatal(err)
 	}
 	prs := v["PRS"]
 	ci := v["CI"]
 	sid := v["sid"]
-	gs := generatorString([]byte(dsiRistretto255), prs, ci, sid, sha512BlockSize)
-	wantGS := hx(t, "11435061636552697374726574746f3235350850617373776f726464")
-	wantGS = append(wantGS, make([]byte, 100)...)
-	wantGS = append(wantGS, hx(t, "180b415f696e69746961746f720b425f726573706f6e646572107e4b4791d6a8ef019b936c79fb7f2c57")...)
-	if !bytes.Equal(gs, wantGS) {
-		t.Fatalf("generator string got %x want %x", gs, wantGS)
+	gen, err := loadDraftGeneratorJSON(draft21X25519GeneratorJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gs := generatorString([]byte(dsiX25519), prs, ci, sid, sha512BlockSize)
+	if !bytes.Equal(gs, gen.GeneratorString) {
+		t.Fatalf("generator string got %x want %x", gs, gen.GeneratorString)
 	}
 
 	sum := sha512.Sum512(gs)
-	wantHash := hx(t, "da6d3ddc8802fca9058755ffd3ebde08a9c2c74945901a258482a288b6663af06bf645c93cd1c51512307199c80e84908916d983b34af77205f90851a657ee27")
-	if !bytes.Equal(sum[:], wantHash) {
-		t.Fatalf("generator hash got %x want %x", sum, wantHash)
+	if !bytes.Equal(sum[:pointSize], gen.HashResult) {
+		t.Fatalf("generator hash got %x want %x", sum[:pointSize], gen.HashResult)
 	}
 	g := calculateGenerator(prs, ci, sid)
 	wantG := v["g"]
-	if !bytes.Equal(g.Bytes(), wantG) {
-		t.Fatalf("generator got %x want %x", g.Bytes(), wantG)
+	if !bytes.Equal(g, wantG) {
+		t.Fatalf("generator got %x want %x", g, wantG)
 	}
 	sidMutations := []struct {
 		name string
@@ -260,7 +253,7 @@ func TestRistrettoDraft21Vectors(t *testing.T) {
 	for _, tc := range sidMutations {
 		t.Run("generator sid mutation "+tc.name, func(t *testing.T) {
 			alteredG := calculateGenerator(prs, ci, tc.sid)
-			if bytes.Equal(alteredG.Bytes(), wantG) {
+			if bytes.Equal(alteredG, wantG) {
 				t.Fatal("generator unexpectedly matched official vector after sid mutation")
 			}
 		})
@@ -274,8 +267,14 @@ func TestRistrettoDraft21Vectors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	Ya := scalarMult(ya, g)
-	Yb := scalarMult(yb, g)
+	Ya, err := scalarMult(ya, g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	Yb, err := scalarMult(yb, g)
+	if err != nil {
+		t.Fatal(err)
+	}
 	wantYa := v["Ya"]
 	wantYb := v["Yb"]
 	if !bytes.Equal(Ya, wantYa) {
@@ -302,7 +301,7 @@ func TestRistrettoDraft21Vectors(t *testing.T) {
 	adb := v["ADb"]
 	transcriptIR := newIRTranscript(Ya, ada, Yb, adb)
 	trIR := transcriptIR.bytes()
-	wantTrIR := hx(t, "20d6bac480f2c386c394efc7c47adb9925dcd2630b64f240c50f8d0eec482b915703414461203ea7e0b19560d7c0b0f5734f63b955286dfa8232b5ebe63324e2d9e7433f725803414462")
+	wantTrIR := hx(t, "201d13c89278cdadd826f6d8d7f887701430f8380ddc17611cdd6dc989ce0c9f320341446120248cccf6d5cdc3646f0ad593f9e6cef4e69d4945f8372e623512ecea3218562303414462")
 	if !bytes.Equal(trIR, wantTrIR) {
 		t.Fatalf("transcript_ir got %x want %x", trIR, wantTrIR)
 	}
@@ -311,15 +310,12 @@ func TestRistrettoDraft21Vectors(t *testing.T) {
 	if !bytes.Equal(iskIR, wantISKIR) {
 		t.Fatalf("ISK_IR got %x want %x", iskIR, wantISKIR)
 	}
-	tags, err := loadDraftVectorJSON(draft21RistrettoConfirmationTagJSON)
-	if err != nil {
-		t.Fatal(err)
+	tagA, tagB := draftVectorConfirmationTags(t)
+	if got := confirmationTag(iskIR, sid, Yb, adb); !bytes.Equal(got, tagB) {
+		t.Fatalf("tagB got %x want %x", got, tagB)
 	}
-	if got := confirmationTag(iskIR, sid, Yb, adb); !bytes.Equal(got, tags["tagB"]) {
-		t.Fatalf("tagB got %x want %x", got, tags["tagB"])
-	}
-	if got := confirmationTag(iskIR, sid, Ya, ada); !bytes.Equal(got, tags["tagA"]) {
-		t.Fatalf("tagA got %x want %x", got, tags["tagA"])
+	if got := confirmationTag(iskIR, sid, Ya, ada); !bytes.Equal(got, tagA) {
+		t.Fatalf("tagA got %x want %x", got, tagA)
 	}
 
 	trOC := testTranscriptOC(Ya, ada, Yb, adb)
@@ -340,19 +336,11 @@ func TestRistrettoDraft21Vectors(t *testing.T) {
 }
 
 func TestCoreDraft21Vectors(t *testing.T) {
-	v, err := loadDraftVectorJSON(draft21RistrettoVectorJSON)
+	v, err := loadDraftVectorJSON(draft21X25519VectorJSON)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tags, err := loadDraftVectorJSON(draft21RistrettoConfirmationTagJSON)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, key := range []string{"ya", "yb"} {
-		if v[key][31]&0xf0 != 0 {
-			t.Fatalf("%s top nibble is not sampler-injectable: %x", key, v[key][31])
-		}
-	}
+	tagA, tagB := draftVectorConfirmationTags(t)
 
 	initNC := draftVectorInput(v, v["ADa"])
 	defer initNC.wipe()
@@ -364,12 +352,12 @@ func TestCoreDraft21Vectors(t *testing.T) {
 	if !bytes.Equal(gotYa, v["Ya"]) {
 		t.Fatalf("newInitiatorCore Ya got %x want %x", gotYa, v["Ya"])
 	}
-	gotTagA, initSession, err := initCore.finish(v["Yb"], v["ADb"], tags["tagB"])
+	gotTagA, initSession, err := initCore.finish(v["Yb"], v["ADb"], tagB)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(gotTagA, tags["tagA"]) {
-		t.Fatalf("initiator core tagA got %x want %x", gotTagA, tags["tagA"])
+	if !bytes.Equal(gotTagA, tagA) {
+		t.Fatalf("initiator core tagA got %x want %x", gotTagA, tagA)
 	}
 	if !bytes.Equal(initSession.state.isk, v["ISK_IR"]) {
 		t.Fatalf("initiator core session ISK got %x want %x", initSession.state.isk, v["ISK_IR"])
@@ -394,10 +382,10 @@ func TestCoreDraft21Vectors(t *testing.T) {
 	if !bytes.Equal(respCore.isk, v["ISK_IR"]) {
 		t.Fatalf("responder core ISK got %x want %x", respCore.isk, v["ISK_IR"])
 	}
-	if !bytes.Equal(gotTagB, tags["tagB"]) {
-		t.Fatalf("responder core tagB got %x want %x", gotTagB, tags["tagB"])
+	if !bytes.Equal(gotTagB, tagB) {
+		t.Fatalf("responder core tagB got %x want %x", gotTagB, tagB)
 	}
-	respSession, err := respCore.finish(tags["tagA"])
+	respSession, err := respCore.finish(tagA)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -424,35 +412,58 @@ func draftVectorInput(v draftVector, ad []byte) normalizedInput {
 	}
 }
 
+func draftVectorConfirmationTags(t *testing.T) (tagA, tagB []byte) {
+	t.Helper()
+	var raw map[string]string
+	if err := json.Unmarshal(draft21X25519ConfirmationTagJSON, &raw); err != nil {
+		t.Fatal(err)
+	}
+	tagA, err := hex.DecodeString(raw["tagA"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	tagB, err = hex.DecodeString(raw["tagB"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tagA, tagB
+}
+
 func TestScalarMultVFYDraftInvalidVectors(t *testing.T) {
-	v, err := loadDraftInvalidVectorJSON(draft21RistrettoInvalidJSON)
+	v, err := loadDraftInvalidVectorJSON(draft21X25519LowOrderJSON)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := scalarFromCanonical(v.Valid["s"])
+	s := hx(t, "af46e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449aff")
+	s, err = scalarFromCanonical(s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	valid := v.Valid["X"]
-	got, err := scalarMultVFY(s, valid)
-	want := v.Valid["G.scalar_mult_vfy(s,X)"]
-	if err != nil || !bytes.Equal(got, want) {
-		t.Fatalf("valid scalar_mult_vfy got err=%v %x want %x", err, got, want)
+	for _, name := range []string{"Invalid Y0", "Invalid Y1", "Invalid Y2", "Invalid Y3", "Invalid Y4", "Invalid Y5", "Invalid Y7"} {
+		got, err := scalarMultVFY(s, v.LowOrder[name])
+		if got != nil {
+			t.Fatalf("%s: scalar_mult_vfy out=%x want nil", name, got)
+		}
+		if !errors.Is(err, ErrAbort) || !errors.Is(err, ErrPeerShareIdentity) {
+			t.Fatalf("%s: scalar_mult_vfy err=%v want ErrAbort and ErrPeerShareIdentity", name, err)
+		}
 	}
 	for _, tc := range []struct {
-		name     string
-		encoded  []byte
-		sentinel error
+		name string
+		want []byte
 	}{
-		{"Y1 non-canonical", v.InvalidY1, ErrPeerShareEncoding},
-		{"Y2 identity", v.InvalidY2, ErrPeerShareIdentity},
+		{"Invalid Y6", hx(t, "d8e2c776bbacd510d09fd9278b7edcd25fc5ae9adfba3b6e040e8d3b71b21806")},
+		{"Invalid Y8", hx(t, "c85c655ebe8be44ba9c0ffde69f2fe10194458d137f09bbff725ce58803cdb38")},
+		{"Invalid Y9", hx(t, "db64dafa9b8fdd136914e61461935fe92aa372cb056314e1231bc4ec12417456")},
+		{"Invalid Y10", hx(t, "e062dcd5376d58297be2618c7498f55baa07d7e03184e8aada20bca28888bf7a")},
+		{"Invalid Y11", hx(t, "993c6ad11c4c29da9a56f7691fd0ff8d732e49de6250b6c2e80003ff4629a175")},
 	} {
-		got, err := scalarMultVFY(s, tc.encoded)
-		if got != nil {
-			t.Fatalf("%s: invalid scalar_mult_vfy out=%x want nil", tc.name, got)
+		got, err := scalarMultVFY(s, v.LowOrder[tc.name])
+		if err != nil {
+			t.Fatalf("%s: scalar_mult_vfy err=%v", tc.name, err)
 		}
-		if !errors.Is(err, ErrAbort) || !errors.Is(err, tc.sentinel) {
-			t.Fatalf("%s: invalid scalar_mult_vfy err=%v want ErrAbort and %v", tc.name, err, tc.sentinel)
+		if !bytes.Equal(got, tc.want) {
+			t.Fatalf("%s: scalar_mult_vfy got %x want %x", tc.name, got, tc.want)
 		}
 	}
 }
