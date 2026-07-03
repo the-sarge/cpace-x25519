@@ -79,9 +79,9 @@ func TestX25519RFC7748IteratedVectors(t *testing.T) {
 		checkpoints[1_000_000] = rfc7748Iterated1M
 		iterations = 1_000_000
 	}
-	pending := make(map[int]string, len(checkpoints))
-	for iteration, want := range checkpoints {
-		pending[iteration] = want
+	pending := make(map[int]struct{}, len(checkpoints))
+	for iteration := range checkpoints {
+		pending[iteration] = struct{}{}
 	}
 
 	k := x25519BasepointEncoding()
