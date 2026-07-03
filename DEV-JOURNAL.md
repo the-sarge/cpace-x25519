@@ -2706,6 +2706,35 @@ Merged PR #11, `test: assert RFC 7748 checkpoint consumption`, as merge commit `
 
 ---
 
+## Dependabot CodeQL Action bump landed - 2026-07-03 15:47 EDT
+
+**Main:** `36fb43f44a2a`
+**Actor:** Codex
+
+**Summary**
+
+Merged Dependabot PR #1, `chore(deps): bump the github-actions group with 4 updates`, as merge commit `36fb43f44a2a96fa5a38907dced2d8c613130377`. The update moves the pinned `github/codeql-action` SHA from `8aad20d150bbac5944a9f9d289da16a4b0d87c1e` (`v4.36.2`) to `54f647b7e1bb85c95cddabcd46b0c578ec92bc1a` (`v4.36.3`) for CodeQL init/autobuild/analyze and SARIF upload steps. This is workflow-only dependency maintenance; it does not change package code, public API, wire behavior, package profile, or release-evidence claims.
+
+**Completed**
+
+- Rebasing/refresh: PR #1 was updated from stale head `f0ac41260356bfe74fca2d0042b402066d373363` to fresh head `000061bf857fa1c13770408b4fe7b4a2c077edc7` against `main` `6c9c8d8f320034e7d11925987f99939867cfdee5`.
+- Workflow pins updated in `.github/workflows/codeql.yml`, `.github/workflows/gosec.yml`, `.github/workflows/release.yml`, and `.github/workflows/sast-gate.yml`.
+- Ran RAS review `20260703T194032-ff48cc14e32e79374c1cb4bb` on the refreshed PR. It reported no actionable findings and zero finding clusters; `cursor` failed due usage limit, while `agy`, `claude`, `codex`, and `grok` completed.
+- Merged PR #1 into `main`; created and completed OmniFocus task `dJTbZ4FLv4Z` to record the Dependabot CodeQL Action patch bump.
+
+**Validation**
+
+- Fresh GitHub checks were green on PR #1 before merge: Actionlint, Check, Analyze, DCO, Dependency Gate, SAST Gate, CodeQL, and gosec.
+- RAS review synthesis required no code changes and confirmed the diff was limited to CodeQL Action patch-version pin updates.
+- Merge-time state was clean (`mergeStateStatus: CLEAN`); local `main` was fast-forwarded to `36fb43f44a2a96fa5a38907dced2d8c613130377`.
+
+**Next**
+
+- With the pending Dependabot PR settled, issue #6 remains the release-gating exact-candidate evidence refresh.
+- Issue #12 remains a non-blocking test maintainability cleanup for the RFC checkpoint guard.
+
+---
+
 ## Issue 12 RFC 7748 pending set landed - 2026-07-03 16:15 EDT
 
 **Main:** `640f1fbee16a`
