@@ -1,18 +1,19 @@
 ---
-status: proposed
+status: accepted
 date: 2026-07-03
-source-review-runs:
+review-runs:
   - 20260703T060754-abacf596cb5ecc28864da9d5 # ras review on PR #2 found the missing fork-profile ADR
-  - 20260703T132521-d2e052b0dcd91af00847982e # ras consider — accepted shape requires ADR text revisions before acceptance
+  - 20260703T132521-d2e052b0dcd91af00847982e # ras consider — accept with text revisions
+  - 20260703T132521-d2e052b0dcd91af00847982e-verification-1783086107699619000 # ras verify — clean after text revisions
 ---
 
 # CPACE-X25519-SHA512 fork profile
 
 ## Status
 
-**Proposed (2026-07-03).** This ADR records the X25519 fork profile already implemented on PR #2 so it can receive the independent `ras consider` gate required by this repository's ADR policy before it is marked accepted. The profile touches wire bytes, package identity, generator mapping, crypto backend and dependency graph, scalar behavior, low-order peer-share handling, retained error sentinels, and release-evidence posture; until this ADR is accepted, treat it as the review target rather than a ratified policy exception.
+**Accepted (2026-07-03).** This ADR records the X25519 fork profile implemented on PR #2. The independent `ras consider` gate above found four ADR-text/checklist revisions and one false-positive DSI finding; the revisions were applied and the follow-up `ras verify` returned clean (`unresolved: []`). The profile touches wire bytes, package identity, generator mapping, crypto backend and dependency graph, scalar behavior, low-order peer-share handling, retained error sentinels, and release-evidence posture; acceptance ratifies those fork-specific package-profile decisions while preserving the stale-evidence and independent-cryptographic-review caveats below.
 
-**Maintainer direction recorded during PR #2 fix pass.** The fork-specific release helper and documentation now use the SBOM asset prefix `cpace-x25519-<tag>.cdx.json` rather than the inherited `cpace-<tag>.cdx.json`. This records the maintainer-directed fix for fork identity; broader ADR acceptance for the full X25519 profile still requires the independent `ras consider` gate.
+**Maintainer direction recorded during PR #2 fix pass.** The fork-specific release helper and documentation now use the SBOM asset prefix `cpace-x25519-<tag>.cdx.json` rather than the inherited `cpace-<tag>.cdx.json`. This records the maintainer-directed fix for fork identity and is included in the accepted fork profile.
 
 ## Context
 
