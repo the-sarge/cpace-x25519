@@ -37,11 +37,11 @@ type draftGeneratorVector struct {
 	EncodedG        []byte
 }
 
-func hx(t *testing.T, s string) []byte {
-	t.Helper()
+func hx(tb testing.TB, s string) []byte {
+	tb.Helper()
 	out, err := hex.DecodeString(s)
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 	return out
 }

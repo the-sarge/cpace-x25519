@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add an X25519 differential and RFC 7748 known-answer test surface for the package-local Montgomery ladder. `FuzzX25519DifferentialECDH` holds `scalarMult` and `scalarMultVFY` to the standard library's `crypto/ecdh` answers on fuzzed scalar/point pairs, including agreement on low-order rejection; RFC 7748 §5.2 vectors and the 1,000-iteration checkpoint pin the ladder directly to the RFC, with the 1,000,000-iteration checkpoint opt-in via `CPACE_RFC7748_FULL=1`. The new fuzz target is registered in `.github/fuzz-targets.json` and `ossfuzz/build.sh`, growing the registry to 15 targets. Because the two implementations share field-arithmetic lineage, this detects transcription and drift divergence, not shared-ancestor design flaws; independent cryptographic review remains a release blocker. Test-only: no public API, wire, or dependency change.
 - Fork as `github.com/the-sarge/cpace-x25519` and port the single implemented suite to `CPACE-X25519-SHA512`: module path, suite byte/name, generator derivation, scalar multiplication, invalid-share handling, draft vectors, docs, and release-helper module expectations now target X25519/SHA-512. Inherited release evidence from `github.com/the-sarge/cpace` is stale until refreshed against an exact cpace-x25519 candidate.
 - CI hardening: split Autoscaled Fuzz across arm64 and amd64 GARM runner labels,
   cap scheduled fuzz defaults with `GOMAXPROCS` and `FUZZ_TEST_PARALLEL`

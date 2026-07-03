@@ -10,6 +10,7 @@
   { "target": "FuzzInitiatorFinishWithFuzzedMessageB", "package": ".", "binary": "fuzz_initiator_finish_with_fuzzed_message_b" },
   { "target": "FuzzResponderFinishWithFuzzedMessageC", "package": ".", "binary": "fuzz_responder_finish_with_fuzzed_message_c" },
   { "target": "FuzzScalarMultVFY", "package": ".", "binary": "fuzz_scalar_mult_vfy" },
+  { "target": "FuzzX25519DifferentialECDH", "package": ".", "binary": "fuzz_x25519_differential_ecdh" },
   { "target": "FuzzMessageARoundTrip", "package": ".", "binary": "fuzz_message_a_round_trip" },
   { "target": "FuzzMessageBRoundTrip", "package": ".", "binary": "fuzz_message_b_round_trip" },
   { "target": "FuzzMessageCRoundTrip", "package": ".", "binary": "fuzz_message_c_round_trip" }
