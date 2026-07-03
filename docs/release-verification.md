@@ -51,7 +51,7 @@ existing Git configuration.
 Fetch tags and verify the tag signature:
 
 ```sh
-git fetch --tags https://github.com/the-sarge/cpace.git
+git fetch --tags https://github.com/the-sarge/cpace-x25519.git
 git verify-tag vX.Y.Z
 ```
 

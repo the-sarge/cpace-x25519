@@ -11,8 +11,7 @@ var (
 	// ErrInvalidInput.
 	ErrEmptySessionID = errors.New("cpace: empty session id")
 
-	// ErrRandomness reports randomness-related failures, including random
-	// source read failures and repeated unusable scalar samples.
+	// ErrRandomness reports randomness-related failures.
 	ErrRandomness = errors.New("cpace: randomness failure")
 
 	// ErrMessage reports malformed or unexpected wire messages.
@@ -29,13 +28,14 @@ var (
 	// neutral-element Diffie-Hellman result.
 	ErrAbort = errors.New("cpace: protocol abort")
 
-	// ErrPeerShareEncoding reports a peer public share that is not a
-	// canonical Ristretto255 encoding. The returned error also wraps
-	// ErrAbort.
+	// ErrPeerShareEncoding reports a peer public share encoding error. Public
+	// message framing catches malformed X25519 share lengths before peer-share
+	// validation.
 	ErrPeerShareEncoding = errors.New("cpace: peer share encoding")
 
-	// ErrPeerShareIdentity reports a peer public share that decoded to the
-	// Ristretto255 identity element. The returned error also wraps ErrAbort.
+	// ErrPeerShareIdentity reports a peer public share that maps to the
+	// X25519 neutral shared-secret output. The returned error also wraps
+	// ErrAbort.
 	ErrPeerShareIdentity = errors.New("cpace: peer share identity")
 
 	// ErrConfirmationFailed reports failed explicit key confirmation.

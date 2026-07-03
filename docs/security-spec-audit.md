@@ -4,6 +4,8 @@ Date: 2026-06-19
 
 Target module: `github.com/the-sarge/cpace`
 
+Fork note: this inherited audit predates the cpace-x25519 port and is stale for release claims in `github.com/the-sarge/cpace-x25519`. The fork changes the implemented suite, protocol code, dependency graph, vectors, and invalid-share behavior; repeat the security/spec audit against an exact cpace-x25519 candidate before making release-current claims.
+
 Implementation baseline: `f7efa6a963a954952b1ecad3f46530f13799fe89`
 
 Documentation/evidence baseline: the merge commit containing this file.

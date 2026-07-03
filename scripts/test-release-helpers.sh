@@ -488,15 +488,10 @@ cat >"$sbom" <<'EOF'
   "specVersion": "1.5",
   "metadata": {
     "component": {
-      "name": "github.com/the-sarge/cpace"
+      "name": "github.com/the-sarge/cpace-x25519"
     }
   },
   "components": [
-    {
-      "type": "library",
-      "name": "github.com/gtank/ristretto255",
-      "purl": "pkg:golang/github.com/gtank/ristretto255@v0.2.0"
-    },
     {
       "type": "library",
       "name": "filippo.io/edwards25519",
@@ -545,14 +540,10 @@ cat >"$substring_sbom" <<'EOF'
   "specVersion": "1.5",
   "metadata": {
     "component": {
-      "name": "github.com/the-sarge/cpace"
+      "name": "github.com/the-sarge/cpace-x25519"
     }
   },
   "components": [
-    {
-      "type": "library",
-      "name": "github.com/example/not-github.com/gtank/ristretto255"
-    },
     {
       "type": "library",
       "name": "github.com/example/not-filippo.io/edwards25519"

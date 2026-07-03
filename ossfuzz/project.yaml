@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-homepage: "https://github.com/the-sarge/cpace"
+homepage: "https://github.com/the-sarge/cpace-x25519"
 language: go
 primary_contact: "the-sarge@the-sarge.com"
-main_repo: "https://github.com/the-sarge/cpace.git"
+main_repo: "https://github.com/the-sarge/cpace-x25519.git"
 fuzzing_engines:
   - libfuzzer
 sanitizers:
   - address
-help_url: "https://github.com/the-sarge/cpace/blob/main/SECURITY.md"
+help_url: "https://github.com/the-sarge/cpace-x25519/blob/main/SECURITY.md"

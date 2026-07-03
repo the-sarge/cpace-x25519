@@ -49,8 +49,7 @@ jq -e '.bomFormat == "CycloneDX" and .specVersion == "1.5"' "$sbom" >/dev/null |
 
 # Keep this expected set aligned with go.mod for release-relevant module graph entries that must appear in Syft's CycloneDX output.
 for module in \
-  github.com/the-sarge/cpace \
-  github.com/gtank/ristretto255 \
+  github.com/the-sarge/cpace-x25519 \
   filippo.io/edwards25519
 do
   jq -e --arg module "$module" '

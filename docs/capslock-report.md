@@ -4,6 +4,8 @@ Date: 2026-06-19
 
 Target module: `github.com/the-sarge/cpace`
 
+Fork note: this inherited Capslock report predates the cpace-x25519 port and is stale for release claims in `github.com/the-sarge/cpace-x25519`. Repeat this lane against an exact cpace-x25519 candidate before making capability-analysis claims.
+
 Package-code baseline: `f7efa6a963a954952b1ecad3f46530f13799fe89`
 
 Status: external-review evidence. Capslock is experimental static capability

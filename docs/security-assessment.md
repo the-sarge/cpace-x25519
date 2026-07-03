@@ -1,19 +1,16 @@
 # Security Assessment
 
-Status: maintained self-assessment for an auditable draft implementation. The original assessment was reviewed against commit `2e09774f171dde8c62763d6e35a258b0fef88801` on 2026-05-08. The current security/spec audit evidence baseline is indexed in `docs/evidence-baseline.md`; `docs/security-spec-audit.md` records the `f7efa6a963a954952b1ecad3f46530f13799fe89` exact-candidate audit.
+Status: maintained self-assessment for an auditable draft implementation. The original assessment was reviewed against commit `2e09774f171dde8c62763d6e35a258b0fef88801` on 2026-05-08. This fork's X25519 port changes protocol code, dependency shape, vectors, and invalid-share behavior after the inherited `f7efa6a963a954952b1ecad3f46530f13799fe89` evidence baseline; do not use inherited dependency, fuzz, Capslock, or security/spec audit evidence for cpace-x25519 release claims until those lanes are refreshed against an exact cpace-x25519 candidate.
 
 ## Cryptographic Scope
 
-Only `CPACE-RISTR255-SHA512` from `draft-irtf-cfrg-cpace-21` is implemented.
+Only `CPACE-X25519-SHA512` from `draft-irtf-cfrg-cpace-21` is implemented.
 The public API exposes initiator-responder mode only and requires explicit key
 confirmation before returning a `Session`.
 
 ## Secret-Dependent Behavior
 
-The implementation delegates Ristretto255 group operations and scalar field
-operations to `github.com/gtank/ristretto255 v0.2.0`, which documents constant
-time operation except for explicitly variable-time APIs that this module does
-not call.
+The implementation uses Go standard-library SHA-512, HMAC, HKDF, and randomness primitives plus a local X25519 Montgomery ladder and Elligator2 generator mapping over `filippo.io/edwards25519/field` arithmetic. The ladder clamps each 32-byte scalar per X25519 before multiplication. The local ladder and generator mapping require independent cryptographic review before any production-ready claim.
 
 Password handling follows the draft generator string padding rule. For short
 passwords the first SHA-512 input block length is independent of password
@@ -33,7 +30,7 @@ package authenticates only the inputs it is given and has no negotiation API.
 
 Each party supplies role-local identities: the initiator uses `SelfID=initiator, PeerID=responder`, and the responder uses `SelfID=responder, PeerID=initiator`. If one side swaps those values, the CI values differ and confirmation fails. Role labels such as `"client"` and `"server"` are not enough as global identities for all users or deployments; callers should bind stable party identities.
 
-Scalar randomness always comes from Go's `crypto/rand.Reader`; callers cannot inject a custom random reader through the public API. Scalar sampling masks the top four bits of byte 31 (clearing bits above group size 252), parses the result as a canonical Ristretto255 scalar, and rejects the zero scalar. Masking bounds every sampled value below `2^252`, and the Ristretto255 scalar order `L = 2^252 + 27742...` is greater than `2^252`, so a masked value can never fall in `[L, 2^252)`: that interval is empty, `SetCanonicalBytes` cannot reject a masked sample, and the canonical-decode retry branch is unreachable defense-in-depth kept in the same spirit as the post-multiply neutral-element check. The only reachable retry is the all-zero masked scalar, at probability `~2^-252` per attempt with the system random reader; the zero check creates a secret-dependent loop only for that case. Sampling failure after `maxScalarTries` retries wraps `ErrRandomness`. The package implements draft §8.3 bit-masking with a defensive retry loop; using the ristretto255 library's `SetUniformBytes` plus zero rejection/retry would be an allowed draft alternative, but it consumes 64 random bytes and reduces modulo the scalar order, changing deterministic behavior and defining a different package profile.
+Scalar randomness always comes from Go's `crypto/rand.Reader`; callers cannot inject a custom random reader through the public API. X25519 scalar sampling reads exactly 32 random bytes, and the scalar multiplication ladder applies X25519 clamping before use. There is no scalar rejection loop in normal operation. Random read failure wraps `ErrRandomness`.
 
 ## Memory Handling
 
@@ -69,16 +66,15 @@ add extra role-label inputs to the draft-21 confirmation MACs.
 
 ## Error Surface
 
-Peer-share rejections wrap `ErrAbort`, and the public API adds one of two exported sentinels for local triage: `ErrPeerShareEncoding` for a non-canonical Ristretto255 encoding and `ErrPeerShareIdentity` for an identity-element submission. Errors from `Respond` and `Initiator.Finish` retain `invalid initiator share` / `invalid responder share` role context. Malformed wire lengths are rejected by framing as `ErrMessage` and never surface as peer-share sentinels; the internal wrong-length branch of share decoding is defensive, `ErrAbort`-wrapped, and unreachable from the wire.
+Peer-share rejections wrap `ErrAbort`, and `ErrPeerShareIdentity` refines X25519 low-order public shares that produce the all-zero shared-secret output. Errors from `Respond` and `Initiator.Finish` retain `invalid initiator share` / `invalid responder share` role context. Malformed wire lengths are rejected by framing as `ErrMessage` and never surface as peer-share sentinels; the internal wrong-length branch of share validation is defensive, `ErrAbort`-wrapped, and unreachable from the wire. `ErrPeerShareEncoding` remains exported for API continuity but is not normally produced by the X25519 public-share path, where every exact-length 32-byte string is passed to the X25519 ladder.
 
-The finer rejection granularity is not a secret-dependent oracle: every classification is a function only of the encoded public wire bytes, with no secret input. The only secret-adjacent branch, the post-multiply neutral-element check, is unreachable for prime-order Ristretto255 and is kept as defense-in-depth behind an `ErrAbort`-wrapped error.
+The finer rejection granularity is local observability for attacker-controlled wire bytes and must not be reflected to the remote peer before confirmation. The responder prevalidates message A with a fixed scalar before generator derivation or responder randomness, and both roles reject any all-zero X25519 output before deriving ISK.
 
 Internally `scalarMultVFY` returns nil with a typed error on failure instead of draft-21's function-level neutral-element return convention. The divergence is intentional and internal-only: protocol abort behavior is unchanged and the draft's invalid-share vectors, including the neutral-element case, are still rejected. Detailed peer-share errors are for local logs and metrics; integrations must not reflect them to the remote peer before confirmation (see `docs/integration-guidance.md`).
 
 ## Dependencies
 
-- `github.com/gtank/ristretto255 v0.2.0`
-- `filippo.io/edwards25519 v1.2.0` as an indirect dependency
+- `filippo.io/edwards25519 v1.2.0`
 
 Dependency evidence freshness is indexed in `docs/evidence-baseline.md`. The lane-specific dependency, vulnerability, and SAST/gosec summary lives in `docs/dependency-review.md`. Refresh those through the baseline module before any stronger release claim.
 
@@ -90,7 +86,7 @@ Fuzz evidence freshness is indexed in `docs/evidence-baseline.md`. The lane-spec
 
 Do not mark a release production-ready until:
 
-- official draft-21 Ristretto255/SHA-512 vectors pass
+- official draft-21 X25519/SHA-512 vectors pass
 - `go test ./...` and `go test -race ./...` pass
 - parser and protocol fuzz targets have completed a meaningful run
 - every target in the fuzz-target registry (`.github/fuzz-targets.json`, with target function, package, and OSS-Fuzz binary name) has run for more than five minutes on release hardware or the manual long-fuzz workflow after the `go test ./...` drift check has passed

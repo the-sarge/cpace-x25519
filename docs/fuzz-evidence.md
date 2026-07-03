@@ -4,6 +4,8 @@ Date: 2026-05-08 through 2026-06-19
 
 Target module: `github.com/the-sarge/cpace`
 
+Fork note: this inherited fuzz evidence predates the cpace-x25519 port and is stale for release claims in `github.com/the-sarge/cpace-x25519`. The fork changes protocol code, dependencies, vectors, and invalid-share behavior; repeat the registered fuzz lanes against an exact cpace-x25519 candidate before making fuzz-evidence claims.
+
 Evidence code commit: `f7efa6a963a954952b1ecad3f46530f13799fe89`
 
 Superseded candidate commit: `2e09774f171dde8c62763d6e35a258b0fef88801`

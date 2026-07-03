@@ -1,4 +1,4 @@
-module github.com/the-sarge/cpace/tools/releasepolicy
+module github.com/the-sarge/cpace-x25519/tools/releasepolicy
 
 go 1.26
 

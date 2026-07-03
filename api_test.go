@@ -10,8 +10,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/gtank/ristretto255"
 )
 
 type failingReader struct {
@@ -234,7 +232,7 @@ func TestClearIdempotent(t *testing.T) {
 	if initiator.scalar != nil {
 		t.Fatal("initiator core retained scalar reference after clear")
 	}
-	if !allZero(scalar.Bytes()) {
+	if !allZero(scalar) {
 		t.Fatal("initiator scalar was not zeroed by clear")
 	}
 
@@ -689,7 +687,7 @@ func TestFinishZeroValueHardening(t *testing.T) {
 		t.Fatal("zero-value Initiator.Finish consumed state on malformed message")
 	}
 
-	v, err := loadDraftVectorJSON(draft21RistrettoVectorJSON)
+	v, err := loadDraftVectorJSON(draft21X25519VectorJSON)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1124,25 +1122,14 @@ func TestProtocolAllowsEmptyLocalAssociatedData(t *testing.T) {
 	}
 }
 
-func TestScalarSamplingRejectsRepeatedZero(t *testing.T) {
-	if _, err := sampleScalar(&repeatingReader{buf: []byte{0}}); !errors.Is(err, ErrRandomness) ||
-		errors.Is(err, ErrInvalidInput) {
-		t.Fatalf("sampleScalar err=%v", err)
-	}
-}
-
-func TestScalarSamplingMasksDraftRistrettoBits(t *testing.T) {
+func TestScalarSamplingReturnsDraftX25519Bytes(t *testing.T) {
 	in := bytes.Repeat([]byte{0xff}, scalarSize)
-	if _, err := scalarFromCanonical(in); !errors.Is(err, ErrInvalidInput) {
-		t.Fatalf("unmasked all-ones scalar err=%v", err)
-	}
 	s, err := sampleScalar(&repeatingReader{buf: in})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := bytes.Repeat([]byte{0xff}, scalarSize)
-	want[31] = 0x0f
-	if got := s.Bytes(); !bytes.Equal(got, want) {
+	if got := s; !bytes.Equal(got, want) {
 		t.Fatalf("sampled scalar=%x want %x", got, want)
 	}
 }
@@ -1571,10 +1558,10 @@ func TestSingleUseStateConcurrentFinishClose(t *testing.T) {
 	})
 }
 
-func TestProtocolAbortsOnInvalidRistrettoEncoding(t *testing.T) {
+func TestProtocolAbortsOnLowOrderX25519Share(t *testing.T) {
 	cfg := testResponderInput()
 	invalid := mustLoadDraftInvalidVector(t)
-	badA := encodeMessageA([]byte("sid"), invalid.InvalidY1, nil)
+	badA := encodeMessageA([]byte("sid"), invalid.LowOrder["Invalid Y0"], nil)
 	if _, _, err := respondTestResponder(cfg, badA); !errors.Is(err, ErrAbort) {
 		t.Fatalf("Respond err=%v", err)
 	}
@@ -1582,20 +1569,13 @@ func TestProtocolAbortsOnInvalidRistrettoEncoding(t *testing.T) {
 
 func TestResponderPrevalidatesInvalidInitiatorShareBeforeRandomness(t *testing.T) {
 	invalid := mustLoadDraftInvalidVector(t)
-	cases := []struct {
-		name string
-		ya   []byte
-	}{
-		{"non-canonical", invalid.InvalidY1},
-		{"identity", invalid.InvalidY2},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, name := range []string{"Invalid Y0", "Invalid Y1", "Invalid Y2", "Invalid Y3", "Invalid Y4", "Invalid Y5", "Invalid Y7"} {
+		t.Run(name, func(t *testing.T) {
 			cfg := testResponderInput()
 			random := &countingFailingReader{err: io.ErrUnexpectedEOF}
-			badA := encodeMessageA([]byte("sid"), tc.ya, nil)
+			badA := encodeMessageA([]byte("sid"), invalid.LowOrder[name], nil)
 			_, _, err := respondWithRandom(cfg, badA, random)
-			if !errors.Is(err, ErrAbort) || errors.Is(err, ErrRandomness) {
+			if !errors.Is(err, ErrAbort) || !errors.Is(err, ErrPeerShareIdentity) || errors.Is(err, ErrRandomness) {
 				t.Fatalf("Respond err=%v", err)
 			}
 			if random.reads != 0 {
@@ -1608,11 +1588,11 @@ func TestResponderPrevalidatesInvalidInitiatorShareBeforeRandomness(t *testing.T
 			}
 			defer nc.wipe()
 			random = &countingFailingReader{err: io.ErrUnexpectedEOF}
-			core, yb, tagB, err := newResponderCore(nc, tc.ya, nil, random)
+			core, yb, tagB, err := newResponderCore(nc, invalid.LowOrder[name], nil, random)
 			if core != nil || yb != nil || tagB != nil {
 				t.Fatalf("newResponderCore returned core=%v yb=%x tagB=%x on invalid share", core, yb, tagB)
 			}
-			if !errors.Is(err, ErrAbort) || errors.Is(err, ErrRandomness) {
+			if !errors.Is(err, ErrAbort) || !errors.Is(err, ErrPeerShareIdentity) || errors.Is(err, ErrRandomness) {
 				t.Fatalf("newResponderCore err=%v", err)
 			}
 			if random.reads != 0 {
@@ -1624,22 +1604,15 @@ func TestResponderPrevalidatesInvalidInitiatorShareBeforeRandomness(t *testing.T
 
 func TestInitiatorAbortsOnInvalidResponderShare(t *testing.T) {
 	invalid := mustLoadDraftInvalidVector(t)
-	cases := []struct {
-		name string
-		yb   []byte
-	}{
-		{"non-canonical", invalid.InvalidY1},
-		{"identity", invalid.InvalidY2},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, name := range []string{"Invalid Y0", "Invalid Y1", "Invalid Y2", "Invalid Y3", "Invalid Y4", "Invalid Y5", "Invalid Y7"} {
+		t.Run(name, func(t *testing.T) {
 			cfg := testInitiatorInput()
 			initiator, _, err := startTestInitiator(cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
-			msgB := encodeMessageB(tc.yb, nil, bytes.Repeat([]byte{0x99}, tagSize))
-			if _, _, err := initiator.Finish(msgB); !errors.Is(err, ErrAbort) {
+			msgB := encodeMessageB(invalid.LowOrder[name], nil, bytes.Repeat([]byte{0x99}, tagSize))
+			if _, _, err := initiator.Finish(msgB); !errors.Is(err, ErrAbort) || !errors.Is(err, ErrPeerShareIdentity) {
 				t.Fatalf("Finish err=%v", err)
 			}
 		})
@@ -1651,38 +1624,17 @@ func TestPeerShareErrorsWrapErrAbort(t *testing.T) {
 	cases := []struct {
 		name      string
 		share     []byte
-		sentinel  error
-		other     error
 		wantError string
 		viaFinish bool
 	}{
 		{
-			name:      "respond non-canonical",
-			share:     invalid.InvalidY1,
-			sentinel:  ErrPeerShareEncoding,
-			other:     ErrPeerShareIdentity,
-			wantError: "cpace: protocol abort: invalid initiator share: cpace: peer share encoding",
-		},
-		{
-			name:      "respond identity",
-			share:     invalid.InvalidY2,
-			sentinel:  ErrPeerShareIdentity,
-			other:     ErrPeerShareEncoding,
+			name:      "respond low-order",
+			share:     invalid.LowOrder["Invalid Y0"],
 			wantError: "cpace: protocol abort: invalid initiator share: cpace: peer share identity",
 		},
 		{
-			name:      "finish non-canonical",
-			share:     invalid.InvalidY1,
-			sentinel:  ErrPeerShareEncoding,
-			other:     ErrPeerShareIdentity,
-			wantError: "cpace: protocol abort: invalid responder share: cpace: peer share encoding",
-			viaFinish: true,
-		},
-		{
-			name:      "finish identity",
-			share:     invalid.InvalidY2,
-			sentinel:  ErrPeerShareIdentity,
-			other:     ErrPeerShareEncoding,
+			name:      "finish low-order",
+			share:     invalid.LowOrder["Invalid Y1"],
 			wantError: "cpace: protocol abort: invalid responder share: cpace: peer share identity",
 			viaFinish: true,
 		},
@@ -1704,17 +1656,12 @@ func TestPeerShareErrorsWrapErrAbort(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected peer-share rejection, got nil error")
 			}
-			if !errors.Is(err, ErrAbort) {
-				t.Fatalf("err=%v does not wrap ErrAbort", err)
+			if !errors.Is(err, ErrAbort) || !errors.Is(err, ErrPeerShareIdentity) {
+				t.Fatalf("err=%v does not wrap ErrAbort and ErrPeerShareIdentity", err)
 			}
-			if !errors.Is(err, tc.sentinel) {
-				t.Fatalf("err=%v does not wrap %v", err, tc.sentinel)
+			if errors.Is(err, ErrPeerShareEncoding) {
+				t.Fatalf("err=%v wraps unrelated ErrPeerShareEncoding", err)
 			}
-			if errors.Is(err, tc.other) {
-				t.Fatalf("err=%v wraps unrelated sentinel %v", err, tc.other)
-			}
-			// Exact-string match pins the role context and the single
-			// "cpace: protocol abort" prefix mandated by ADR-0003.
 			if err.Error() != tc.wantError {
 				t.Fatalf("err=%q want %q", err.Error(), tc.wantError)
 			}
@@ -1722,21 +1669,9 @@ func TestPeerShareErrorsWrapErrAbort(t *testing.T) {
 	}
 }
 
-func TestPeerShareEncodingRejection(t *testing.T) {
-	invalid := mustLoadDraftInvalidVector(t)
-	badA := encodeMessageA([]byte("sid"), invalid.InvalidY1, nil)
-	_, _, err := Respond(testInitiatorInput(), badA)
-	if !errors.Is(err, ErrPeerShareEncoding) {
-		t.Fatalf("Respond err=%v want ErrPeerShareEncoding", err)
-	}
-	if !errors.Is(err, ErrAbort) {
-		t.Fatalf("Respond err=%v does not wrap ErrAbort", err)
-	}
-}
-
 func TestPeerShareIdentityRejection(t *testing.T) {
 	invalid := mustLoadDraftInvalidVector(t)
-	badA := encodeMessageA([]byte("sid"), invalid.InvalidY2, nil)
+	badA := encodeMessageA([]byte("sid"), invalid.LowOrder["Invalid Y0"], nil)
 	_, _, err := Respond(testInitiatorInput(), badA)
 	if !errors.Is(err, ErrPeerShareIdentity) {
 		t.Fatalf("Respond err=%v want ErrPeerShareIdentity", err)
@@ -1747,10 +1682,6 @@ func TestPeerShareIdentityRejection(t *testing.T) {
 }
 
 func TestPeerShareLengthDefenseInternal(t *testing.T) {
-	// Malformed wire lengths surface as ErrMessage from framing before any
-	// share reaches decodePublicShare, so the length branch is only reachable
-	// through a direct internal call. It must stay an ErrAbort-wrapped
-	// defensive error with no peer-share sentinel.
 	invalid := mustLoadDraftInvalidVector(t)
 	s, err := scalarFromCanonical(invalid.Valid["s"])
 	if err != nil {
@@ -1758,10 +1689,7 @@ func TestPeerShareLengthDefenseInternal(t *testing.T) {
 	}
 	for _, n := range []int{0, pointSize - 1, pointSize + 1} {
 		short := make([]byte, n)
-		p, err := decodePublicShare(short)
-		if p != nil {
-			t.Fatalf("len=%d: decodePublicShare returned non-nil element", n)
-		}
+		_, err := validatePublicShare(short)
 		assertLengthDefenseError(t, n, err)
 		out, err := scalarMultVFY(s, short)
 		if out != nil {
@@ -1785,32 +1713,13 @@ func assertLengthDefenseError(t *testing.T, n int, err error) {
 }
 
 func TestPeerShareRolePassesThroughNonSentinelErrors(t *testing.T) {
-	// The ADR-0003 call-site mapping sanctions exactly two behaviors: rewrap
-	// the two exported sentinels with role context, and pass every other
-	// error through unchanged. Pin the pass-through half with the two real
-	// non-sentinel errors the helpers can produce, asserting pointer identity
-	// so both a role-context rewrap (the duplicated-prefix shape) and an
-	// error-swallowing regression fail loudly.
-	invalid := mustLoadDraftInvalidVector(t)
-	_, lengthErr := decodePublicShare(make([]byte, pointSize-1))
+	lengthErr := validatePublicShareLength(make([]byte, pointSize-1))
 	if lengthErr == nil {
 		t.Fatal("expected length defense error")
 	}
-	_, neutralErr := scalarMultVFY(ristretto255.NewScalar().Zero(), invalid.Valid["X"])
-	if neutralErr == nil {
-		t.Fatal("expected post-multiply neutral-element error")
-	}
-	for _, tc := range []struct {
-		name string
-		err  error
-	}{
-		{"wrong length", lengthErr},
-		{"post-multiply neutral element", neutralErr},
-	} {
-		for _, role := range []peerShareRole{initiatorPeerShare, responderPeerShare} {
-			if got := role.wrapError(tc.err); !samePointerErrorValue(got, tc.err) {
-				t.Fatalf("%s/%s: wrapError returned %v, want the identical error value", tc.name, role, got)
-			}
+	for _, role := range []peerShareRole{initiatorPeerShare, responderPeerShare} {
+		if got := role.wrapError(lengthErr); !samePointerErrorValue(got, lengthErr) {
+			t.Fatalf("%s: wrapError returned %v, want the identical error value", role, got)
 		}
 	}
 }
@@ -1845,18 +1754,18 @@ func TestPeerShareRoleSharedSecretAddsRoleContext(t *testing.T) {
 		t.Fatalf("sharedSecret got %x want %x", got, want)
 	}
 
-	_, err = responderPeerShare.sharedSecret(s, invalid.InvalidY1)
+	_, err = responderPeerShare.sharedSecret(s, invalid.LowOrder["Invalid Y0"])
 	if err == nil {
 		t.Fatal("expected responder share rejection")
 	}
-	if !errors.Is(err, ErrAbort) || !errors.Is(err, ErrPeerShareEncoding) {
-		t.Fatalf("sharedSecret err=%v want ErrAbort and ErrPeerShareEncoding", err)
+	if !errors.Is(err, ErrAbort) || !errors.Is(err, ErrPeerShareIdentity) {
+		t.Fatalf("sharedSecret err=%v want ErrAbort and ErrPeerShareIdentity", err)
 	}
-	if want := "cpace: protocol abort: invalid responder share: cpace: peer share encoding"; err.Error() != want {
+	if want := "cpace: protocol abort: invalid responder share: cpace: peer share identity"; err.Error() != want {
 		t.Fatalf("sharedSecret err=%q want %q", err.Error(), want)
 	}
 
-	_, err = initiatorPeerShare.sharedSecret(s, invalid.InvalidY2)
+	_, err = initiatorPeerShare.sharedSecret(s, invalid.LowOrder["Invalid Y1"])
 	if err == nil {
 		t.Fatal("expected initiator share rejection")
 	}
@@ -1868,68 +1777,21 @@ func TestPeerShareRoleSharedSecretAddsRoleContext(t *testing.T) {
 	}
 }
 
-func TestScalarMultVFYElementMatchesEncodedPeerShare(t *testing.T) {
+func TestScalarMultVFYLowOrderIdentity(t *testing.T) {
 	invalid := mustLoadDraftInvalidVector(t)
 	s, err := scalarFromCanonical(invalid.Valid["s"])
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := decodePublicShare(invalid.Valid["X"])
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := scalarMultVFYElement(s, p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want, err := scalarMultVFY(s, invalid.Valid["X"])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want) {
-		t.Fatalf("scalarMultVFYElement got %x want %x", got, want)
-	}
-}
-
-func TestPeerShareRoleDecodeSharedSecretAddsRoleContext(t *testing.T) {
-	invalid := mustLoadDraftInvalidVector(t)
-	s, err := scalarFromCanonical(invalid.Valid["s"])
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	p, err := responderPeerShare.decode(invalid.Valid["X"])
-	if err != nil {
-		t.Fatal(err)
-	}
-	got, err := responderPeerShare.sharedSecretElement(s, p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := invalid.Valid["G.scalar_mult_vfy(s,X)"]; !bytes.Equal(got, want) {
-		t.Fatalf("sharedSecretElement got %x want %x", got, want)
-	}
-
-	_, err = responderPeerShare.decode(invalid.InvalidY1)
-	if err == nil {
-		t.Fatal("expected responder share rejection")
-	}
-	if !errors.Is(err, ErrAbort) || !errors.Is(err, ErrPeerShareEncoding) {
-		t.Fatalf("decode err=%v want ErrAbort and ErrPeerShareEncoding", err)
-	}
-	if want := "cpace: protocol abort: invalid responder share: cpace: peer share encoding"; err.Error() != want {
-		t.Fatalf("decode err=%q want %q", err.Error(), want)
-	}
-
-	_, err = initiatorPeerShare.decode(invalid.InvalidY2)
-	if err == nil {
-		t.Fatal("expected initiator share rejection")
+	out, err := scalarMultVFY(s, invalid.LowOrder["Invalid Y0"])
+	if out != nil {
+		t.Fatalf("out=%x want nil", out)
 	}
 	if !errors.Is(err, ErrAbort) || !errors.Is(err, ErrPeerShareIdentity) {
-		t.Fatalf("decode err=%v want ErrAbort and ErrPeerShareIdentity", err)
+		t.Fatalf("err=%v want ErrAbort and ErrPeerShareIdentity", err)
 	}
-	if want := "cpace: protocol abort: invalid initiator share: cpace: peer share identity"; err.Error() != want {
-		t.Fatalf("decode err=%q want %q", err.Error(), want)
+	if !strings.Contains(err.Error(), "neutral-element shared secret") {
+		t.Fatalf("err=%q missing neutral-element diagnostic", err)
 	}
 }
 
@@ -1946,47 +1808,6 @@ func TestWireLengthRejectionIsMessageNotPeerShare(t *testing.T) {
 		if errors.Is(err, ErrAbort) || errors.Is(err, ErrPeerShareEncoding) || errors.Is(err, ErrPeerShareIdentity) {
 			t.Fatalf("len=%d: wire-length rejection err=%v leaked an abort-layer error", n, err)
 		}
-	}
-}
-
-func TestScalarMultVFYPostMultiplyIdentityDefense(t *testing.T) {
-	// For prime-order Ristretto255 the post-multiply identity branch is
-	// unreachable from the wire: s·p is non-identity for any decoded
-	// (non-identity) p and any scalar sampleScalar can return, since zero
-	// samples are rejected. A zero scalar — an input sampleScalar can never
-	// produce — is therefore the one direct-call input that forces s·p to
-	// the identity and exercises the branch.
-	invalid := mustLoadDraftInvalidVector(t)
-	out, err := scalarMultVFY(ristretto255.NewScalar().Zero(), invalid.Valid["X"])
-	if out != nil {
-		t.Fatalf("out=%x want nil", out)
-	}
-	if !errors.Is(err, ErrAbort) {
-		t.Fatalf("err=%v does not wrap ErrAbort", err)
-	}
-	if errors.Is(err, ErrPeerShareEncoding) || errors.Is(err, ErrPeerShareIdentity) {
-		t.Fatalf("err=%v wraps a peer-share sentinel", err)
-	}
-	if !strings.Contains(err.Error(), "neutral-element shared secret") {
-		t.Fatalf("err=%q missing neutral-element diagnostic", err)
-	}
-
-	p, err := decodePublicShare(invalid.Valid["X"])
-	if err != nil {
-		t.Fatal(err)
-	}
-	out, err = scalarMultVFYElement(ristretto255.NewScalar().Zero(), p)
-	if out != nil {
-		t.Fatalf("element out=%x want nil", out)
-	}
-	if !errors.Is(err, ErrAbort) {
-		t.Fatalf("element err=%v does not wrap ErrAbort", err)
-	}
-	if errors.Is(err, ErrPeerShareEncoding) || errors.Is(err, ErrPeerShareIdentity) {
-		t.Fatalf("element err=%v wraps a peer-share sentinel", err)
-	}
-	if !strings.Contains(err.Error(), "neutral-element shared secret") {
-		t.Fatalf("element err=%q missing neutral-element diagnostic", err)
 	}
 }
 
@@ -2080,10 +1901,10 @@ func TestBuildCIWireStability(t *testing.T) {
 	if got, want := DraftVersion, "draft-irtf-cfrg-cpace-21"; got != want {
 		t.Fatalf("DraftVersion=%q want %q", got, want)
 	}
-	if got, want := suiteName, "CPACE-RISTR255-SHA512"; got != want {
+	if got, want := suiteName, "CPACE-X25519-SHA512"; got != want {
 		t.Fatalf("suiteName=%q want %q", got, want)
 	}
-	if got, want := currentSuite, byte(0x01); got != want {
+	if got, want := currentSuite, byte(0x02); got != want {
 		t.Fatalf("currentSuite=0x%02x want 0x%02x", got, want)
 	}
 
@@ -2104,7 +1925,7 @@ func TestBuildCIWireStability(t *testing.T) {
 	}
 	appendLV([]byte("CPace-Go-CI"))
 	appendLV([]byte("draft-irtf-cfrg-cpace-21"))
-	appendLV([]byte("CPACE-RISTR255-SHA512"))
+	appendLV([]byte("CPACE-X25519-SHA512"))
 	appendLV([]byte("initiator"))
 	appendLV([]byte("initiator-id"))
 	appendLV([]byte("responder"))
@@ -2261,7 +2082,7 @@ func TestInitiatorFinishConsumesStateOnAbort(t *testing.T) {
 
 func mustLoadDraftInvalidVector(t *testing.T) draftInvalidVector {
 	t.Helper()
-	v, err := loadDraftInvalidVectorJSON(draft21RistrettoInvalidJSON)
+	v, err := loadDraftInvalidVectorJSON(draft21X25519LowOrderJSON)
 	if err != nil {
 		t.Fatal(err)
 	}

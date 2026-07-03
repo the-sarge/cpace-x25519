@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fork as `github.com/the-sarge/cpace-x25519` and port the single implemented suite to `CPACE-X25519-SHA512`: module path, suite byte/name, generator derivation, scalar multiplication, invalid-share handling, draft vectors, docs, and release-helper module expectations now target X25519/SHA-512. Inherited release evidence from `github.com/the-sarge/cpace` is stale until refreshed against an exact cpace-x25519 candidate.
 - CI hardening: split Autoscaled Fuzz across arm64 and amd64 GARM runner labels,
   cap scheduled fuzz defaults with `GOMAXPROCS` and `FUZZ_TEST_PARALLEL`
   tuning, and add a pinned GolangCI-Lint advisory lane for curated analyzers.

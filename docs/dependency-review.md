@@ -4,6 +4,8 @@ Date: 2026-06-19
 
 Target module: `github.com/the-sarge/cpace`
 
+Fork note: this inherited review predates the cpace-x25519 port and is stale for release claims in `github.com/the-sarge/cpace-x25519`. The fork removes `github.com/gtank/ristretto255`, makes `filippo.io/edwards25519` direct, and changes protocol code; repeat this lane against an exact cpace-x25519 candidate before making dependency, vulnerability, or SAST claims.
+
 Review commit: `f7efa6a963a954952b1ecad3f46530f13799fe89`
 
 Review worktree: clean worktree at the review commit.

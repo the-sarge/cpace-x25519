@@ -835,12 +835,12 @@ exclude:
   - './.git/**'
   - './.ras/**'
 `,
-			want: `want "github.com/the-sarge/cpace"`,
+			want: `want "github.com/the-sarge/cpace-x25519"`,
 		},
 		{
 			name: "missing shared exclude",
 			in: `source:
-  name: github.com/the-sarge/cpace
+  name: github.com/the-sarge/cpace-x25519
 exclude:
   - './.git/**'
 `,
@@ -881,7 +881,7 @@ func TestReleasePolicyAcceptsCRLFAllowedSigners(t *testing.T) {
 }
 
 const acceptedSyftReleaseConfig = `source:
-  name: github.com/the-sarge/cpace
+  name: github.com/the-sarge/cpace-x25519
 exclude:
   - './.git/**'
   - './.ras/**'

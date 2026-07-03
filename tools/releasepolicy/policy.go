@@ -496,7 +496,7 @@ var acceptedReleasePolicy = releasePolicy{
 	requiredConfigs: []releaseConfigPolicy{
 		{
 			path:       ".github/syft-release.yaml",
-			sourceName: "github.com/the-sarge/cpace",
+			sourceName: "github.com/the-sarge/cpace-x25519",
 			excludes:   []string{"./.git/**", "./.ras/**"},
 		},
 	},

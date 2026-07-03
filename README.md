@@ -1,10 +1,9 @@
-# CPace for Go
+# CPace-X25519 for Go
 
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/the-sarge/cpace/badge)](https://scorecard.dev/viewer/?uri=github.com/the-sarge/cpace)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12767/badge)](https://www.bestpractices.dev/projects/12767)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/the-sarge/cpace-x25519/badge)](https://scorecard.dev/viewer/?uri=github.com/the-sarge/cpace-x25519)
 
 This repository implements `draft-irtf-cfrg-cpace-21` for the
-`CPACE-RISTR255-SHA512` suite only.
+`CPACE-X25519-SHA512` suite only.
 
 Status: auditable draft implementation. This code has not had independent
 cryptographic review and is not production-ready.

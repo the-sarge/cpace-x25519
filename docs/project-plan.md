@@ -33,7 +33,7 @@ All rows below are closed and preserved as the policy/API decision record.
 | Peer metadata | `PeerAssociatedData` and `PeerID` expose copied metadata bound into the confirmed exchange. | Done. Local AD/ID accessors are deferred until a concrete caller need appears. |
 | Confirmation tag role separation | Draft-compatible tag input is unchanged. | Done. Keep draft-compatible tags; no package-added role labels. |
 | Field size limits | Package-owned per-field caps: password and IDs 4 KiB, context and session ID 1 KiB, AD 64 KiB, public shares/tags exact-sized; malformed framed inputs also have a 128 KiB aggregate decoder backstop. | Done. Valid message shapes remain governed by non-configurable per-field caps; the aggregate cap is an invalid-message throttle. |
-| Scalar sampling | Masked canonical 32-byte sampling with an all-zero-sample retry. | Done. Keep the draft-21 Ristretto255 recommendation; `SetUniformBytes` plus zero rejection/retry is an allowed alternative but would use 64-byte modulo reduction and define a different package profile. |
+| Scalar sampling | Read 32 random bytes and clamp inside the X25519 ladder. | Done for the X25519 fork. Refresh release evidence before making release-current claims. |
 
 ## Recommended PR Order
 
@@ -63,7 +63,7 @@ Current pinned evidence baselines and freshness caveats are indexed in `docs/evi
 | Release checklist | `docs/release-checklist.md` records exact-candidate validation, evidence refresh, signed-tag, release-validation, and GitHub-release steps. | The checklist must be executed against a future candidate before making stronger release-readiness claims. |
 | Capslock capability analysis | `docs/evidence-baseline.md` indexes the current pinned Capslock capability-analysis baseline; `docs/capslock-report.md` carries the lane-specific summary and triage. | Capslock is experimental review signal, not a release gate. Repeat if dependencies, imports, randomness, HKDF/HMAC usage, or the Go toolchain change. |
 | Performance benchmarks | `bench_test.go` and `task bench` cover full round trips, protocol phases, exporters, and message encoding/decoding with `-benchmem`. | Benchmark results are local comparison evidence, not release gates. Record host, Go version, exact command, and commit when sharing numbers. |
-| OSS-Fuzz integration | `ossfuzz/` stages upstream project files for all 14 native Go fuzz targets. Local `build_fuzzers` and `check_build` validation passed with the repository mounted into a temporary `google/oss-fuzz` checkout on 2026-05-07. Upstream PR `google/oss-fuzz#15480` is open; CLA, header-check, and the upstream PR helper build passed on 2026-05-08. | Upstream onboarding still requires upstream review, merge, and follow-up monitoring after OSS-Fuzz starts running the project. |
+| OSS-Fuzz integration | `ossfuzz/` stages upstream project files for all 14 native Go fuzz targets under the cpace-x25519 module path. The inherited 2026-05 validation and `google/oss-fuzz#15480` PR were for the original `cpace` project. | Refresh local OSS-Fuzz validation and open a fresh cpace-x25519 upstream submission before treating OSS-Fuzz onboarding as current. |
 
 ## Release Readiness
 
