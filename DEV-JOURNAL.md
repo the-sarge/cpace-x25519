@@ -2640,3 +2640,66 @@ Merged PR #2, `Port package to CPACE-X25519-SHA512`, as merge commit `2664770014
 - Refresh dependency review, fuzz evidence, Capslock, and security/spec audit against an exact cpace-x25519 candidate before making release-current evidence claims.
 - Run fresh cpace-x25519 OSS-Fuzz validation and open a new upstream submission; the inherited 2026-05 validation was for the original `cpace` project.
 - Keep production-readiness claims blocked on independent cryptographic review of the local X25519 ladder and Elligator2 generator mapping.
+
+---
+
+## X25519 differential coverage landed - 2026-07-03 11:34 EDT
+
+**Main:** `fe2441f72cd0`
+**Actor:** Codex
+
+**Summary**
+
+Merged PR #4, `test: add X25519 ecdh differential fuzz target and RFC 7748 vectors`, as merge commit `fe2441f72cd0338ad364689fdd22583eb7b99518`. The change adds a package-local X25519 ladder test surface: differential fuzzing against the standard library `crypto/ecdh`, RFC 7748 section 5.2 known-answer checks, and an opt-in 1,000,000-iteration RFC checkpoint. This is test and registry coverage only; it does not change the public API, wire behavior, package profile, or dependency set.
+
+**Completed**
+
+- Added `FuzzX25519DifferentialECDH`, comparing `scalarMult` and `scalarMultVFY` with `crypto/ecdh` for value agreement and low-order rejection behavior across fuzzed scalar/point pairs.
+- Added RFC 7748 section 5.2 one-shot vectors plus iterated checkpoints at 1 and 1,000 iterations by default; the 1,000,000-iteration checkpoint is gated behind `CPACE_RFC7748_FULL=1`.
+- Registered the new fuzz target in `.github/fuzz-targets.json` and `ossfuzz/build.sh`, bringing the live registry/build surface to 15 targets, and updated `docs/project-plan.md` and `CHANGELOG.md` accordingly.
+- Widened the `hx` test helper from `*testing.T` to `testing.TB` so fuzz and test code can share the decode helper.
+- Ran RAS review `20260703T150619-982f32eadaaec4e8075f185a` on PR #4. It produced no blocking findings. The low-severity RFC checkpoint-consumption guard finding was filed as issue #5 rather than folded into the reviewed PR; the historical fuzz-evidence target-count discussion was left unchanged under evidence-discipline rules.
+- Filed release/readiness follow-ups #5 through #9 for RFC checkpoint guard hardening, exact-candidate evidence refresh, OSS-Fuzz revalidation/submission, independent cryptographic review, and Sage-derived vector coverage.
+
+**Validation**
+
+- Local validation before merge: `task check`, `task docs:check`, focused RFC/vector tests, and mutation sanity for the new differential/RFC coverage all passed on PR head `dc964e6f31379e443184f10bec8270f64d22be13`.
+- GitHub checks were green on PR #4 before merge: Check, Analyze, macos-latest, windows-latest, DCO, Dependency Gate, GolangCI-Lint, SAST Gate, Staticcheck, CodeQL, and gosec.
+- Merge-time state was clean (`mergeStateStatus: CLEAN`); PR #4 merged into `main` on 2026-07-03 at `fe2441f72cd0338ad364689fdd22583eb7b99518`.
+
+**Next**
+
+- Fix issue #5 on a fresh branch by asserting that every configured RFC 7748 iterated checkpoint is consumed, including mutation sanity with an unreachable checkpoint.
+- Keep release evidence claims stale until issue #6 refreshes dependency-review, long-fuzz, Capslock, and security/spec-audit evidence against an exact candidate commit.
+- Revalidate the 15-target OSS-Fuzz surface and prepare a fresh upstream submission for cpace-x25519 per issue #7.
+- Keep production-readiness claims blocked on independent review of the package-local X25519 ladder and Elligator2 generator mapping, plus additional Sage-derived vectors for non-ladder surfaces.
+
+---
+
+## RFC checkpoint guard landed - 2026-07-03 14:59 EDT
+
+**Main:** `4baff6be1203`
+**Actor:** Codex
+
+**Summary**
+
+Merged PR #11, `test: assert RFC 7748 checkpoint consumption`, as merge commit `4baff6be1203a92336e04ab4af38a482d135e5d7`. The change hardens `TestX25519RFC7748IteratedVectors` so configured RFC 7748 checkpoints must be consumed by the loop; an unreached checkpoint now fails with a deterministic list of iteration numbers. This is test-only coverage hardening and does not change public API, wire behavior, package profile, dependencies, or release-evidence claims.
+
+**Completed**
+
+- Added a pending-checkpoint guard to `x25519_differential_test.go`: each configured checkpoint is copied into a pending set, deleted after successful verification, and reported after the loop if any remain.
+- Verified mutation sanity by temporarily adding unreachable checkpoint `2000` while default `iterations` stayed `1000`; the focused test failed with `unreached RFC 7748 checkpoints: [2000]`; the mutation was reverted before commit.
+- Ran RAS review `20260703T181156-635882f2b7a64d10fa94e417` on PR #11. It reported no behavioral or blocking findings. The sole nit was that `pending` stores unused string values and should eventually become a set-typed `map[int]struct{}`.
+- Filed the RAS nit as issue #12 and mirrored it in OmniFocus as task `lG8uJ6GhMif`.
+- Merged PR #11, which auto-closed issue #5; completed OmniFocus task `j9xBJiF0tne` for issue #5.
+
+**Validation**
+
+- Local validation before merge: `go test -run TestX25519RFC7748IteratedVectors -count=1 .`, `CPACE_RFC7748_FULL=1 go test -run TestX25519RFC7748IteratedVectors -count=1 .`, `go test -run TestX25519RFC7748Vectors -count=1 .`, `go test ./...`, `git diff --check`, and `task check`.
+- GitHub checks were green on PR #11 before merge: Check, Analyze, macos-latest, windows-latest, DCO, Dependency Gate, GolangCI-Lint, SAST Gate, Staticcheck, CodeQL, and gosec.
+- Merge-time state was clean (`mergeStateStatus: CLEAN`); PR #11 merged into `main` on 2026-07-03 at `4baff6be1203a92336e04ab4af38a482d135e5d7`.
+
+**Next**
+
+- Leave issue #12 as a non-blocking maintainability cleanup for the RFC checkpoint guard.
+- Keep release evidence claims stale until issue #6 refreshes dependency-review, long-fuzz, Capslock, and security/spec-audit evidence against an exact candidate commit.
