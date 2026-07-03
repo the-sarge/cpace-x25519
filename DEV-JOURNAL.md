@@ -2673,3 +2673,33 @@ Merged PR #4, `test: add X25519 ecdh differential fuzz target and RFC 7748 vecto
 - Keep release evidence claims stale until issue #6 refreshes dependency-review, long-fuzz, Capslock, and security/spec-audit evidence against an exact candidate commit.
 - Revalidate the 15-target OSS-Fuzz surface and prepare a fresh upstream submission for cpace-x25519 per issue #7.
 - Keep production-readiness claims blocked on independent review of the package-local X25519 ladder and Elligator2 generator mapping, plus additional Sage-derived vectors for non-ladder surfaces.
+
+---
+
+## RFC checkpoint guard landed - 2026-07-03 14:59 EDT
+
+**Main:** `4baff6be1203`
+**Actor:** Codex
+
+**Summary**
+
+Merged PR #11, `test: assert RFC 7748 checkpoint consumption`, as merge commit `4baff6be1203a92336e04ab4af38a482d135e5d7`. The change hardens `TestX25519RFC7748IteratedVectors` so configured RFC 7748 checkpoints must be consumed by the loop; an unreached checkpoint now fails with a deterministic list of iteration numbers. This is test-only coverage hardening and does not change public API, wire behavior, package profile, dependencies, or release-evidence claims.
+
+**Completed**
+
+- Added a pending-checkpoint guard to `x25519_differential_test.go`: each configured checkpoint is copied into a pending set, deleted after successful verification, and reported after the loop if any remain.
+- Verified mutation sanity by temporarily adding unreachable checkpoint `2000` while default `iterations` stayed `1000`; the focused test failed with `unreached RFC 7748 checkpoints: [2000]`; the mutation was reverted before commit.
+- Ran RAS review `20260703T181156-635882f2b7a64d10fa94e417` on PR #11. It reported no behavioral or blocking findings. The sole nit was that `pending` stores unused string values and should eventually become a set-typed `map[int]struct{}`.
+- Filed the RAS nit as issue #12 and mirrored it in OmniFocus as task `lG8uJ6GhMif`.
+- Merged PR #11, which auto-closed issue #5; completed OmniFocus task `j9xBJiF0tne` for issue #5.
+
+**Validation**
+
+- Local validation before merge: `go test -run TestX25519RFC7748IteratedVectors -count=1 .`, `CPACE_RFC7748_FULL=1 go test -run TestX25519RFC7748IteratedVectors -count=1 .`, `go test -run TestX25519RFC7748Vectors -count=1 .`, `go test ./...`, `git diff --check`, and `task check`.
+- GitHub checks were green on PR #11 before merge: Check, Analyze, macos-latest, windows-latest, DCO, Dependency Gate, GolangCI-Lint, SAST Gate, Staticcheck, CodeQL, and gosec.
+- Merge-time state was clean (`mergeStateStatus: CLEAN`); PR #11 merged into `main` on 2026-07-03 at `4baff6be1203a92336e04ab4af38a482d135e5d7`.
+
+**Next**
+
+- Leave issue #12 as a non-blocking maintainability cleanup for the RFC checkpoint guard.
+- Keep release evidence claims stale until issue #6 refreshes dependency-review, long-fuzz, Capslock, and security/spec-audit evidence against an exact candidate commit.
