@@ -2763,3 +2763,36 @@ Merged PR #14, `test: use set-typed RFC 7748 pending checkpoints`, as squash com
 **Next**
 
 - Follow-up issue #15 tracks the fresh review's info-level optional cleanup to consider eliminating the duplicate `pending` checkpoint keyset entirely. It was not changed in PR #14 under the low/nit policy.
+
+---
+
+## Issue 15 RFC 7748 checkpoint cleanup landed - 2026-07-03 19:47 EDT
+
+**Main:** `12e0f1b693f3`
+**Actor:** Codex
+
+**Summary**
+
+Merged PR #17, `test: simplify RFC 7748 checkpoint tracking`, as squash commit `12e0f1b693f3dcc2fa3ce0181aac75f15f752252`. The change resolves issue #15 by removing the duplicate RFC 7748 `pending` checkpoint keyset and deleting reached checkpoints directly from `checkpoints`, while preserving the deterministic unreached-checkpoint failure list. This is test-only maintainability cleanup and does not change public API, wire behavior, package profile, dependencies, security surface, or release-evidence claims.
+
+**Completed**
+
+- Updated `x25519_differential_test.go` so `TestX25519RFC7748IteratedVectors` uses `checkpoints` as the single checkpoint tracker.
+- Verified mutation sanity by temporarily adding unreachable checkpoint `2000`; the focused test failed with `unreached RFC 7748 checkpoints: [2000]`; the mutation was reverted before commit.
+- Ran RAS review `20260703T204750-0a5efcbfcfe18ad7761bdd12`, which found a DCO metadata blocker only. The branch tip was amended with `Signed-off-by: Joshua Sargent <the-sarge@the-sarge.com>` and force-pushed as `b9cf6c9ef0dd3fe1d4ab2be8079f8b4d951a077f`.
+- Ran `ras verify 20260703T204750-0a5efcbfcfe18ad7761bdd12 --head b9cf6c9ef0dd3fe1d4ab2be8079f8b4d951a077f`; verification resolved the DCO blocker, confirmed the code patch tree was unchanged, and reported no open or new concerns.
+- Ran fresh RAS review `20260703T205705-cd9ab4841fa9f9912cf4662d`; it reported no actionable findings. No follow-up issues were created during review.
+- Merged PR #17, which auto-closed issue #15.
+
+**Validation**
+
+- `go test -run TestX25519RFC7748IteratedVectors -count=1 .`
+- `CPACE_RFC7748_FULL=1 go test -run TestX25519RFC7748IteratedVectors -count=1 .`
+- `go test ./...`
+- `git diff --check`
+- `task check`
+- GitHub PR checks on #17 were all successful before merge, including Check, Analyze, macos-latest, windows-latest, DCO, Dependency Gate, GolangCI-Lint, SAST Gate, Staticcheck, CodeQL, and gosec.
+
+**Next**
+
+- No PR-specific follow-up issues remain from issue #15. Keep release-evidence claims unchanged until a separate exact-candidate evidence refresh updates the pinned dependency-review, fuzz, and security-audit evidence.
