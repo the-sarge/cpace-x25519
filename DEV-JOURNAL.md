@@ -2610,3 +2610,33 @@ Landed PR #221 for issue #197, a test-only hardening pass on `irTranscript.clear
 - Mutation sanity: temporarily removed `clearBytes(t.ya)` and confirmed the focused test failed on non-zero `ya` backing bytes.
 - `go test ./... && go vet ./...`
 - GitHub checks were green on PR #221 before merge: CI Check, CodeQL Analyze, DCO, Dependency Gate, GolangCI-Lint Advisory, SAST Gate, Staticcheck Advisory, macOS/windows smoke; gosec was neutral as expected.
+
+---
+
+## CPACE-X25519 port merged - 2026-07-03 09:59 EDT
+
+**Main:** `266477001470`
+**Actor:** Codex
+
+**Summary**
+
+Merged PR #2, `Port package to CPACE-X25519-SHA512`, as merge commit `266477001470f2f50cd86eb21c2eacf5540301aa`. This establishes the forked module profile for `github.com/the-sarge/cpace-x25519`: X25519/SHA-512 suite identity, package-local X25519 ladder and Elligator2 generator mapping, X25519 low-order share handling, cpace-x25519 release-helper naming, and stale inherited-evidence posture.
+
+**Completed**
+
+- Ported the package from the inherited Ristretto profile to `CPACE-X25519-SHA512`: module/repo identity, suite byte/name, DSI strings, generator derivation, scalar multiplication, X25519 low-order rejection, draft vector fixtures, OSS-Fuzz staging, docs, and release helper expectations.
+- Resolved RAS review `20260703T060754-abacf596cb5ecc28864da9d5`: added literal hash-pinned X25519 confirmation-tag goldens; fixed inherited evidence wording in dependency, fuzz, security/spec, and OSS-Fuzz docs; corrected live repository references; updated the changelog and fixture provenance notes; removed the dead prevalidation clone; documented the fixed validation scalar; and renamed SBOM assets to `cpace-x25519-<tag>.cdx.json`.
+- Added ADR-0010 for the accepted cpace-x25519 fork profile. `ras consider` run `20260703T132521-d2e052b0dcd91af00847982e` required ADR text/checklist revisions for the package-local Montgomery ladder, module-path criterion, fork-local suite-byte registry, and `ErrPeerShareEncoding` continuity rationale; verification `20260703T132521-d2e052b0dcd91af00847982e-verification-1783086107699619000` returned clean.
+- Updated ADR-0002, ADR-0003, and ADR-0007 with fork supersession/refinement notes so inherited parent-profile decisions no longer contradict the accepted X25519 fork profile.
+
+**Validation**
+
+- Local validation on the final PR head included targeted vector/prevalidation tests, `go test ./...`, `go run github.com/securego/gosec/v2/cmd/gosec@v2.26.1 -tests ./...`, `task docs:check`, release-helper checks, `task quick`, and full `task check`.
+- Final RAS verification of the original PR review, pinned to `feae128a1205f32b5f88e56de20def6ba20e709b`, reported no remaining prior findings and no new concerns.
+- GitHub checks were green before merge on PR #2: Check, Analyze, macos-latest, windows-latest, DCO, Dependency Gate, SAST Gate, CodeQL, gosec, Staticcheck, and GolangCI-Lint.
+
+**Next**
+
+- Refresh dependency review, fuzz evidence, Capslock, and security/spec audit against an exact cpace-x25519 candidate before making release-current evidence claims.
+- Run fresh cpace-x25519 OSS-Fuzz validation and open a new upstream submission; the inherited 2026-05 validation was for the original `cpace` project.
+- Keep production-readiness claims blocked on independent cryptographic review of the local X25519 ladder and Elligator2 generator mapping.
