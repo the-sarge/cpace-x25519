@@ -79,11 +79,6 @@ func TestX25519RFC7748IteratedVectors(t *testing.T) {
 		checkpoints[1_000_000] = rfc7748Iterated1M
 		iterations = 1_000_000
 	}
-	pending := make(map[int]struct{}, len(checkpoints))
-	for iteration := range checkpoints {
-		pending[iteration] = struct{}{}
-	}
-
 	k := x25519BasepointEncoding()
 	u := x25519BasepointEncoding()
 	for i := 1; i <= iterations; i++ {
@@ -96,12 +91,12 @@ func TestX25519RFC7748IteratedVectors(t *testing.T) {
 			if got := hex.EncodeToString(k); got != want {
 				t.Fatalf("after %d iterations got %s want %s", i, got, want)
 			}
-			delete(pending, i)
+			delete(checkpoints, i)
 		}
 	}
-	if len(pending) > 0 {
-		unreached := make([]int, 0, len(pending))
-		for iteration := range pending {
+	if len(checkpoints) > 0 {
+		unreached := make([]int, 0, len(checkpoints))
+		for iteration := range checkpoints {
 			unreached = append(unreached, iteration)
 		}
 		sort.Ints(unreached)
