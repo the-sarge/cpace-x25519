@@ -2888,3 +2888,35 @@ Merged PR #26, `Record cpace-x25519 OSS-Fuzz onboarding evidence`, as squash com
 
 - Monitor `google/oss-fuzz#15838` for upstream review, acceptance, scheduled ClusterFuzz builds, coverage, and crash signal; PR #26 records only local validation plus upstream submission.
 - Existing follow-up issue #24 remains open for adding a lightweight guard around OSS-Fuzz target self-containment; PR #26 did not create any remaining open review follow-up issues.
+
+---
+
+## OSS-Fuzz self-containment guard landed - 2026-07-04 12:35 EDT
+
+**Main:** `2c0d57e70c51`
+**Actor:** Codex
+
+**Summary**
+
+Merged PR #30, `Guard OSS-Fuzz target self-containment`, as squash commit `2c0d57e70c5100203440706e830cfea219f6cdbb`. The PR closes issue #24 by adding a local registry guard that keeps registered OSS-Fuzz target files self-contained for native Go OSS-Fuzz rewriting, while preserving the public API, protocol behavior, package-profile policy, and production code.
+
+**Completed**
+
+- Added an AST/type-aware self-containment guard for registered fuzz targets so same-file and production declarations are allowed while helpers declared only in other `*_test.go` files are rejected.
+- Added synthetic regression coverage for cross-file helper functions, methods, constants, implicit interface method requirements, aliased `testing` imports, same-file helpers, production helpers, and path normalization.
+- Documented deliberate helper duplication and invalid-vector provenance needed by OSS-Fuzz native Go rewriting.
+- Fixed RAS review finding C-002 by making `packageFilePath` robust under `go test -trimpath` and direct trimmed test-binary execution.
+- Resolved RAS review finding C-001 by moving the self-containment guard and its regression tests into same-package `fuzz_selfcontainment_test.go`.
+- Issue #24 auto-closed as completed when PR #30 merged.
+
+**Validation**
+
+- Local validation after the final fixes passed: `go test -trimpath ./...`, `go test -trimpath -c -o /tmp/trimcheck-cpace.test .`, `/tmp/trimcheck-cpace.test -test.run 'TestFuzzTargetRegistryDiscoveryUsesPackageDirectory|TestFuzzTargetRegistrySelfContainedFiles' -test.count=1`, `go test ./...`, and `task check:changed`.
+- RAS review `20260704T151612-1ac46922dc7cba90a39c653d` found one medium `-trimpath` source-discovery bug and one low test-organization finding; both were fixed in pushed head `06c71e974fa4da6d8acf9a050fde6750341ce8d7`.
+- RAS verification for `20260704T151612-1ac46922dc7cba90a39c653d` resolved both findings at head `06c71e974fa4da6d8acf9a050fde6750341ce8d7` and reported no new concerns.
+- Fresh RAS review `20260704T162204-385b9aee3a471958420c8e68` on final head `06c71e974fa4da6d8acf9a050fde6750341ce8d7` reported no actionable coding fixes, no low/nit items, and no new concerns.
+- GitHub checks on final PR #30 head passed before merge: Check, DCO, Dependency Gate, CodeQL/Analyze, SAST Gate/gosec, Staticcheck, GolangCI-Lint advisory, and macOS/Windows smoke.
+
+**Next**
+
+- No open follow-up issue remains for issue #24. Any stronger release-readiness claim still needs evidence refresh against the exact release candidate commit under the repository evidence policy.
