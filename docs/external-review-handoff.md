@@ -87,7 +87,7 @@ The current inherited package-code evidence baseline and freshness caveats are i
 
 Capslock capability-analysis evidence is recorded in `docs/capslock-report.md`; its pinned baseline and freshness caveat are indexed in `docs/evidence-baseline.md`.
 
-OSS-Fuzz onboarding needs a fresh cpace-x25519 submission. The inherited `google/oss-fuzz#15480` context was for the original `cpace` project and does not establish fork readiness.
+OSS-Fuzz local build validation passed for all 15 registered cpace-x25519 native Go fuzz targets at `a2f892f785991b8ac20d60979c1f32639287f0d4`, with raw evidence under `docs/evidence/ossfuzz-a2f892f-20260704/`, and the fresh upstream submission is open as `google/oss-fuzz#15838`. The inherited `google/oss-fuzz#15480` context was for the original `cpace` project and does not establish fork readiness; upstream review/merge and later ClusterFuzz signal remain pending.
 
 The SageMath-derived extended vector fixture under `testdata/sage-x25519-extended.json` adds a code-lineage-independent oracle for generator derivation, random/twist/low-order/non-canonical X25519 scalar multiplication, and full package-profile exchange ISK/tag/message outputs. It is reproducible with the pinned Docker/Sage command recorded in the fixture metadata and generator script. This strengthens test coverage and reviewer inspection material, but it is not a substitute for independent cryptographic review or exact-candidate dependency/fuzz/security evidence refresh.
 

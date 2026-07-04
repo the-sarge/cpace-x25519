@@ -1,8 +1,10 @@
 # Fuzz Evidence
 
-Date: 2026-05-08 through 2026-06-19
+Date: 2026-05-08 through 2026-07-04
 
-Target module: `github.com/the-sarge/cpace`
+Historical target module: `github.com/the-sarge/cpace`
+
+Current fork module: `github.com/the-sarge/cpace-x25519`
 
 Fork note: this inherited fuzz evidence predates the cpace-x25519 port and is stale for release claims in `github.com/the-sarge/cpace-x25519`. The fork changes protocol code, dependencies, vectors, and invalid-share behavior; repeat the registered fuzz lanes against an exact cpace-x25519 candidate before making fuzz-evidence claims.
 
@@ -13,7 +15,7 @@ Superseded candidate commit: `2e09774f171dde8c62763d6e35a258b0fef88801`
 Supplemental tag commit: `4e661bc1f925ebedf1f270668129d85bab73e468`
 (`v0.1.2`)
 
-Registered fuzz targets: 14 from `.github/fuzz-targets.json` at the inherited parent baseline. The current cpace-x25519 registry still needs its own exact-candidate long-fuzz refresh before release claims.
+Registered fuzz targets: 14 from `.github/fuzz-targets.json` at the inherited parent baseline. The current cpace-x25519 registry has 15 targets; local OSS-Fuzz build validation passed for those targets as described below, but the registry still needs its own exact-candidate long-fuzz refresh before release claims.
 
 Inherited baseline status: `docs/evidence-baseline.md` records that these pinned parent-module fuzz runs are stale for cpace-x25519 release claims.
 
@@ -21,6 +23,12 @@ Inherited baseline status: `docs/evidence-baseline.md` records that these pinned
 
 - `FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=1h PARALLEL=1 task fuzz` (inherited Go 1.26.4 parent baseline runs)
 - `FUZZ_RACE=0 GOMAXPROCS=4 FUZZTIME=1h PARALLEL=2 task fuzz` (earlier campaigns below)
+
+## cpace-x25519 OSS-Fuzz Local Build Validation
+
+Local OSS-Fuzz validation passed on 2026-07-04 for cpace-x25519 commit `a2f892f785991b8ac20d60979c1f32639287f0d4`, using the upstream `google/oss-fuzz` helper flow on `mbp128.local` with `DOCKER_DEFAULT_PLATFORM=linux/amd64`, `--architecture x86_64`, and the `address` sanitizer. The run built the staged `projects/cpace-x25519` image, compiled all 15 native Go fuzz targets from `.github/fuzz-targets.json`, confirmed the produced fuzzer binaries matched the registry, and passed `python3 infra/helper.py check_build --architecture x86_64 --sanitizer address cpace-x25519`. Raw logs, binary comparison files, host/tool captures, and upstream PR metadata are committed under `docs/evidence/ossfuzz-a2f892f-20260704/`.
+
+The fresh upstream submission is open as `google/oss-fuzz#15838`. This validates local staging and records the submission, but it is not yet upstream OSS-Fuzz coverage evidence: Google review/merge, scheduled ClusterFuzz builds, coverage reporting, and crash signal remain pending.
 
 ## Go 1.26.4 Exact-Candidate Paired Long Runs
 

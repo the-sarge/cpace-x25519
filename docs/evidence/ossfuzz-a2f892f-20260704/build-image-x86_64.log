@@ -1,0 +1,79 @@
+INFO:__main__:Pulling latest base images...
+INFO:common_utils:Running: docker pull gcr.io/oss-fuzz-base/base-image
+Using default tag: latest
+latest: Pulling from oss-fuzz-base/base-image
+Digest: sha256:ee77166cf114e1480bb27fb74f1f0c1a85a0f297eecc9595d6c3110006836bc3
+Status: Image is up to date for gcr.io/oss-fuzz-base/base-image:latest
+gcr.io/oss-fuzz-base/base-image:latest
+INFO:common_utils:Running: docker pull gcr.io/oss-fuzz-base/base-clang
+Using default tag: latest
+latest: Pulling from oss-fuzz-base/base-clang
+Digest: sha256:d5c24d8d5642bb8cbe70caf51c6eb7188f2c81caac4a901c0753f650ffe36d63
+Status: Image is up to date for gcr.io/oss-fuzz-base/base-clang:latest
+gcr.io/oss-fuzz-base/base-clang:latest
+INFO:common_utils:Running: docker pull gcr.io/oss-fuzz-base/base-builder
+Using default tag: latest
+latest: Pulling from oss-fuzz-base/base-builder
+Digest: sha256:4cd392f2f69bad4e25fa0941da71d842923beb137ecb653c36c47dfbaa51f18c
+Status: Image is up to date for gcr.io/oss-fuzz-base/base-builder:latest
+gcr.io/oss-fuzz-base/base-builder:latest
+INFO:common_utils:Running: docker pull gcr.io/oss-fuzz-base/base-runner
+Using default tag: latest
+latest: Pulling from oss-fuzz-base/base-runner
+Digest: sha256:0f0bd4db371dd186b85f11fddbe1581e52005dd96996a8f2c8423f2c2e3c9a5d
+Status: Image is up to date for gcr.io/oss-fuzz-base/base-runner:latest
+gcr.io/oss-fuzz-base/base-runner:latest
+INFO:common_utils:Running: docker pull gcr.io/oss-fuzz-base/base-runner-debug
+Using default tag: latest
+latest: Pulling from oss-fuzz-base/base-runner-debug
+Digest: sha256:f4f313acc770ab2b3153990f29618db02d479fd5aaaeb1faac11ba9c0d809fa9
+Status: Image is up to date for gcr.io/oss-fuzz-base/base-runner-debug:latest
+gcr.io/oss-fuzz-base/base-runner-debug:latest
+INFO:common_utils:Running: docker pull gcr.io/oss-fuzz-base/base-builder-go
+Using default tag: latest
+latest: Pulling from oss-fuzz-base/base-builder-go
+Digest: sha256:f697c2d5a30530287784b8100e9df59fcec69cfe516e0e5afa0537536601e762
+Status: Image is up to date for gcr.io/oss-fuzz-base/base-builder-go:latest
+gcr.io/oss-fuzz-base/base-builder-go:latest
+INFO:common_utils:Running: docker build --no-cache -t gcr.io/oss-fuzz/cpace-x25519 --file /Users/josh/code/github.com/the-sarge/oss-fuzz/projects/cpace-x25519/Dockerfile /Users/josh/code/github.com/the-sarge/oss-fuzz/projects/cpace-x25519.
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 775B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for gcr.io/oss-fuzz-base/base-builder-go:latest
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 30B done
+#4 DONE 0.0s
+
+#5 [1/4] FROM gcr.io/oss-fuzz-base/base-builder-go:latest@sha256:f697c2d5a30530287784b8100e9df59fcec69cfe516e0e5afa0537536601e762
+#5 resolve gcr.io/oss-fuzz-base/base-builder-go:latest@sha256:f697c2d5a30530287784b8100e9df59fcec69cfe516e0e5afa0537536601e762 0.0s done
+#5 CACHED
+
+#6 [2/4] RUN git clone --depth 1 https://github.com/the-sarge/cpace-x25519.git
+#6 0.228 Cloning into 'cpace-x25519'...
+#6 DONE 1.0s
+
+#7 [3/4] WORKDIR /src/cpace-x25519
+#7 DONE 0.0s
+
+#8 [4/4] COPY build.sh /src/
+#8 DONE 0.0s
+
+#9 exporting to image
+#9 exporting layers 0.1s done
+#9 exporting manifest sha256:478fa1ac88bae21cff92215f1500b0d0deeb6c0fc75e088cfd2add6d6ac2be18 done
+#9 exporting config sha256:155802b55c469304c6f01af048dfbd7dd294a6833377fa0e10a2ec7b84b2f6a4 done
+#9 exporting attestation manifest sha256:2824479913696316beed8d8b576e26ff08299bd8de683e317b81db1c2adf182b done
+#9 exporting manifest list sha256:dca189db26d8e02238475e5f0b6c7ae6ac7e66406e9529291f35023155321538 done
+#9 naming to gcr.io/oss-fuzz/cpace-x25519:latest done
+#9 DONE 0.2s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/sg6kgq1mytdi0km14zh1vt97k

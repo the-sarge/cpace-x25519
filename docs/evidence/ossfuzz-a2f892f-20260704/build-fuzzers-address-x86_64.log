@@ -1,0 +1,62 @@
+INFO:common_utils:Running: docker build -t gcr.io/oss-fuzz/cpace-x25519 --file /Users/josh/code/github.com/the-sarge/oss-fuzz/projects/cpace-x25519/Dockerfile /Users/josh/code/github.com/the-sarge/oss-fuzz/projects/cpace-x25519.
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 775B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for gcr.io/oss-fuzz-base/base-builder-go:latest
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 30B done
+#4 DONE 0.0s
+
+#5 [1/4] FROM gcr.io/oss-fuzz-base/base-builder-go:latest@sha256:f697c2d5a30530287784b8100e9df59fcec69cfe516e0e5afa0537536601e762
+#5 resolve gcr.io/oss-fuzz-base/base-builder-go:latest@sha256:f697c2d5a30530287784b8100e9df59fcec69cfe516e0e5afa0537536601e762 done
+#5 DONE 0.0s
+
+#6 [3/4] WORKDIR /src/cpace-x25519
+#6 CACHED
+
+#7 [2/4] RUN git clone --depth 1 https://github.com/the-sarge/cpace-x25519.git
+#7 CACHED
+
+#8 [4/4] COPY build.sh /src/
+#8 CACHED
+
+#9 exporting to image
+#9 exporting layers 0.0s done
+#9 exporting manifest sha256:478fa1ac88bae21cff92215f1500b0d0deeb6c0fc75e088cfd2add6d6ac2be18 done
+#9 exporting config sha256:155802b55c469304c6f01af048dfbd7dd294a6833377fa0e10a2ec7b84b2f6a4 done
+#9 exporting attestation manifest sha256:80c759a36fb080191e81b006abea487ab2296ec12e1de0c0eba4490e83799ab5 0.0s done
+#9 exporting manifest list sha256:013cb465d8a20906cfe2124fd1cc9d35acadb27ef225f716d52ed22d283f8f9a done
+#9 naming to gcr.io/oss-fuzz/cpace-x25519:latest done
+#9 DONE 0.2s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/e7d7fvrfb4c2ylnh3hq7f1z3n
+INFO:__main__:Cleaning existing build artifacts.
+INFO:__main__:Running: docker run --privileged --shm-size=2g --platform linux/amd64 --rm -v /Users/josh/code/github.com/the-sarge/oss-fuzz/build/out/cpace-x25519/:/out -t gcr.io/oss-fuzz/cpace-x25519 /bin/bash -c 'rm -rf /out/*'.
+INFO:__main__:Running: docker run --privileged --shm-size=2g --platform linux/amd64 --rm -v /Users/josh/code/github.com/the-sarge/oss-fuzz/build/work/cpace-x25519:/work -t gcr.io/oss-fuzz/cpace-x25519 /bin/bash -c 'rm -rf /work/*'.
+INFO:__main__:Running: docker run --privileged --shm-size=2g --platform linux/amd64 --rm -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e ARCHITECTURE=x86_64 -e PROJECT_NAME=cpace-x25519 -e HELPER=True -e FUZZING_LANGUAGE=go -v /Users/josh/code/github.com/the-sarge/cpace-x25519:/src/cpace-x25519 -v /Users/josh/code/github.com/the-sarge/oss-fuzz/build/out/cpace-x25519/:/out -v /Users/josh/code/github.com/the-sarge/oss-fuzz/build/work/cpace-x25519:/work gcr.io/oss-fuzz/cpace-x25519.
+---------------------------------------------------------------
+vm.mmap_rnd_bits = 28
+Compiling libFuzzer to /usr/lib/libFuzzingEngine.a...  done.
+---------------------------------------------------------------
+CC=clang
+CXX=clang++ -lresolv
+CFLAGS=-O1   -fno-omit-frame-pointer   -gline-tables-only   -Wno-error=incompatible-function-pointer-types   -Wno-error=int-conversion   -Wno-error=deprecated-declarations   -Wno-error=implicit-function-declaration   -Wno-error=implicit-int   -Wno-error=unknown-warning-option   -Wno-error=vla-cxx-extension   -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -fsanitize=address -fsanitize-address-use-after-scope -fsanitize=fuzzer-no-link
+CXXFLAGS=-O1   -fno-omit-frame-pointer   -gline-tables-only   -Wno-error=incompatible-function-pointer-types   -Wno-error=int-conversion   -Wno-error=deprecated-declarations   -Wno-error=implicit-function-declaration   -Wno-error=implicit-int   -Wno-error=unknown-warning-option   -Wno-error=vla-cxx-extension   -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION -fsanitize=address -fsanitize-address-use-after-scope -fsanitize=fuzzer-no-link -stdlib=libc++
+RUSTFLAGS=--cfg fuzzing -Zsanitizer=address -Cdebuginfo=1 -Cforce-frame-pointers
+---------------------------------------------------------------
++ exec /src/cpace-x25519/ossfuzz/build.sh
+go: downloading github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20250520111509-a70c2aa677fa
+go: downloading go1.26.4 (linux/amd64)
+go: downloading github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24
+go: added github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24
+go: added github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20250520111509-a70c2aa677fa
+go: downloading filippo.io/edwards25519 v1.2.0
