@@ -28,10 +28,15 @@ const (
 	rfc7748Iterated1000 = "684cf59ba83309552800ef566f2f4d3c1c3887c49360e3875f2eb94d99532c51"
 	rfc7748Iterated1M   = "7c3911e0ab2586fd864497297e575e6f3bc601c0883c30df5f4dd2d24f665424"
 
+	// Transcribed from testdata/draft21-x25519-low-order.json so this
+	// registered fuzz target file stays self-contained for OSS-Fuzz rewriting.
 	x25519DraftInvalidY2 = "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f"
 	x25519DraftInvalidY6 = "daffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 )
 
+// Keep this small hex helper in the registered fuzz target file rather than
+// reusing hx from vectors_test.go; OSS-Fuzz rewrites each target file
+// independently.
 type x25519Fatalf interface {
 	Fatalf(format string, args ...any)
 }

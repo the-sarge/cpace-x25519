@@ -192,6 +192,27 @@ func TestEmbeddedDraftInvalidVectorJSON(t *testing.T) {
 	}
 }
 
+func TestX25519DifferentialInvalidYConstantsMatchDraftFixture(t *testing.T) {
+	var raw map[string]string
+	if err := json.Unmarshal(draft21X25519LowOrderJSON, &raw); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		got  string
+		key  string
+	}{
+		{"invalid-y2", x25519DraftInvalidY2, "Invalid Y2"},
+		{"invalid-y6", x25519DraftInvalidY6, "Invalid Y6"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if !bytes.Equal(hx(t, tc.got), hx(t, raw[tc.key])) {
+				t.Fatalf("%s=%s want %s from draft low-order fixture", tc.name, tc.got, raw[tc.key])
+			}
+		})
+	}
+}
+
 func TestEmbeddedDraftConfirmationTagGoldens(t *testing.T) {
 	if got := pinnedJSONHash(draft21X25519ConfirmationTagJSON); got != draft21X25519TagsJSONSHA256 {
 		t.Fatalf("confirmation tag JSON SHA-256 got %s want %s", got, draft21X25519TagsJSONSHA256)

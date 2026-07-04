@@ -4,17 +4,22 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
+	"unicode"
 )
 
 type fuzzTargetRegistryEntry struct {
@@ -28,6 +33,14 @@ type ossFuzzBuildTarget struct {
 	Target string
 	Binary string
 	Line   string
+}
+
+type fuzzTargetSelfContainmentViolation struct {
+	TargetFile      string
+	AffectedTargets []string
+	Name            string
+	DeclFile        string
+	Detail          string
 }
 
 var fuzzTargetBinaryPattern = regexp.MustCompile(`^[a-z0-9_]+$`)
@@ -108,6 +121,567 @@ func TestFuzzTargetRegistryMatchesOSSFuzzBuild(t *testing.T) {
 	}
 }
 
+func TestFuzzTargetRegistrySelfContainedFiles(t *testing.T) {
+	entries := readFuzzTargetRegistry(t)
+	fset, files := parseRootPackageGoFiles(t)
+
+	// OSS-Fuzz rewrites each registered target file independently: production
+	// declarations and same-file test helpers are available, but helpers from
+	// other *_test.go files are not.
+	violations := findFuzzTargetSelfContainmentViolations(t, fset, files, entries)
+	if len(violations) == 0 {
+		return
+	}
+
+	var lines []string
+	for _, violation := range violations {
+		if violation.Detail != "" {
+			lines = append(lines, fmt.Sprintf("registered target file %s (targets: %s) is not self-contained: %s", violation.TargetFile, strings.Join(violation.AffectedTargets, ","), violation.Detail))
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("registered target file %s (targets: %s) depends on %s from %s", violation.TargetFile, strings.Join(violation.AffectedTargets, ","), violation.Name, violation.DeclFile))
+	}
+	t.Fatalf("registered fuzz target files must be self-contained for OSS-Fuzz native Go rewriting:\n%s", strings.Join(lines, "\n"))
+}
+
+func TestFuzzTargetSelfContainmentRejectsCrossFileTestHelpers(t *testing.T) {
+	fset := token.NewFileSet()
+	files := []*ast.File{
+		parseGoSource(t, fset, "target_test.go", `package p
+
+import "testing"
+
+func FuzzTarget(f *testing.F) {
+	helper()
+}
+`),
+		parseGoSource(t, fset, "helper_test.go", `package p
+
+func helper() {}
+`),
+	}
+	entries := []fuzzTargetRegistryEntry{{
+		Target:  "FuzzTarget",
+		Package: ".",
+		Binary:  "fuzz_target",
+	}}
+
+	violations := findFuzzTargetSelfContainmentViolations(t, fset, files, entries)
+	if len(violations) != 1 {
+		t.Fatalf("violations count=%d want 1: %#v", len(violations), violations)
+	}
+	if got := violations[0]; !reflect.DeepEqual(got.AffectedTargets, []string{"FuzzTarget"}) || got.TargetFile != "target_test.go" || got.Name != "helper" || got.DeclFile != "helper_test.go" {
+		t.Fatalf("violation=%#v", got)
+	}
+}
+
+func TestFuzzTargetSelfContainmentRejectsCrossFileTestMethods(t *testing.T) {
+	fset := token.NewFileSet()
+	files := []*ast.File{
+		parseGoSource(t, fset, "prod.go", `package p
+
+type productionReceiver struct{}
+`),
+		parseGoSource(t, fset, "target_test.go", `package p
+
+import "testing"
+
+func FuzzTarget(f *testing.F) {
+	var x productionReceiver
+	x.helper()
+}
+`),
+		parseGoSource(t, fset, "helper_test.go", `package p
+
+func (productionReceiver) helper() {}
+`),
+	}
+	entries := []fuzzTargetRegistryEntry{{
+		Target:  "FuzzTarget",
+		Package: ".",
+		Binary:  "fuzz_target",
+	}}
+
+	violations := findFuzzTargetSelfContainmentViolations(t, fset, files, entries)
+	if len(violations) != 1 {
+		t.Fatalf("violations count=%d want 1: %#v", len(violations), violations)
+	}
+	if got := violations[0]; !reflect.DeepEqual(got.AffectedTargets, []string{"FuzzTarget"}) || got.TargetFile != "target_test.go" || got.Name != "helper" || got.DeclFile != "helper_test.go" {
+		t.Fatalf("violation=%#v", got)
+	}
+}
+
+func TestFuzzTargetSelfContainmentRejectsCrossFileTestMethodsOnLocalReceivers(t *testing.T) {
+	fset := token.NewFileSet()
+	files := []*ast.File{
+		parseGoSource(t, fset, "target_test.go", `package p
+
+import "testing"
+
+type localReceiver struct{}
+
+func FuzzTarget(f *testing.F) {
+	var x localReceiver
+	x.crossFileHelper()
+}
+`),
+		parseGoSource(t, fset, "helper_test.go", `package p
+
+func (localReceiver) crossFileHelper() {}
+`),
+	}
+	entries := []fuzzTargetRegistryEntry{{
+		Target:  "FuzzTarget",
+		Package: ".",
+		Binary:  "fuzz_target",
+	}}
+
+	violations := findFuzzTargetSelfContainmentViolations(t, fset, files, entries)
+	if len(violations) != 1 {
+		t.Fatalf("violations count=%d want 1: %#v", len(violations), violations)
+	}
+	if got := violations[0]; !reflect.DeepEqual(got.AffectedTargets, []string{"FuzzTarget"}) || got.TargetFile != "target_test.go" || got.Name != "crossFileHelper" || got.DeclFile != "helper_test.go" {
+		t.Fatalf("violation=%#v", got)
+	}
+}
+
+func TestFuzzTargetSelfContainmentRejectsImplicitCrossFileTestMethods(t *testing.T) {
+	fset := token.NewFileSet()
+	files := []*ast.File{
+		parseGoSource(t, fset, "prod.go", `package p
+
+type Receiver struct{}
+`),
+		parseGoSource(t, fset, "target_test.go", `package p
+
+import "testing"
+
+type Sink interface {
+	M()
+}
+
+func FuzzTarget(f *testing.F) {
+	accept(Receiver{})
+}
+
+func accept(Sink) {}
+`),
+		parseGoSource(t, fset, "helper_test.go", `package p
+
+func (Receiver) M() {}
+`),
+	}
+	entries := []fuzzTargetRegistryEntry{{
+		Target:  "FuzzTarget",
+		Package: ".",
+		Binary:  "fuzz_target",
+	}}
+
+	violations := findFuzzTargetSelfContainmentViolations(t, fset, files, entries)
+	if len(violations) != 1 {
+		t.Fatalf("violations count=%d want 1: %#v", len(violations), violations)
+	}
+	if got := violations[0]; !reflect.DeepEqual(got.AffectedTargets, []string{"FuzzTarget"}) || got.TargetFile != "target_test.go" || got.Detail == "" {
+		t.Fatalf("violation=%#v", got)
+	}
+}
+
+func TestFuzzTargetSelfContainmentAllowsModuleImportResolutionNoise(t *testing.T) {
+	fset := token.NewFileSet()
+	files := []*ast.File{
+		parseGoSource(t, fset, "target_test.go", `package p
+
+import (
+	_ "filippo.io/edwards25519/field"
+	"testing"
+)
+
+func FuzzTarget(f *testing.F) {}
+`),
+	}
+	entries := []fuzzTargetRegistryEntry{{
+		Target:  "FuzzTarget",
+		Package: ".",
+		Binary:  "fuzz_target",
+	}}
+
+	if violations := findFuzzTargetSelfContainmentViolations(t, fset, files, entries); len(violations) != 0 {
+		t.Fatalf("violations count=%d want 0: %#v", len(violations), violations)
+	}
+}
+
+func TestFuzzTargetSelfContainmentRecognizesAliasedTestingImport(t *testing.T) {
+	fset := token.NewFileSet()
+	files := []*ast.File{
+		parseGoSource(t, fset, "target_test.go", `package p
+
+import t "testing"
+
+func FuzzTarget(f *t.F) {
+	helper()
+}
+`),
+		parseGoSource(t, fset, "helper_test.go", `package p
+
+func helper() {}
+`),
+	}
+	entries := []fuzzTargetRegistryEntry{{
+		Target:  "FuzzTarget",
+		Package: ".",
+		Binary:  "fuzz_target",
+	}}
+
+	definedTargets := discoverDefinedFuzzTargetsInFiles(files)
+	if _, ok := definedTargets["FuzzTarget"]; !ok {
+		t.Fatalf("aliased testing import target was not discovered: %v", sortedKeys(definedTargets))
+	}
+	violations := findFuzzTargetSelfContainmentViolations(t, fset, files, entries)
+	if len(violations) != 1 {
+		t.Fatalf("violations count=%d want 1: %#v", len(violations), violations)
+	}
+	if got := violations[0]; !reflect.DeepEqual(got.AffectedTargets, []string{"FuzzTarget"}) || got.TargetFile != "target_test.go" || got.Name != "helper" || got.DeclFile != "helper_test.go" {
+		t.Fatalf("violation=%#v", got)
+	}
+}
+
+func TestFuzzTargetSelfContainmentRejectsCrossFileTestConst(t *testing.T) {
+	fset := token.NewFileSet()
+	files := []*ast.File{
+		parseGoSource(t, fset, "target_test.go", `package p
+
+import "testing"
+
+func FuzzTarget(f *testing.F) {
+	_ = crossFileConst
+}
+`),
+		parseGoSource(t, fset, "helper_test.go", `package p
+
+const crossFileConst = 1
+`),
+	}
+	entries := []fuzzTargetRegistryEntry{{
+		Target:  "FuzzTarget",
+		Package: ".",
+		Binary:  "fuzz_target",
+	}}
+
+	violations := findFuzzTargetSelfContainmentViolations(t, fset, files, entries)
+	if len(violations) != 1 {
+		t.Fatalf("violations count=%d want 1: %#v", len(violations), violations)
+	}
+	if got := violations[0]; !reflect.DeepEqual(got.AffectedTargets, []string{"FuzzTarget"}) || got.TargetFile != "target_test.go" || got.Name != "crossFileConst" || got.DeclFile != "helper_test.go" {
+		t.Fatalf("violation=%#v", got)
+	}
+}
+
+func TestFuzzTargetSelfContainmentAllowsSameFileTestHelpers(t *testing.T) {
+	fset := token.NewFileSet()
+	files := []*ast.File{
+		parseGoSource(t, fset, "target_test.go", `package p
+
+import "testing"
+
+func FuzzTarget(f *testing.F) {
+	helper()
+}
+
+func helper() {}
+`),
+	}
+	entries := []fuzzTargetRegistryEntry{{
+		Target:  "FuzzTarget",
+		Package: ".",
+		Binary:  "fuzz_target",
+	}}
+
+	if violations := findFuzzTargetSelfContainmentViolations(t, fset, files, entries); len(violations) != 0 {
+		t.Fatalf("violations count=%d want 0: %#v", len(violations), violations)
+	}
+}
+
+func TestFuzzTargetSelfContainmentAllowsProductionHelpers(t *testing.T) {
+	fset := token.NewFileSet()
+	files := []*ast.File{
+		parseGoSource(t, fset, "prod.go", `package p
+
+func helper() {}
+`),
+		parseGoSource(t, fset, "target_test.go", `package p
+
+import "testing"
+
+func FuzzTarget(f *testing.F) {
+	helper()
+}
+`),
+	}
+	entries := []fuzzTargetRegistryEntry{{
+		Target:  "FuzzTarget",
+		Package: ".",
+		Binary:  "fuzz_target",
+	}}
+
+	if violations := findFuzzTargetSelfContainmentViolations(t, fset, files, entries); len(violations) != 0 {
+		t.Fatalf("violations count=%d want 0: %#v", len(violations), violations)
+	}
+}
+
+func TestFuzzTargetSelfContainmentReportsAllTargetsInFile(t *testing.T) {
+	fset := token.NewFileSet()
+	files := []*ast.File{
+		parseGoSource(t, fset, "target_test.go", `package p
+
+import "testing"
+
+func FuzzOne(f *testing.F) {
+	helper()
+}
+
+func FuzzTwo(f *testing.F) {}
+`),
+		parseGoSource(t, fset, "helper_test.go", `package p
+
+func helper() {}
+`),
+	}
+	entries := []fuzzTargetRegistryEntry{
+		{Target: "FuzzTwo", Package: ".", Binary: "fuzz_two"},
+		{Target: "FuzzOne", Package: ".", Binary: "fuzz_one"},
+	}
+
+	violations := findFuzzTargetSelfContainmentViolations(t, fset, files, entries)
+	if len(violations) != 1 {
+		t.Fatalf("violations count=%d want 1: %#v", len(violations), violations)
+	}
+	if got := violations[0]; !reflect.DeepEqual(got.AffectedTargets, []string{"FuzzOne", "FuzzTwo"}) || got.TargetFile != "target_test.go" || got.Name != "helper" || got.DeclFile != "helper_test.go" {
+		t.Fatalf("violation=%#v", got)
+	}
+}
+
+func findFuzzTargetSelfContainmentViolations(tb testing.TB, fset *token.FileSet, files []*ast.File, entries []fuzzTargetRegistryEntry) []fuzzTargetSelfContainmentViolation {
+	tb.Helper()
+
+	registeredTargets := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		if entry.Package == "." {
+			registeredTargets[entry.Target] = struct{}{}
+		}
+	}
+
+	targetsByFile := make(map[string]map[string]struct{})
+	for _, file := range files {
+		filename := fset.Position(file.Pos()).Filename
+		testingNames := testingImportNames(file)
+		for _, decl := range file.Decls {
+			fn, ok := decl.(*ast.FuncDecl)
+			if !ok {
+				continue
+			}
+			if _, ok := registeredTargets[fn.Name.Name]; !ok || !hasTestingFSignature(fn, testingNames) {
+				continue
+			}
+			if targetsByFile[filename] == nil {
+				targetsByFile[filename] = make(map[string]struct{})
+			}
+			targetsByFile[filename][fn.Name.Name] = struct{}{}
+		}
+	}
+
+	info := &types.Info{
+		Uses:       make(map[*ast.Ident]types.Object),
+		Selections: make(map[*ast.SelectorExpr]*types.Selection),
+	}
+	// The standard importer does not resolve module-only dependencies here; go
+	// test remains the compiler gate. This guard only needs same-package object
+	// resolution to find dependencies on declarations from other *_test.go files.
+	conf := types.Config{
+		Importer: importer.Default(),
+		Error:    func(error) {},
+	}
+	pkg, _ := conf.Check(files[0].Name.Name, fset, files, info)
+	if pkg == nil {
+		tb.Fatal("type-check fuzz target package did not return a package")
+	}
+
+	seen := make(map[string]struct{})
+	var violations []fuzzTargetSelfContainmentViolation
+	affectedTargets := func(targetFile string) []string {
+		return sortedKeys(targetsByFile[targetFile])
+	}
+	addViolation := func(targetFile string, obj types.Object) {
+		if obj == nil || !obj.Pos().IsValid() {
+			return
+		}
+		if obj.Pkg() != pkg {
+			return
+		}
+		declFile := fset.Position(obj.Pos()).Filename
+		if declFile == "" || declFile == targetFile || !strings.HasSuffix(declFile, "_test.go") {
+			return
+		}
+		targets := affectedTargets(targetFile)
+		key := strings.Join(targets, ",") + "\x00" + targetFile + "\x00" + obj.Name() + "\x00" + declFile
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		violations = append(violations, fuzzTargetSelfContainmentViolation{
+			TargetFile:      targetFile,
+			AffectedTargets: targets,
+			Name:            obj.Name(),
+			DeclFile:        declFile,
+		})
+	}
+	addTypeCheckViolation := func(targetFile, detail string) {
+		for _, violation := range violations {
+			if violation.TargetFile == targetFile && violation.Name != "" && detailMentionsObjectName(detail, violation.Name) {
+				return
+			}
+		}
+		targets := affectedTargets(targetFile)
+		key := strings.Join(targets, ",") + "\x00" + targetFile + "\x00" + detail
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		violations = append(violations, fuzzTargetSelfContainmentViolation{
+			TargetFile:      targetFile,
+			AffectedTargets: targets,
+			Detail:          detail,
+		})
+	}
+
+	for ident, obj := range info.Uses {
+		useFile := fset.Position(ident.Pos()).Filename
+		if _, ok := targetsByFile[useFile]; !ok {
+			continue
+		}
+		addViolation(useFile, obj)
+	}
+	for selector, selection := range info.Selections {
+		useFile := fset.Position(selector.Sel.Pos()).Filename
+		if _, ok := targetsByFile[useFile]; !ok {
+			continue
+		}
+		addViolation(useFile, selection.Obj())
+	}
+	for targetFile := range targetsByFile {
+		for _, err := range selfContainedTargetTypeErrors(fset, files, targetFile) {
+			addTypeCheckViolation(targetFile, err)
+		}
+	}
+
+	sort.Slice(violations, func(i, j int) bool {
+		a, b := violations[i], violations[j]
+		if a.TargetFile != b.TargetFile {
+			return a.TargetFile < b.TargetFile
+		}
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		if a.DeclFile != b.DeclFile {
+			return a.DeclFile < b.DeclFile
+		}
+		return strings.Join(a.AffectedTargets, ",") < strings.Join(b.AffectedTargets, ",")
+	})
+	return violations
+}
+
+func selfContainedTargetTypeErrors(fset *token.FileSet, files []*ast.File, targetFile string) []string {
+	var isolated []*ast.File
+	for _, file := range files {
+		filename := fset.Position(file.Pos()).Filename
+		if filename == targetFile || !strings.HasSuffix(filename, "_test.go") {
+			isolated = append(isolated, file)
+		}
+	}
+
+	var details []string
+	conf := types.Config{
+		Importer: importer.Default(),
+		Error: func(err error) {
+			var typeErr types.Error
+			if !errors.As(err, &typeErr) {
+				return
+			}
+			if fset.Position(typeErr.Pos).Filename == targetFile {
+				if isImportResolutionNoise(fset, files, targetFile, typeErr) {
+					return
+				}
+				details = append(details, typeErr.Msg)
+			}
+		},
+	}
+	_, _ = conf.Check(files[0].Name.Name, fset, isolated, nil)
+	sort.Strings(details)
+	return details
+}
+
+func isImportResolutionNoise(fset *token.FileSet, files []*ast.File, targetFile string, typeErr types.Error) bool {
+	if strings.HasPrefix(typeErr.Msg, "could not import") || strings.Contains(typeErr.Msg, "cannot find package") {
+		return true
+	}
+	for _, file := range files {
+		if fset.Position(file.Pos()).Filename != targetFile {
+			continue
+		}
+		for _, spec := range file.Imports {
+			if spec.Pos() <= typeErr.Pos && typeErr.Pos <= spec.End() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func detailMentionsObjectName(detail, name string) bool {
+	for _, token := range strings.FieldsFunc(detail, func(r rune) bool {
+		return r != '_' && !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	}) {
+		if token == name {
+			return true
+		}
+	}
+	return false
+}
+
+func parseRootPackageGoFiles(tb testing.TB) (*token.FileSet, []*ast.File) {
+	tb.Helper()
+
+	names, err := filepath.Glob("*.go")
+	if err != nil {
+		tb.Fatalf("list *.go files: %v", err)
+	}
+
+	fset := token.NewFileSet()
+	var files []*ast.File
+	for _, name := range names {
+		parsed, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			tb.Fatalf("parse %s: %v", name, err)
+		}
+		if parsed.Name.Name != "cpace" {
+			continue
+		}
+		files = append(files, parsed)
+	}
+	if len(files) == 0 {
+		tb.Fatal("no root package Go files found")
+	}
+	return fset, files
+}
+
+func parseGoSource(tb testing.TB, fset *token.FileSet, name, source string) *ast.File {
+	tb.Helper()
+	parsed, err := parser.ParseFile(fset, name, source, 0)
+	if err != nil {
+		tb.Fatalf("parse %s: %v", name, err)
+	}
+	return parsed
+}
+
 func readFuzzTargetRegistry(tb testing.TB) []fuzzTargetRegistryEntry {
 	tb.Helper()
 
@@ -137,28 +711,37 @@ func discoverDefinedFuzzTargets(tb testing.TB) map[string]struct{} {
 		tb.Fatalf("list *_test.go files: %v", err)
 	}
 
-	targets := make(map[string]struct{})
 	fset := token.NewFileSet()
+	var parsedFiles []*ast.File
 	for _, name := range files {
 		parsed, err := parser.ParseFile(fset, name, nil, 0)
 		if err != nil {
 			tb.Fatalf("parse %s: %v", name, err)
 		}
-		for _, decl := range parsed.Decls {
+		parsedFiles = append(parsedFiles, parsed)
+	}
+
+	return discoverDefinedFuzzTargetsInFiles(parsedFiles)
+}
+
+func discoverDefinedFuzzTargetsInFiles(files []*ast.File) map[string]struct{} {
+	targets := make(map[string]struct{})
+	for _, file := range files {
+		testingNames := testingImportNames(file)
+		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok || !strings.HasPrefix(fn.Name.Name, "Fuzz") {
 				continue
 			}
-			if hasTestingFSignature(fn) {
+			if hasTestingFSignature(fn, testingNames) {
 				targets[fn.Name.Name] = struct{}{}
 			}
 		}
 	}
-
 	return targets
 }
 
-func hasTestingFSignature(fn *ast.FuncDecl) bool {
+func hasTestingFSignature(fn *ast.FuncDecl, testingNames map[string]struct{}) bool {
 	if fn.Type.Params == nil || len(fn.Type.Params.List) != 1 {
 		return false
 	}
@@ -178,7 +761,30 @@ func hasTestingFSignature(fn *ast.FuncDecl) bool {
 		return false
 	}
 	pkg, ok := selector.X.(*ast.Ident)
-	return ok && pkg.Name == "testing" && selector.Sel.Name == "F"
+	if !ok || selector.Sel.Name != "F" {
+		return false
+	}
+	_, ok = testingNames[pkg.Name]
+	return ok
+}
+
+func testingImportNames(file *ast.File) map[string]struct{} {
+	names := make(map[string]struct{})
+	for _, spec := range file.Imports {
+		path, err := strconv.Unquote(spec.Path.Value)
+		if err != nil || path != "testing" {
+			continue
+		}
+		name := "testing"
+		if spec.Name != nil {
+			name = spec.Name.Name
+		}
+		if name == "_" || name == "." {
+			continue
+		}
+		names[name] = struct{}{}
+	}
+	return names
 }
 
 func readOSSFuzzBuildTargets(tb testing.TB) []ossFuzzBuildTarget {
