@@ -2796,3 +2796,32 @@ Merged PR #17, `test: simplify RFC 7748 checkpoint tracking`, as squash commit `
 **Next**
 
 - No PR-specific follow-up issues remain from issue #15. Keep release-evidence claims unchanged until a separate exact-candidate evidence refresh updates the pinned dependency-review, fuzz, and security-audit evidence.
+
+---
+
+## Sage vector dataset landed - 2026-07-03 21:52 EDT
+
+**Main:** `9e824e849d12`
+**Actor:** Codex
+
+**Summary**
+
+Landed PR #19 for issue #9, adding the SageMath-derived extended X25519 vector dataset and its reproducible pinned generator. The merged change adds `testdata/generate_sage_x25519_vectors.sage`, hash-pinned `testdata/sage-x25519-extended.json`, and `sage_vectors_test.go` coverage for generator derivation, scalar multiplication over random/twist/low-order/non-canonical inputs, and full package-profile exchange messages, ISK, tags, and transcript IDs. Reviewer-facing docs, the spec matrix, the security assessment release bar, project plan, and changelog were updated without changing public API, wire format, package profile, or dependencies.
+
+**Completed**
+
+- PR #19 merged to `main` as merge commit `9e824e849d126088d3299d0f2e32cac6a88f6400` with signed head commit `d6d59a4fc9057ae3df126ca22eef8387cca2ca71`.
+- RAS one-shot review run `20260704T013042-afaf98fee4e28a31d4acb175` completed without blocking findings; the only Fix First items were low/nit follow-ups.
+- Follow-up GitHub issues were created from the RAS synthesis: #20 for documenting or gating Sage fixture regeneration drift, and #21 for removing mutable `:latest` provenance metadata.
+- The follow-up issues were mirrored into OmniFocus project `cpace-x25519` as tasks `kl-xqrMBIcX` (#20) and `onx47Rb6bBR` (#21).
+
+**Validation**
+
+- Local validation before merge: `go test ./...` passed on the rebased signed PR branch.
+- GitHub checks for PR #19 passed after the DCO signoff amend: Check, DCO, Dependency Gate, CodeQL/Analyze, SAST Gate/gosec, Staticcheck, GolangCI-Lint advisory, and macOS/Windows smoke.
+- RAS reviewer quorum was met by agy, claude, codex, and grok; cursor failed due usage limits and was reported as non-quorum-blocking.
+
+**Next**
+
+- Address follow-up issues #20 and #21 separately; these are not merge blockers for the Sage-vector dataset.
+- Exact-candidate dependency, fuzz, and security/spec evidence still needs refresh before any stronger release-readiness claim.
