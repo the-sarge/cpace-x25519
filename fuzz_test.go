@@ -28,6 +28,10 @@ type draftInvalidVector struct {
 	LowOrder  map[string][]byte
 }
 
+// The exchange fixture and fuzz helpers live in this registered fuzz target
+// file so OSS-Fuzz native Go rewriting can compile each target independently.
+// exchange_fixture_test.go is limited to snapshot-only hygiene helpers.
+
 type testFatalf interface {
 	Fatalf(format string, args ...any)
 }
