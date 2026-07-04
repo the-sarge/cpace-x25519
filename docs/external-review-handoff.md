@@ -48,6 +48,7 @@ cryptographic review before any production-ready claim.
 - `docs/ci-policy.md` for hosted-runner policy, advisory lanes, long-fuzz
   evidence, and signed release tags.
 - `docs/release-checklist.md` for exact-candidate release evidence steps.
+- `testdata/generate_sage_x25519_vectors.sage` and `testdata/sage-x25519-extended.json` for the reproducible SageMath-derived extended X25519 oracle fixture.
 
 ## Implemented Scope
 
@@ -87,6 +88,8 @@ The current inherited package-code evidence baseline and freshness caveats are i
 Capslock capability-analysis evidence is recorded in `docs/capslock-report.md`; its pinned baseline and freshness caveat are indexed in `docs/evidence-baseline.md`.
 
 OSS-Fuzz onboarding needs a fresh cpace-x25519 submission. The inherited `google/oss-fuzz#15480` context was for the original `cpace` project and does not establish fork readiness.
+
+The SageMath-derived extended vector fixture under `testdata/sage-x25519-extended.json` adds a code-lineage-independent oracle for generator derivation, random/twist/low-order/non-canonical X25519 scalar multiplication, and full package-profile exchange ISK/tag/message outputs. It is reproducible with the pinned Docker/Sage command recorded in the fixture metadata and generator script. This strengthens test coverage and reviewer inspection material, but it is not a substitute for independent cryptographic review or exact-candidate dependency/fuzz/security evidence refresh.
 
 ## Review Questions
 
