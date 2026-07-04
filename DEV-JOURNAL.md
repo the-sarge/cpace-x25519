@@ -2825,3 +2825,35 @@ Landed PR #19 for issue #9, adding the SageMath-derived extended X25519 vector d
 
 - Address follow-up issues #20 and #21 separately; these are not merge blockers for the Sage-vector dataset.
 - Exact-candidate dependency, fuzz, and security/spec evidence still needs refresh before any stronger release-readiness claim.
+
+---
+
+## OSS-Fuzz target self-containment - 2026-07-03 22:39 EDT
+
+**Main:** `c476a63233fa`
+**Actor:** Codex
+
+**Summary**
+
+Merged PR #23, which made the registered OSS-Fuzz target files self-contained for native Go OSS-Fuzz compilation. The validation failure came from OSS-Fuzz rewriting target files independently, while normal `go test ./...` compiled all `*_test.go` helpers together.
+
+**Completed**
+
+- Moved exchange and message-seed helpers used by registered fuzz targets into `fuzz_test.go`.
+- Made `x25519_differential_test.go` own its local hex helper and seed constants so `FuzzX25519DifferentialECDH` no longer depends on helpers from other test files.
+- Preserved the public API, protocol behavior, package-profile policy, and production code.
+- Filed follow-up issue #24 for the low/nit RAS findings about adding a lightweight self-containment guard and documenting deliberate helper duplication.
+
+**Validation**
+
+- `go test ./...`
+- `task check:changed`
+- `task check`
+- `DOCKER_DEFAULT_PLATFORM=linux/amd64 python3 infra/helper.py build_image --architecture x86_64 --no-pull cpace-x25519`
+- `DOCKER_DEFAULT_PLATFORM=linux/amd64 python3 infra/helper.py build_fuzzers --architecture x86_64 --sanitizer address --clean cpace-x25519 /Users/josh/code/github.com/the-sarge/cpace-x25519`
+- `DOCKER_DEFAULT_PLATFORM=linux/amd64 python3 infra/helper.py check_build --architecture x86_64 --sanitizer address cpace-x25519`
+- RAS review `20260704T022536-3521d699df3e8238b8ede0f4` surfaced no blocking findings; low/nit-only findings were filed as issue #24 under the approved loop policy.
+
+**Next**
+
+Continue issue #7 by rerunning OSS-Fuzz validation against merged `main`, opening the fresh `google/oss-fuzz` `projects/cpace-x25519` submission, and recording the evidence bundle/docs.
