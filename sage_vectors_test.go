@@ -15,13 +15,16 @@ import (
 //go:embed testdata/sage-x25519-extended.json
 var sageX25519ExtendedJSON []byte
 
-const sageX25519ExtendedJSONSHA256 = "5af9e53a690bee3855c7f94af399b1381c3e0bdd6150cda99c2759f198564999"
+const sageX25519ExtendedJSONSHA256 = "72e2602dd8d7b5a5f46e07c1d86c637bf3cd672ac9a434cab41a40eb693487f2"
 
 type sageExtendedFixture struct {
 	Meta struct {
-		Schema          int    `json:"schema"`
-		SageVersion     string `json:"sage_version"`
-		ContainerDigest string `json:"container_digest"`
+		Schema            int      `json:"schema"`
+		SageVersion       string   `json:"sage_version"`
+		ContainerImage    string   `json:"container_image"`
+		ContainerDigest   string   `json:"container_digest"`
+		GenerationCommand string   `json:"generation_command"`
+		Notes             []string `json:"notes"`
 	} `json:"meta"`
 	GeneratorCases  []sageGeneratorCase  `json:"generator_cases"`
 	ScalarMultCases []sageScalarMultCase `json:"scalar_mult_cases"`
@@ -101,12 +104,36 @@ func TestEmbeddedSageExtendedVectorJSON(t *testing.T) {
 	if fixture.Meta.SageVersion != "10.9" {
 		t.Fatalf("Sage version=%q want 10.9", fixture.Meta.SageVersion)
 	}
+	// Keep this expectation in sync with CONTAINER_DIGEST in
+	// testdata/generate_sage_x25519_vectors.sage; re-pin by regenerating the
+	// JSON fixture, then updating the pinned JSON hash above.
 	if fixture.Meta.ContainerDigest != "sagemath/sagemath@sha256:e068670ae5863b54b2550e72437ec637b0283acb0dc712c8584c124dbf44e667" {
 		t.Fatalf("unexpected container digest %q", fixture.Meta.ContainerDigest)
+	}
+	if strings.Contains(fixture.Meta.ContainerImage, ":latest") {
+		t.Fatalf("container image records mutable tag %q", fixture.Meta.ContainerImage)
+	}
+	if fixture.Meta.ContainerImage != fixture.Meta.ContainerDigest {
+		t.Fatalf("container image=%q want digest-qualified reference %q", fixture.Meta.ContainerImage, fixture.Meta.ContainerDigest)
+	}
+	if !strings.Contains(fixture.Meta.GenerationCommand, fixture.Meta.ContainerDigest) {
+		t.Fatalf("generation command %q does not contain pinned container digest %q", fixture.Meta.GenerationCommand, fixture.Meta.ContainerDigest)
+	}
+	if !sageFixtureNotesMentionManualDriftCheck(fixture.Meta.Notes) {
+		t.Fatal("fixture metadata does not document the pinned manual drift check")
 	}
 	if len(fixture.GeneratorCases) != 2 || len(fixture.ScalarMultCases) != 11 || len(fixture.ExchangeCases) != 2 {
 		t.Fatalf("case counts generator=%d scalar=%d exchange=%d", len(fixture.GeneratorCases), len(fixture.ScalarMultCases), len(fixture.ExchangeCases))
 	}
+}
+
+func sageFixtureNotesMentionManualDriftCheck(notes []string) bool {
+	for _, note := range notes {
+		if strings.Contains(note, "Manual drift check") {
+			return true
+		}
+	}
+	return false
 }
 
 func TestSageGeneratorVectors(t *testing.T) {

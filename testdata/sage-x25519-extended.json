@@ -90,12 +90,13 @@
   ],
   "meta": {
     "container_digest": "sagemath/sagemath@sha256:e068670ae5863b54b2550e72437ec637b0283acb0dc712c8584c124dbf44e667",
-    "container_image": "sagemath/sagemath:latest",
+    "container_image": "sagemath/sagemath@sha256:e068670ae5863b54b2550e72437ec637b0283acb0dc712c8584c124dbf44e667",
     "generation_command": "docker run --rm --platform linux/amd64 -v \"$PWD:/work\" -w /work sagemath/sagemath@sha256:e068670ae5863b54b2550e72437ec637b0283acb0dc712c8584c124dbf44e667 \"sage testdata/generate_sage_x25519_vectors.sage\" > testdata/sage-x25519-extended.json && rm -f testdata/generate_sage_x25519_vectors.sage.py",
     "generation_script": "testdata/generate_sage_x25519_vectors.sage",
     "name": "cpace-x25519 SageMath extended vector dataset",
     "notes": [
       "The Sage script implements field arithmetic over GF(2^255-19), Elligator2 generator derivation, X25519 scalar multiplication, CPace transcript/ISK/tag derivation, and package message framing without importing Go code.",
+      "Manual drift check: rerun the pinned generation_command, then run git diff --exit-code -- testdata/sage-x25519-extended.json; Docker/Sage is not required in normal PR CI.",
       "Scalar and point values labelled random are deterministic SHA-512 expansions so the generator is reproducible offline.",
       "Point decoding follows RFC 7748 by ignoring the top bit and accepting non-canonical encodings modulo 2^255-19."
     ],

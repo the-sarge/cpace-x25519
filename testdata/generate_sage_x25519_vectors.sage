@@ -6,6 +6,10 @@ import json
 import sage.env
 from sage.all import GF
 
+# Maintainers: fixture provenance, including the pinned Docker/Sage command and
+# manual drift check, is emitted in document["meta"] below. Regeneration is
+# intentionally manual; Docker/Sage is not required in normal PR CI.
+
 P = 2^255 - 19
 F = GF(P)
 MASK_255 = (1 << 255) - 1
@@ -30,12 +34,15 @@ ROLE_A = 0x01
 ROLE_B = 0x02
 ROLE_C = 0x03
 
-CONTAINER_IMAGE = "sagemath/sagemath:latest"
+# Re-pinning this container requires regenerating sage-x25519-extended.json and
+# updating sageX25519ExtendedJSONSHA256 plus the digest expectation in
+# sage_vectors_test.go.
 CONTAINER_DIGEST = "sagemath/sagemath@sha256:e068670ae5863b54b2550e72437ec637b0283acb0dc712c8584c124dbf44e667"
+CONTAINER_IMAGE = CONTAINER_DIGEST
 GENERATION_COMMAND = (
     "docker run --rm --platform linux/amd64 "
     "-v \"$PWD:/work\" -w /work "
-    "sagemath/sagemath@sha256:e068670ae5863b54b2550e72437ec637b0283acb0dc712c8584c124dbf44e667 "
+    f"{CONTAINER_DIGEST} "
     "\"sage testdata/generate_sage_x25519_vectors.sage\" "
     "> testdata/sage-x25519-extended.json && "
     "rm -f testdata/generate_sage_x25519_vectors.sage.py"
@@ -414,6 +421,7 @@ document = {
         "generation_command": GENERATION_COMMAND,
         "notes": [
             "The Sage script implements field arithmetic over GF(2^255-19), Elligator2 generator derivation, X25519 scalar multiplication, CPace transcript/ISK/tag derivation, and package message framing without importing Go code.",
+            "Manual drift check: rerun the pinned generation_command, then run git diff --exit-code -- testdata/sage-x25519-extended.json; Docker/Sage is not required in normal PR CI.",
             "Scalar and point values labelled random are deterministic SHA-512 expansions so the generator is reproducible offline.",
             "Point decoding follows RFC 7748 by ignoring the top bit and accepting non-canonical encodings modulo 2^255-19.",
         ],
