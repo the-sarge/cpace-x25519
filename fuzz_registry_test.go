@@ -126,6 +126,8 @@ func TestFuzzTargetRegistrySelfContainedFiles(t *testing.T) {
 	entries := readFuzzTargetRegistry(t)
 	fset, files := parseRootPackageGoFiles(t)
 
+	// Keep this under plain go test: each registered fuzz target file must stay
+	// self-contained for OSS-Fuzz native Go rewriting.
 	// OSS-Fuzz rewrites each registered target file independently: production
 	// declarations and same-file test helpers are available, but helpers from
 	// other *_test.go files are not.
@@ -494,18 +496,16 @@ func helper() {}
 }
 
 func TestFuzzTargetRegistryDiscoveryUsesPackageDirectory(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("get cwd: %v", err)
+	modulePath := packageFilePath(t, "go.mod")
+	if !filepath.IsAbs(modulePath) {
+		t.Fatalf("packageFilePath returned %q, want absolute path", modulePath)
 	}
-	if err := os.Chdir(t.TempDir()); err != nil {
-		t.Fatalf("chdir away from package: %v", err)
+	if _, err := os.Stat(modulePath); err != nil {
+		t.Fatalf("stat package file %s: %v", modulePath, err)
 	}
-	t.Cleanup(func() {
-		if err := os.Chdir(cwd); err != nil {
-			t.Fatalf("restore cwd: %v", err)
-		}
-	})
+	if files := packageSourceFiles(t, "*_test.go"); len(files) == 0 || !filepath.IsAbs(files[0]) {
+		t.Fatalf("packageSourceFiles returned %v, want absolute test files", files)
+	}
 
 	fset, files := parseRootPackageGoFiles(t)
 	if len(files) == 0 {
@@ -525,6 +525,32 @@ func TestFuzzTargetRegistryDiscoveryUsesPackageDirectory(t *testing.T) {
 	}
 	if module := readModulePath(t); module == "" {
 		t.Fatal("readModulePath returned empty module")
+	}
+}
+
+func TestFuzzTargetRegistryDiscoveryIgnoresExternalPackageTargets(t *testing.T) {
+	fset := token.NewFileSet()
+	files := []*ast.File{
+		parseGoSource(t, fset, "internal_test.go", `package cpace
+
+import "testing"
+
+func FuzzInternal(f *testing.F) {}
+`),
+		parseGoSource(t, fset, "external_test.go", `package cpace_test
+
+import "testing"
+
+func FuzzExternal(f *testing.F) {}
+`),
+	}
+
+	targets := discoverDefinedFuzzTargetsInFiles(filesInPackage(files, "cpace"))
+	if _, ok := targets["FuzzInternal"]; !ok {
+		t.Fatalf("internal package fuzz target was not discovered: %v", sortedKeys(targets))
+	}
+	if _, ok := targets["FuzzExternal"]; ok {
+		t.Fatalf("external package fuzz target was discovered: %v", sortedKeys(targets))
 	}
 }
 
@@ -704,6 +730,26 @@ func isImportResolutionNoise(fset *token.FileSet, files []*ast.File, targetFile 
 	return false
 }
 
+func TestDetailMentionsObjectNameUsesIdentifierBoundaries(t *testing.T) {
+	tests := []struct {
+		detail string
+		name   string
+		want   bool
+	}{
+		{detail: "undefined: helper", name: "helper", want: true},
+		{detail: `undefined: "helper"`, name: "helper", want: true},
+		{detail: "cannot use helper() as Sink", name: "helper", want: true},
+		{detail: "undefined: helperExtra", name: "helper", want: false},
+		{detail: "undefined: helper_extra", name: "helper", want: false},
+	}
+
+	for _, tt := range tests {
+		if got := detailMentionsObjectName(tt.detail, tt.name); got != tt.want {
+			t.Fatalf("detailMentionsObjectName(%q, %q) = %v, want %v", tt.detail, tt.name, got, tt.want)
+		}
+	}
+}
+
 func detailMentionsObjectName(detail, name string) bool {
 	for _, token := range strings.FieldsFunc(detail, func(r rune) bool {
 		return r != '_' && !unicode.IsLetter(r) && !unicode.IsDigit(r)
@@ -830,7 +876,17 @@ func discoverDefinedFuzzTargets(tb testing.TB) map[string]struct{} {
 		parsedFiles = append(parsedFiles, parsed)
 	}
 
-	return discoverDefinedFuzzTargetsInFiles(parsedFiles)
+	return discoverDefinedFuzzTargetsInFiles(filesInPackage(parsedFiles, "cpace"))
+}
+
+func filesInPackage(files []*ast.File, name string) []*ast.File {
+	filtered := make([]*ast.File, 0, len(files))
+	for _, file := range files {
+		if file.Name.Name == name {
+			filtered = append(filtered, file)
+		}
+	}
+	return filtered
 }
 
 func discoverDefinedFuzzTargetsInFiles(files []*ast.File) map[string]struct{} {
