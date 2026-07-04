@@ -1,0 +1,17 @@
+INFO:__main__:Running: docker run --privileged --shm-size=2g --platform linux/amd64 --rm -e FUZZING_ENGINE=libfuzzer -e SANITIZER=address -e ARCHITECTURE=x86_64 -e FUZZING_LANGUAGE=go -e HELPER=True -v /Users/josh/code/github.com/the-sarge/oss-fuzz/build/out/cpace-x25519:/out -t gcr.io/oss-fuzz-base/base-runner:latest test_all.py.
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_message_a_round_trip
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_decode_message_a
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_protocol_consistency
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_draft_invalid_vector_json_loader
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_decode_message_c
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_draft_vector_json_loader
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_x25519_differential_ecdh
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_responder_finish_with_fuzzed_message_c
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_scalar_mult_vfy
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_decode_message_b
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_respond_with_fuzzed_message_a
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_message_c_round_trip
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_message_b_round_trip
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_protocol_mismatch
+INFO: performing bad build checks for /tmp/not-out/tmpqdcz8sxh/fuzz_initiator_finish_with_fuzzed_message_b
+INFO:__main__:Check build passed.

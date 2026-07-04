@@ -1,10 +1,10 @@
 # OSS-Fuzz Staging
 
-This directory stages the files intended for a future `google/oss-fuzz/projects/cpace-x25519` upstream pull request. The active fuzz targets remain in this repository in `fuzz_test.go` and are registered locally in `.github/fuzz-targets.json`, where each entry names the target function, package, and OSS-Fuzz binary name; `go test ./...` checks those entries against this build script.
+This directory stages the files used by the `google/oss-fuzz/projects/cpace-x25519` upstream pull request. The active fuzz targets remain in this repository in `fuzz_test.go` and are registered locally in `.github/fuzz-targets.json`, where each entry names the target function, package, and OSS-Fuzz binary name; `go test ./...` checks those entries against this build script.
 
-For the eventual upstream OSS-Fuzz PR, prefer a small delegate `build.sh` in `google/oss-fuzz/projects/cpace-x25519` that executes this repository's `ossfuzz/build.sh` instead of duplicating the target list there.
+For the upstream OSS-Fuzz PR, use a small delegate `build.sh` in `google/oss-fuzz/projects/cpace-x25519` that executes this repository's `ossfuzz/build.sh` instead of duplicating the target list there.
 
-Before opening the upstream OSS-Fuzz PR:
+Before opening or updating the upstream OSS-Fuzz PR:
 
 1. Copy these files into a fork of `google/oss-fuzz` under `projects/cpace-x25519`.
 2. Confirm `primary_contact` in `project.yaml` is the maintainer
@@ -38,4 +38,6 @@ DOCKER_DEFAULT_PLATFORM=linux/amd64 python3 infra/helper.py build_fuzzers --arch
 DOCKER_DEFAULT_PLATFORM=linux/amd64 python3 infra/helper.py check_build cpace
 ```
 
-Fresh cpace-x25519 OSS-Fuzz validation and a new upstream submission are still required before treating OSS-Fuzz onboarding as current for this fork.
+Fresh cpace-x25519 local validation passed on 2026-07-04 against commit `a2f892f785991b8ac20d60979c1f32639287f0d4`, and a new upstream submission is open as `google/oss-fuzz#15838`. Raw logs, binary registry comparison, host/tool metadata, and upstream PR metadata are committed under `docs/evidence/ossfuzz-a2f892f-20260704/`.
+
+OSS-Fuzz onboarding is not complete until the upstream project is accepted and merged by `google/oss-fuzz`, and later ClusterFuzz signal should be monitored separately.
