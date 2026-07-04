@@ -27,7 +27,22 @@ const (
 	rfc7748Iterated1    = "422c8e7a6227d7bca1350b3e2bb7279f7897b87bb6854b783c60e80311ae3079"
 	rfc7748Iterated1000 = "684cf59ba83309552800ef566f2f4d3c1c3887c49360e3875f2eb94d99532c51"
 	rfc7748Iterated1M   = "7c3911e0ab2586fd864497297e575e6f3bc601c0883c30df5f4dd2d24f665424"
+
+	x25519DraftInvalidY2 = "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f"
+	x25519DraftInvalidY6 = "daffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 )
+
+type x25519Fatalf interface {
+	Fatalf(format string, args ...any)
+}
+
+func x25519Hex(tb x25519Fatalf, s string) []byte {
+	out, err := hex.DecodeString(s)
+	if err != nil {
+		tb.Fatalf("invalid hex fixture %q: %v", s, err)
+	}
+	return out
+}
 
 func x25519BasepointEncoding() []byte {
 	b := make([]byte, pointSize)
@@ -43,9 +58,9 @@ func TestX25519RFC7748Vectors(t *testing.T) {
 		{"vector1", rfc7748Scalar1, rfc7748U1, rfc7748Out1},
 		{"vector2", rfc7748Scalar2, rfc7748U2, rfc7748Out2},
 	} {
-		scalar := hx(t, tc.scalar)
-		u := hx(t, tc.u)
-		want := hx(t, tc.out)
+		scalar := x25519Hex(t, tc.scalar)
+		u := x25519Hex(t, tc.u)
+		want := x25519Hex(t, tc.out)
 
 		got, err := scalarMult(scalar, u)
 		if err != nil {
@@ -126,23 +141,17 @@ func ecdhX25519(scalar, point []byte) ([]byte, error) {
 // out transcription and drift divergence, not shared-ancestor design flaws;
 // those remain with the hash-pinned draft fixtures and independent review.
 func FuzzX25519DifferentialECDH(f *testing.F) {
-	invalid := fuzzDraftInvalidVector(f)
-	seedScalar := invalid.Valid["s"]
+	seedScalar := x25519Hex(f, rfc7748Scalar1)
 	if len(seedScalar) != scalarSize {
 		f.Fatalf("invalid scalar fixture length=%d", len(seedScalar))
 	}
-	f.Add(hx(f, rfc7748Scalar1), hx(f, rfc7748U1))
-	f.Add(hx(f, rfc7748Scalar2), hx(f, rfc7748U2))
-	f.Add(hx(f, rfc7748Scalar1), x25519BasepointEncoding())
-	if validX := invalid.Valid["X"]; len(validX) == pointSize {
-		f.Add(seedScalar, validX)
-	}
+	f.Add(seedScalar, x25519Hex(f, rfc7748U1))
+	f.Add(x25519Hex(f, rfc7748Scalar2), x25519Hex(f, rfc7748U2))
+	f.Add(seedScalar, x25519BasepointEncoding())
 	// One rejected low-order encoding and one accepted non-canonical encoding
 	// from the draft fixture, so both oracle branches have seed coverage.
-	for _, name := range []string{"Invalid Y2", "Invalid Y6"} {
-		if p := invalid.LowOrder[name]; len(p) == pointSize {
-			f.Add(seedScalar, p)
-		}
+	for _, point := range [][]byte{x25519Hex(f, x25519DraftInvalidY2), x25519Hex(f, x25519DraftInvalidY6)} {
+		f.Add(seedScalar, point)
 	}
 	f.Add(make([]byte, scalarSize), make([]byte, pointSize))
 	f.Add(bytes.Repeat([]byte{0xff}, scalarSize), bytes.Repeat([]byte{0xff}, pointSize))
