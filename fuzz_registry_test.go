@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -460,6 +461,73 @@ func helper() {}
 	}
 }
 
+func TestFuzzTargetSelfContainmentNormalizesFilePaths(t *testing.T) {
+	fset := token.NewFileSet()
+	dir := t.TempDir()
+	files := []*ast.File{
+		parseGoSource(t, fset, filepath.Join(dir, "target_test.go"), `package p
+
+import "testing"
+
+func FuzzTarget(f *testing.F) {
+	helper()
+}
+`),
+		parseGoSource(t, fset, filepath.Join(dir, "helper_test.go"), `package p
+
+func helper() {}
+`),
+	}
+	entries := []fuzzTargetRegistryEntry{{
+		Target:  "FuzzTarget",
+		Package: ".",
+		Binary:  "fuzz_target",
+	}}
+
+	violations := findFuzzTargetSelfContainmentViolations(t, fset, files, entries)
+	if len(violations) != 1 {
+		t.Fatalf("violations count=%d want 1: %#v", len(violations), violations)
+	}
+	if got := violations[0]; got.TargetFile != "target_test.go" || got.DeclFile != "helper_test.go" {
+		t.Fatalf("violation=%#v", got)
+	}
+}
+
+func TestFuzzTargetRegistryDiscoveryUsesPackageDirectory(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get cwd: %v", err)
+	}
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatalf("chdir away from package: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(cwd); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	})
+
+	fset, files := parseRootPackageGoFiles(t)
+	if len(files) == 0 {
+		t.Fatal("parseRootPackageGoFiles returned no files")
+	}
+	if got := goFileName(fset, files[0].Pos()); got == "" || filepath.IsAbs(got) {
+		t.Fatalf("normalized file name = %q, want package-relative basename", got)
+	}
+	if targets := discoverDefinedFuzzTargets(t); len(targets) == 0 {
+		t.Fatal("discoverDefinedFuzzTargets returned no targets")
+	}
+	if entries := readFuzzTargetRegistry(t); len(entries) == 0 {
+		t.Fatal("readFuzzTargetRegistry returned no entries")
+	}
+	if targets := readOSSFuzzBuildTargets(t); len(targets) == 0 {
+		t.Fatal("readOSSFuzzBuildTargets returned no targets")
+	}
+	if module := readModulePath(t); module == "" {
+		t.Fatal("readModulePath returned empty module")
+	}
+}
+
 func findFuzzTargetSelfContainmentViolations(tb testing.TB, fset *token.FileSet, files []*ast.File, entries []fuzzTargetRegistryEntry) []fuzzTargetSelfContainmentViolation {
 	tb.Helper()
 
@@ -472,7 +540,7 @@ func findFuzzTargetSelfContainmentViolations(tb testing.TB, fset *token.FileSet,
 
 	targetsByFile := make(map[string]map[string]struct{})
 	for _, file := range files {
-		filename := fset.Position(file.Pos()).Filename
+		filename := goFileName(fset, file.Pos())
 		testingNames := testingImportNames(file)
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
@@ -500,7 +568,7 @@ func findFuzzTargetSelfContainmentViolations(tb testing.TB, fset *token.FileSet,
 		Importer: importer.Default(),
 		Error:    func(error) {},
 	}
-	pkg, _ := conf.Check(files[0].Name.Name, fset, files, info)
+	pkg, _ := conf.Check(packageName(files), fset, files, info)
 	if pkg == nil {
 		tb.Fatal("type-check fuzz target package did not return a package")
 	}
@@ -517,8 +585,8 @@ func findFuzzTargetSelfContainmentViolations(tb testing.TB, fset *token.FileSet,
 		if obj.Pkg() != pkg {
 			return
 		}
-		declFile := fset.Position(obj.Pos()).Filename
-		if declFile == "" || declFile == targetFile || !strings.HasSuffix(declFile, "_test.go") {
+		declFile := goFileName(fset, obj.Pos())
+		if declFile == "" || declFile == targetFile || !isTestGoFile(declFile) {
 			return
 		}
 		targets := affectedTargets(targetFile)
@@ -554,14 +622,14 @@ func findFuzzTargetSelfContainmentViolations(tb testing.TB, fset *token.FileSet,
 	}
 
 	for ident, obj := range info.Uses {
-		useFile := fset.Position(ident.Pos()).Filename
+		useFile := goFileName(fset, ident.Pos())
 		if _, ok := targetsByFile[useFile]; !ok {
 			continue
 		}
 		addViolation(useFile, obj)
 	}
 	for selector, selection := range info.Selections {
-		useFile := fset.Position(selector.Sel.Pos()).Filename
+		useFile := goFileName(fset, selector.Sel.Pos())
 		if _, ok := targetsByFile[useFile]; !ok {
 			continue
 		}
@@ -592,8 +660,8 @@ func findFuzzTargetSelfContainmentViolations(tb testing.TB, fset *token.FileSet,
 func selfContainedTargetTypeErrors(fset *token.FileSet, files []*ast.File, targetFile string) []string {
 	var isolated []*ast.File
 	for _, file := range files {
-		filename := fset.Position(file.Pos()).Filename
-		if filename == targetFile || !strings.HasSuffix(filename, "_test.go") {
+		filename := goFileName(fset, file.Pos())
+		if filename == targetFile || !isTestGoFile(filename) {
 			isolated = append(isolated, file)
 		}
 	}
@@ -606,7 +674,7 @@ func selfContainedTargetTypeErrors(fset *token.FileSet, files []*ast.File, targe
 			if !errors.As(err, &typeErr) {
 				return
 			}
-			if fset.Position(typeErr.Pos).Filename == targetFile {
+			if goFileName(fset, typeErr.Pos) == targetFile {
 				if isImportResolutionNoise(fset, files, targetFile, typeErr) {
 					return
 				}
@@ -614,7 +682,7 @@ func selfContainedTargetTypeErrors(fset *token.FileSet, files []*ast.File, targe
 			}
 		},
 	}
-	_, _ = conf.Check(files[0].Name.Name, fset, isolated, nil)
+	_, _ = conf.Check(packageName(isolated), fset, isolated, nil)
 	sort.Strings(details)
 	return details
 }
@@ -624,7 +692,7 @@ func isImportResolutionNoise(fset *token.FileSet, files []*ast.File, targetFile 
 		return true
 	}
 	for _, file := range files {
-		if fset.Position(file.Pos()).Filename != targetFile {
+		if goFileName(fset, file.Pos()) != targetFile {
 			continue
 		}
 		for _, spec := range file.Imports {
@@ -650,10 +718,7 @@ func detailMentionsObjectName(detail, name string) bool {
 func parseRootPackageGoFiles(tb testing.TB) (*token.FileSet, []*ast.File) {
 	tb.Helper()
 
-	names, err := filepath.Glob("*.go")
-	if err != nil {
-		tb.Fatalf("list *.go files: %v", err)
-	}
+	names := packageSourceFiles(tb, "*.go")
 
 	fset := token.NewFileSet()
 	var files []*ast.File
@@ -673,6 +738,53 @@ func parseRootPackageGoFiles(tb testing.TB) (*token.FileSet, []*ast.File) {
 	return fset, files
 }
 
+func packageSourceFiles(tb testing.TB, pattern string) []string {
+	tb.Helper()
+
+	names, err := filepath.Glob(packageFilePath(tb, pattern))
+	if err != nil {
+		tb.Fatalf("list %s files: %v", pattern, err)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func packageFilePath(tb testing.TB, name string) string {
+	tb.Helper()
+
+	_, sourceFile, _, ok := runtime.Caller(0)
+	if !ok {
+		tb.Fatal("locate fuzz registry test source")
+	}
+	return filepath.Join(filepath.Dir(sourceFile), name)
+}
+
+func goFileName(fset *token.FileSet, pos token.Pos) string {
+	filename := fset.Position(pos).Filename
+	if filename == "" {
+		return ""
+	}
+	return filepath.Base(filepath.Clean(filename))
+}
+
+func isTestGoFile(filename string) bool {
+	return strings.HasSuffix(goFileBase(filename), "_test.go")
+}
+
+func goFileBase(filename string) string {
+	if filename == "" {
+		return ""
+	}
+	return filepath.Base(filepath.Clean(filename))
+}
+
+func packageName(files []*ast.File) string {
+	if len(files) == 0 {
+		return "cpace"
+	}
+	return files[0].Name.Name
+}
+
 func parseGoSource(tb testing.TB, fset *token.FileSet, name, source string) *ast.File {
 	tb.Helper()
 	parsed, err := parser.ParseFile(fset, name, source, 0)
@@ -685,7 +797,7 @@ func parseGoSource(tb testing.TB, fset *token.FileSet, name, source string) *ast
 func readFuzzTargetRegistry(tb testing.TB) []fuzzTargetRegistryEntry {
 	tb.Helper()
 
-	data, err := os.ReadFile(".github/fuzz-targets.json")
+	data, err := os.ReadFile(packageFilePath(tb, ".github/fuzz-targets.json"))
 	if err != nil {
 		tb.Fatalf("read .github/fuzz-targets.json: %v", err)
 	}
@@ -706,10 +818,7 @@ func readFuzzTargetRegistry(tb testing.TB) []fuzzTargetRegistryEntry {
 func discoverDefinedFuzzTargets(tb testing.TB) map[string]struct{} {
 	tb.Helper()
 
-	files, err := filepath.Glob("*_test.go")
-	if err != nil {
-		tb.Fatalf("list *_test.go files: %v", err)
-	}
+	files := packageSourceFiles(tb, "*_test.go")
 
 	fset := token.NewFileSet()
 	var parsedFiles []*ast.File
@@ -790,7 +899,7 @@ func testingImportNames(file *ast.File) map[string]struct{} {
 func readOSSFuzzBuildTargets(tb testing.TB) []ossFuzzBuildTarget {
 	tb.Helper()
 
-	data, err := os.ReadFile("ossfuzz/build.sh")
+	data, err := os.ReadFile(packageFilePath(tb, "ossfuzz/build.sh"))
 	if err != nil {
 		tb.Fatalf("read ossfuzz/build.sh: %v", err)
 	}
@@ -823,7 +932,7 @@ func readOSSFuzzBuildTargets(tb testing.TB) []ossFuzzBuildTarget {
 func readModulePath(tb testing.TB) string {
 	tb.Helper()
 
-	data, err := os.ReadFile("go.mod")
+	data, err := os.ReadFile(packageFilePath(tb, "go.mod"))
 	if err != nil {
 		tb.Fatalf("read go.mod: %v", err)
 	}
