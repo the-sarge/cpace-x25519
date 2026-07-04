@@ -2857,3 +2857,34 @@ Merged PR #23, which made the registered OSS-Fuzz target files self-contained fo
 **Next**
 
 Continue issue #7 by rerunning OSS-Fuzz validation against merged `main`, opening the fresh `google/oss-fuzz` `projects/cpace-x25519` submission, and recording the evidence bundle/docs.
+
+---
+
+## OSS-Fuzz onboarding evidence landed - 2026-07-03 23:36 EDT
+
+**Main:** `97ec86cac756`
+**Actor:** Codex
+
+**Summary**
+
+Merged PR #26, `Record cpace-x25519 OSS-Fuzz onboarding evidence`, as squash commit `97ec86cac756fa883d138cdb77067e92e41936c0`. The PR completes issue #7's local OSS-Fuzz validation and upstream-submission slice by adding `docs/evidence/ossfuzz-a2f892f-20260704/`, updating the evidence baseline and OSS-Fuzz/fuzzing project docs, and recording the fresh upstream submission `google/oss-fuzz#15838` for `projects/cpace-x25519`.
+
+**Completed**
+
+- Recorded local OSS-Fuzz validation for cpace commit `a2f892f785991b8ac20d60979c1f32639287f0d4`, including `build_image`, `build_fuzzers`, `check_build`, a 15-target registry comparison, host/tool metadata, upstream PR metadata, and `SHA256SUMS`.
+- Opened upstream OSS-Fuzz PR `google/oss-fuzz#15838` from the submitted `the-sarge/oss-fuzz` branch head `2cc262938096d54fd5d6d658018058403cdbd611`.
+- Updated `CHANGELOG.md`, `docs/evidence-baseline.md`, `docs/external-review-handoff.md`, `docs/fuzz-evidence.md`, `docs/project-plan.md`, and `ossfuzz/README.md` to describe the local validation status and remaining upstream-acceptance work.
+- RAS review `20260704T030451-ec0245a48a300fa399ef56d1` found evidence-process blockers in the first pushed head; local fixes corrected the OSS-Fuzz branch SHA, summary-doc tracking, build-fuzzers provenance, and line-ending provenance.
+- RAS verification resolved those blockers at pushed head `692d212fbc2888714ce1c75ee00644316b086884`; fresh RAS review `20260704T032317-22ece66e9a81b6a41298c4ef` had only one low-severity docs-only wording finding, which was fixed in `6b2a0077d8cae307e5c0b34d15d02f5bcbe27641` with the required RAS re-run skipped by policy.
+- Follow-up issue #27, created from the earlier low/nit evidence findings, was closed as resolved by the PR #26 fixes before merge.
+
+**Validation**
+
+- Local evidence checks included `(cd docs/evidence/ossfuzz-a2f892f-20260704 && shasum -a 256 -c SHA256SUMS)`, `task docs:check`, `task evidence:baseline`, `go test ./...`, `task check:changed`, and `task check`.
+- The fresh OSS-Fuzz validation command set passed locally: `DOCKER_DEFAULT_PLATFORM=linux/amd64 python3 infra/helper.py build_image --architecture x86_64 --pull cpace-x25519`, `DOCKER_DEFAULT_PLATFORM=linux/amd64 python3 infra/helper.py build_fuzzers --architecture x86_64 --sanitizer address --clean cpace-x25519 /Users/josh/code/github.com/the-sarge/cpace-x25519`, and `DOCKER_DEFAULT_PLATFORM=linux/amd64 python3 infra/helper.py check_build --architecture x86_64 --sanitizer address cpace-x25519`.
+- GitHub PR checks on final head `6b2a0077d8cae307e5c0b34d15d02f5bcbe27641` passed before merge: Check, DCO, Dependency Gate, SAST Gate, and gosec.
+
+**Next**
+
+- Monitor `google/oss-fuzz#15838` for upstream review, acceptance, scheduled ClusterFuzz builds, coverage, and crash signal; PR #26 records only local validation plus upstream submission.
+- Existing follow-up issue #24 remains open for adding a lightweight guard around OSS-Fuzz target self-containment; PR #26 did not create any remaining open review follow-up issues.
