@@ -289,45 +289,6 @@ func overDeclaredMessageField(spec messageSpec, fieldIndex int) []byte {
 	return appendLEB128(msg, declaredLength+1)
 }
 
-func messageAFuzzSeeds(validA, crossRoleB, invalidY []byte) [][]byte {
-	return messageFuzzSeeds(messageASpec, validA, crossRoleB, invalidY)
-}
-
-func messageAProtocolFuzzSeeds(validA, crossRoleB, invalidY []byte) [][]byte {
-	seeds := messageAFuzzSeeds(validA, crossRoleB, invalidY)
-	seeds = append(seeds, messageWithDecodedField(messageASpec, validA, 0, []byte("other sid")))
-	return seeds
-}
-
-func messageBFuzzSeeds(validB, crossRoleC, invalidY []byte) [][]byte {
-	return messageFuzzSeeds(messageBSpec, validB, crossRoleC, invalidY)
-}
-
-func messageCFuzzSeeds(validC, crossRoleA []byte) [][]byte {
-	return messageFuzzSeeds(messageCSpec, validC, crossRoleA, nil)
-}
-
-func messageFuzzSeeds(spec messageSpec, valid, crossRole, invalidY []byte) [][]byte {
-	seeds := [][]byte{
-		clone(valid),
-		truncatedMessage(valid),
-		withMessageRole(valid, otherMessageRole(spec.role)),
-		append(messageHeader(spec.role), 0x80, 0x00),
-	}
-	if pointIndex, ok := spec.exactFieldIndex(pointSize); ok {
-		seeds = append(seeds, messageWithDecodedField(spec, valid, pointIndex, identityEncoding))
-		if invalidY != nil {
-			seeds = append(seeds, messageWithDecodedField(spec, valid, pointIndex, invalidY))
-		}
-	}
-	if tagIndex, ok := spec.exactFieldIndex(tagSize); ok {
-		seeds = append(seeds, messageWithDecodedField(spec, valid, tagIndex, bytes.Repeat([]byte{0x99}, tagSize-1)))
-		seeds = append(seeds, withMessageTamperedLastByte(valid))
-	}
-	seeds = append(seeds, clone(crossRole))
-	return seeds
-}
-
 func TestMessageAProtocolFuzzSeedsPreserveValidFields(t *testing.T) {
 	initInput, respInput := defaultExchangeInputs()
 	exchange := newExchange(t, initInput, respInput)
@@ -590,84 +551,6 @@ func TestMessageFuzzSeedsSkipsAbsentExactFieldLengths(t *testing.T) {
 	}
 }
 
-func (spec messageSpec) exactFieldIndex(length int) (int, bool) {
-	found := -1
-	foundName := ""
-	for i, field := range spec.fields {
-		if field.exact && field.length == length {
-			if found >= 0 {
-				panic(fmt.Sprintf("cpace test: %s has ambiguous exact %d-byte field: %s and %s", spec.name, length, foundName, field.name))
-			}
-			found = i
-			foundName = field.name
-		}
-	}
-	if found < 0 {
-		return 0, false
-	}
-	return found, true
-}
-
-func exactMessageFieldBytes(spec messageSpec, length int, fill byte, delta int) []byte {
-	i, ok := spec.exactFieldIndex(length)
-	if !ok {
-		panic("cpace test: exact message field missing from catalogue")
-	}
-	n := max(spec.fields[i].length+delta, 0)
-	return bytes.Repeat([]byte{fill}, n)
-}
-
-func messageWithDecodedField(spec messageSpec, msg []byte, fieldIndex int, value []byte) []byte {
-	fields, err := spec.decode(msg)
-	if err != nil {
-		panic(fmt.Sprintf("cpace test: valid %s message failed to decode: %v", spec.name, err))
-	}
-	fields[fieldIndex] = value
-	return spec.encode(fields...)
-}
-
-func (spec messageSpec) acceptsFieldLengths(fields ...[]byte) bool {
-	if len(fields) != len(spec.fields) {
-		return false
-	}
-	remainingSpecs := spec.fields
-	for _, got := range fields {
-		field := remainingSpecs[0]
-		remainingSpecs = remainingSpecs[1:]
-		if err := field.validateMessageLength(len(got)); err != nil {
-			return false
-		}
-	}
-	return true
-}
-
-func messageFieldsMatchFramingShape(spec messageSpec, fields ...[]byte) bool {
-	if len(fields) != len(spec.fields) {
-		return false
-	}
-	// Keep this independent from acceptsFieldLengths and validateMessageLength so round-trip fuzzers can detect decoder acceptance drift.
-	remainingSpecs := spec.fields
-	for _, got := range fields {
-		field := remainingSpecs[0]
-		remainingSpecs = remainingSpecs[1:]
-		gotLength := len(got)
-		if field.exact {
-			if gotLength != field.length {
-				return false
-			}
-			continue
-		}
-		if gotLength > field.length {
-			return false
-		}
-	}
-	return true
-}
-
-func messageHeader(role byte) []byte {
-	return []byte{wireFormatV1, wireSuite, role}
-}
-
 func decodeMessageFromCatalogue(msg []byte) error {
 	if len(msg) < messageHeaderSize {
 		return fmt.Errorf("cpace test: message framing catalogue case has short header")
@@ -694,36 +577,4 @@ func withMessageHeader(msg []byte, format, suite, role byte) []byte {
 		out[2] = role
 	}
 	return out
-}
-
-func withMessageRole(msg []byte, role byte) []byte {
-	out := clone(msg)
-	if len(out) > 2 {
-		out[2] = role
-	}
-	return out
-}
-
-func withMessageTamperedLastByte(msg []byte) []byte {
-	out := clone(msg)
-	if len(out) > 0 {
-		out[len(out)-1] ^= 0x01
-	}
-	return out
-}
-
-func truncatedMessage(msg []byte) []byte {
-	if len(msg) == 0 {
-		return nil
-	}
-	return clone(msg[:len(msg)-1])
-}
-
-func otherMessageRole(role byte) byte {
-	for _, spec := range messageFramingCatalogue() {
-		if spec.role != role {
-			return spec.role
-		}
-	}
-	return 0xff
 }
