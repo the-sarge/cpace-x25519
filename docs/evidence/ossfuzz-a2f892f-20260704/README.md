@@ -14,12 +14,12 @@ DOCKER_DEFAULT_PLATFORM=linux/amd64 python3 infra/helper.py check_build --archit
 
 All three commands passed. `built-binaries.txt` contains the 15 produced cpace-x25519 fuzzer binaries plus `llvm-symbolizer`; `registered-binaries.txt` contains the 15 binaries from `.github/fuzz-targets.json`; `binary-diff.txt` is empty after excluding `llvm-symbolizer`.
 
-The committed `build-fuzzers-address-x86_64.log` is a recapture of the same `build_fuzzers` command against a detached worktree at `a2f892f785991b8ac20d60979c1f32639287f0d4`; it includes the capture wrapper's `helper exit status: 0` marker because the helper does not print a success banner after the final Go dependency-download line.
+The committed `build-fuzzers-address-x86_64.log` recaptures the successful `build_fuzzers` command against a detached worktree at `a2f892f785991b8ac20d60979c1f32639287f0d4`. That helper is quiet after Go dependency resolution, so the final `helper exit status: 0` line is a wrapper-added marker; target-level confirmation comes from `built-binaries.txt`, empty `binary-diff.txt`, and `check-build-address-x86_64.log`.
 
 ## Files
 
 - `build-image-x86_64.log`: OSS-Fuzz image build transcript with pulled base image digests.
-- `build-fuzzers-address-x86_64.log`: clean address-sanitizer fuzzer build transcript recaptured against the detached `a2f892f785991b8ac20d60979c1f32639287f0d4` worktree, including the capture wrapper exit-status marker.
+- `build-fuzzers-address-x86_64.log`: successful address-sanitizer fuzzer build transcript recaptured against the detached `a2f892f785991b8ac20d60979c1f32639287f0d4` worktree; the helper output is quiet after dependency resolution and the exit-status marker is wrapper-added.
 - `check-build-address-x86_64.log`: OSS-Fuzz `check_build` transcript, line-ending normalized from mixed CRLF/LF to LF after capture without changing log messages.
 - `built-binaries.txt`, `registered-binaries.txt`, `binary-diff.txt`: binary registry comparison.
 - `google-oss-fuzz-pr-15838.json`: upstream PR metadata captured with `gh pr view`.
