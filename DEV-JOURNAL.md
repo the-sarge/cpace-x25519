@@ -2888,3 +2888,16 @@ Merged PR #26, `Record cpace-x25519 OSS-Fuzz onboarding evidence`, as squash com
 
 - Monitor `google/oss-fuzz#15838` for upstream review, acceptance, scheduled ClusterFuzz builds, coverage, and crash signal; PR #26 records only local validation plus upstream submission.
 - Existing follow-up issue #24 remains open for adding a lightweight guard around OSS-Fuzz target self-containment; PR #26 did not create any remaining open review follow-up issues.
+
+---
+
+## Sage fixture provenance pinned - 2026-07-04 09:13 EDT
+
+**Main:** `59742a64d9c8`
+**Actor:** Codex
+
+Recorded the landing of PR #29, which closed issues #20 and #21 by pinning Sage fixture provenance to the immutable SageMath image digest and adding regression coverage that rejects mutable `:latest` provenance in the generated fixture metadata.
+
+Validation before merge included targeted Sage fixture tests, `go test ./...`, `task check:changed`, and `task check`; GitHub required checks were green at head `2d17254a4c57f4070cd3841ec4fc5613315fca9c`.
+
+RAS review loop completed with initial review `20260704T042120-0bcc18f90001c655cbb32185`, verification at `bf7deb0597773981086cb57b25e3f5ab735e0037`, and fresh review `20260704T043322-e812d60eb2d6d06e3055ed57`; only cheap docs/comment polish remained and was handled under the docs-only low/nit policy without another RAS rerun.
