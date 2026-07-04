@@ -81,5 +81,4 @@ Before any production-readiness claim:
 ## Later Investigation
 
 - Longer continuous fuzzing campaigns.
-- Offline Sage-derived extended vector dataset.
 - Caller input field-policy concentration: issue #136 was evaluated after the caller-input follow-up coverage landed. Keep the current small `input.go` validation/copy/normalization functions until future caller-input changes create drift; a private field-policy catalogue is not worth adding now without a behavior-preserving simplification.
